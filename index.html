@@ -41,7 +41,7 @@
                     // Намираме маршрута за този детайл
                     let myRoute = routes.filter(r => String(r['Код на детайла']).trim() === dId);
                     
-                    // Намираме първата незавършена операция (тя ще свети в синьо)
+                    // Намираме първата незавършена операция
                     let activeOp = null;
                     for (let step of myRoute) {
                         let opName = step['Име на операция'];
@@ -51,7 +51,7 @@
                         
                         if (produced < target) {
                             activeOp = { name: opName, current: produced, target: target };
-                            break; // Спираме тук, това е текущата операция
+                            break; 
                         }
                     }
 
@@ -73,7 +73,12 @@
                 grid.innerHTML = `<div class="error">ГРЕШКА: ${err.message}</div>`;
             }
         }
+
+        // Стартираме първоначално зареждане
         init();
+
+        // Автоматично обновяване на всеки 30 секунди (30000 милисекунди)
+        setInterval(init, 30000);
     </script>
 </body>
 </html>
