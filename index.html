@@ -2,83 +2,54 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>Производствен Монитор</title>
+    <title>Диагностика</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background-color: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; }
-        h1 { text-align: center; color: #60a5fa; }
-        #dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; border-top: 4px solid #60a5fa; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .detail-name { font-size: 22px; font-weight: bold; color: #fff; margin-bottom: 10px; }
-        .active-op { background: #1e3a8a; padding: 15px; border-radius: 8px; border-left: 5px solid #60a5fa; }
-        .error { color: #f87171; background: #450a0a; padding: 10px; border-radius: 5px; }
+        body { background: #1a1a1a; color: #fff; font-family: monospace; padding: 20px; }
+        .log { border-bottom: 1px solid #444; padding: 5px; color: #00ff00; }
     </style>
 </head>
 <body>
-    <h1>Активни задачи</h1>
-    <div id="dashboard-grid">Зареждане на данните...</div>
+    <h1>Диагностика на монитора</h1>
+    <div id="log-container"></div>
 
     <script>
+        const log = (msg) => {
+            const div = document.createElement('div');
+            div.className = 'log';
+            div.innerText = "> " + msg;
+            document.getElementById('log-container').appendChild(div);
+        };
+
         const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
 
         const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function init() {
-            const grid = document.getElementById('dashboard-grid');
+            log("Започвам връзка със Supabase...");
             try {
-                // Извличаме данните
-                const { data: plan } = await client.from('plan').select('*');
-                const { data: routes } = await client.from('marshruti').select('*');
-                const { data: reports } = await client.from('otcheti').select('*');
+                const { data: plan, error: planErr } = await client.from('plan').select('*');
+                if (planErr) { log("ГРЕШКА при таблица 'plan': " + planErr.message); return; }
+                log("Успешно извлякох " + plan.length + " записа от 'plan'.");
 
-                grid.innerHTML = ''; 
+                const { data: routes, error: routeErr } = await client.from('marshruti').select('*');
+                if (routeErr) { log("ГРЕШКА при таблица 'marshruti': " + routeErr.message); return; }
+                log("Успешно извлякох " + routes.length + " записа от 'marshruti'.");
 
-                plan.forEach(p => {
-                    let dId = String(p['ID Детайл']).trim();
-                    let target = p['Целево количество'] || 10;
-                    
-                    // Намираме маршрута за този детайл
-                    let myRoute = routes.filter(r => String(r['Код на детайла']).trim() === dId);
-                    
-                    // Намираме първата незавършена операция
-                    let activeOp = null;
-                    for (let step of myRoute) {
-                        let opName = step['Име на операция'];
-                        let produced = reports
-                            .filter(r => String(r['ID Детайл']).trim() === dId && r['Операция'] === opName)
-                            .reduce((sum, r) => sum + (parseInt(r['Количество']) || 0), 0);
-                        
-                        if (produced < target) {
-                            activeOp = { name: opName, current: produced, target: target };
-                            break; 
-                        }
-                    }
+                const { data: reports, error: repErr } = await client.from('otcheti').select('*');
+                if (repErr) { log("ГРЕШКА при таблица 'otcheti': " + repErr.message); return; }
+                log("Успешно извлякох " + reports.length + " записа от 'otcheti'.");
 
-                    // Показваме карта само ако има активна операция
-                    if (activeOp) {
-                        const card = document.createElement('div');
-                        card.className = 'card';
-                        card.innerHTML = `
-                            <div class="detail-name">${dId}</div>
-                            <div class="active-op">
-                                <div>Операция: <b>${activeOp.name}</b></div>
-                                <div style="font-size: 24px; margin-top: 10px;">${activeOp.current} / ${activeOp.target}</div>
-                            </div>
-                        `;
-                        grid.appendChild(card);
-                    }
-                });
+                log("Всички данни са заредени. Анализирам...");
+                
+                if (plan.length === 0) { log("Внимание: Таблица 'plan' е ПРАЗНА."); }
+
             } catch (err) {
-                grid.innerHTML = `<div class="error">ГРЕШКА: ${err.message}</div>`;
+                log("КРИТИЧНА ГРЕШКА: " + err.message);
             }
         }
-
-        // Стартираме първоначално зареждане
         init();
-
-        // Автоматично обновяване на всеки 30 секунди (30000 милисекунди)
-        setInterval(init, 30000);
     </script>
 </body>
 </html>
