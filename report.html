@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Отчитане на бройки</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f4f8; }
+        .form-card { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #60a5fa; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="form-card">
+        <h2>Отчет на продукция</h2>
+        <input type="text" id="dId" placeholder="Код на детайла">
+        <input type="text" id="opName" placeholder="Операция">
+        <input type="number" id="qty" placeholder="Количество">
+        <button onclick="submitData()">Запиши в системата</button>
+        <p id="msg"></p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function submitData() {
+            const dId = document.getElementById('dId').value;
+            const op = document.getElementById('opName').value;
+            const qty = parseInt(document.getElementById('qty').value);
+            const msg = document.getElementById('msg');
+
+            const { error } = await client.from('otcheti').insert([
+                { 'ID Детайл': dId, 'Операция': op, 'Количество': qty }
+            ]);
+
+            if (error) {
+                msg.innerText = "Грешка: " + error.message;
+                msg.style.color = "red";
+            } else {
+                msg.innerText = "Успешно записано!";
+                msg.style.color = "green";
+                document.getElementById('dId').value = '';
+                document.getElementById('qty').value = '';
+            }
+        }
+    </script>
+</body>
+</html>
