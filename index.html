@@ -81,11 +81,14 @@
                 }
             });
 
+            // ПОПРАВКАТА Е ТУК: Правилно извикване на функцията за Mermaid v9
             try {
-                const { svg } = await mermaid.render('prodTree', graphDef);
-                container.innerHTML = svg;
+                mermaid.render('prodTree', graphDef, function(svgCode) {
+                    container.innerHTML = svgCode;
+                });
             } catch (err) {
                 console.error("Грешка при чертане на дървото:", err);
+                container.innerHTML = '<p style="color: #ef4444;">Грешка при генериране на графиката.</p>';
             }
         }
         
