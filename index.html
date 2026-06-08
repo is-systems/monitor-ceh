@@ -2,92 +2,89 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>Производствен Монитор - Активен</title>
+    <title>Производствен Монитор</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background-color: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; }
         h1 { text-align: center; color: #60a5fa; }
-        #dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
-        
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .detail-name { font-size: 24px; font-weight: bold; color: #60a5fa; margin-bottom: 15px; border-bottom: 2px solid #334155; padding-bottom: 10px; }
-        
-        /* Стилизиране на операцията */
-        .active-op { background: #1e3a8a; border-left: 6px solid #60a5fa; padding: 20px; border-radius: 8px; }
-        .active-op span { color: #fff; font-size: 22px; }
-        .qty-box { font-size: 28px; font-weight: bold; color: #fff; }
+        #dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; border-top: 4px solid #60a5fa; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .detail-name { font-size: 22px; font-weight: bold; color: #fff; margin-bottom: 10px; }
+        .active-op { background: #1e3a8a; padding: 15px; border-radius: 8px; border-left: 5px solid #60a5fa; }
+        .error { color: #f87171; background: #450a0a; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <h1>Активни задачи</h1>
-    <div id="dashboard-grid">Зареждане на задачите...</div>
+    <div id="dashboard-grid">Зареждане на връзката...</div>
 
     <script>
-        const client = supabase.createClient('URL', 'KEY'); // Сложи твоите ключове тук
+        // Твоите данни от Supabase
+        const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function init() {
-            // 1. Взимаме всички данни
-            const [ {data: plan}, {data: bom}, {data: stock}, {data: routes}, {data: reports} ] = await Promise.all([
-                client.from('plan').select('*'),
-                client.from('bom').select('*'),
-                client.from('stock').select('*'),
-                client.from('marshruti').select('*'),
-                client.from('otcheti').select('*')
-            ]);
-
             const grid = document.getElementById('dashboard-grid');
-            grid.innerHTML = '';
+            
+            try {
+                // 1. Взимаме данните
+                const { data: plan } = await client.from('plan').select('*');
+                const { data: routes } = await client.from('marshruti').select('*');
+                const { data: reports } = await client.from('otcheti').select('*');
 
-            // 2. Логика: За всеки детайл в плана
-            plan.forEach(p => {
-                let dId = p['ID Детайл'];
-                let neededTotal = p['Количество']; // Колко резолвера трябват
-                
-                // Взимаме поддетайлите от BOM
-                let subParts = bom.filter(b => b.parent_id === dId);
+                grid.innerHTML = ''; // Изчистваме "Зареждане..."
 
-                subParts.forEach(sub => {
-                    let subId = sub.child_id;
-                    let target = (sub.qty_per_unit * neededTotal) - (stock.find(s => s.id === subId)?.qty || 0);
+                if (!plan || plan.length === 0) {
+                    grid.innerHTML = "Няма данни в плана.";
+                    return;
+                }
 
-                    // Намираме маршрута за този поддетайл
-                    let route = routes.filter(r => r['Код на детайла'] === subId);
+                // 2. Логика
+                plan.forEach(p => {
+                    let dId = String(p['ID Детайл']).trim();
+                    let target = p['Целево количество'] || 10;
+
+                    // Намираме маршрута за този детайл
+                    let myRoute = routes.filter(r => String(r['Код на детайла']).trim() === dId);
                     
-                    // Намираме ПЪРВАТА недовършена операция
+                    // Намираме първата незавършена операция
                     let activeOp = null;
-                    for (let step of route) {
-                        let produced = reports.filter(r => r['ID Детайл'] === subId && r['Операция'] === step['Име на операция'])
-                                              .reduce((sum, r) => sum + r['Количество'], 0);
+                    for (let step of myRoute) {
+                        let opName = step['Име на операция'];
+                        let produced = reports
+                            .filter(r => String(r['ID Детайл']).trim() === dId && r['Операция'] === opName)
+                            .reduce((sum, r) => sum + (parseInt(r['Количество']) || 0), 0);
                         
                         if (produced < target) {
-                            activeOp = { name: step['Име на операция'], current: produced, target: target };
-                            break; // Намерихме я - спираме търсенето (скриваме следващите)
+                            activeOp = { name: opName, current: produced, target: target };
+                            break; 
                         }
                     }
 
-                    // Рендерираме само ако има активна операция
+                    // 3. Рендериране
                     if (activeOp) {
                         const card = document.createElement('div');
                         card.className = 'card';
                         card.innerHTML = `
-                            <div class="detail-name">${subId} (за ${dId})</div>
+                            <div class="detail-name">${dId}</div>
                             <div class="active-op">
-                                <span>Операция: <b>${activeOp.name}</b></span>
-                                <div class="qty-box">${activeOp.current} / ${activeOp.target}</div>
+                                <div>Операция: <b>${activeOp.name}</b></div>
+                                <div style="font-size: 24px; margin-top: 10px;">${activeOp.current} / ${activeOp.target}</div>
                             </div>
                         `;
                         grid.appendChild(card);
                     }
                 });
-            });
+
+            } catch (err) {
+                grid.innerHTML = `<div class="error">ГРЕШКА: ${err.message}</div>`;
+                console.error(err);
+            }
         }
+
         init();
     </script>
 </body>
 </html>
-const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co'; // Твоят адрес
-const SUPABASE_KEY = 'ТУК_ТВОЯТ_КЛЮЧ'; 
-
-console.log("Адресът, който използвам е:", SUPABASE_URL); // Добави това!
-
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
