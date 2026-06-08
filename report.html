@@ -2,50 +2,141 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>Отчитане на бройки</title>
+    <title>Система за отчитане</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f4f8; }
-        .form-card { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #60a5fa; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
+        .container { max-width: 500px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        h1 { border-bottom: 2px solid #334155; padding-bottom: 10px; font-size: 24px; margin-top: 0; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px; }
+        select, input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 16px; box-sizing: border-box; }
+        select:focus, input:focus { outline: none; border-color: #60a5fa; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #1d4ed8; }
+        #message { margin-top: 15px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="form-card">
-        <h2>Отчет на продукция</h2>
-        <input type="text" id="dId" placeholder="Код на детайла">
-        <input type="text" id="opName" placeholder="Операция">
-        <input type="number" id="qty" placeholder="Количество">
-        <button onclick="submitData()">Запиши в системата</button>
-        <p id="msg"></p>
+
+    <div class="container">
+        <h1>Отчитане на операция</h1>
+        <form id="reportForm">
+            
+            <div class="form-group">
+                <label for="operator">Име на работник / Оператор:</label>
+                <input type="text" id="operator" required placeholder="Напр. Иван Иванов">
+            </div>
+
+            <div class="form-group">
+                <label for="detail">Избери Детайл (Само активни по план):</label>
+                <select id="detail" required>
+                    <option value="">-- Зареждане на детайли... --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="operation">Избери Операция:</label>
+                <select id="operation" required>
+                    <option value="">-- Първо избери детайл --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="quantity">Изработено количество:</label>
+                <input type="number" id="quantity" required min="1" value="1">
+            </div>
+
+            <button type="submit">Изпрати отчет</button>
+            <div id="message"></div>
+        </form>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
-        const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const client = supabase.createClient(
+            'https://zdythzcgcjxwbxufunuh.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
+        );
 
-        async function submitData() {
-            const dId = document.getElementById('dId').value;
-            const op = document.getElementById('opName').value;
-            const qty = parseInt(document.getElementById('qty').value);
-            const msg = document.getElementById('msg');
+        let activeTasks = []; // Тук ще пазим данните от базата
 
-            const { error } = await client.from('otcheti').insert([
-                { 'ID Детайл': dId, 'Операция': op, 'Количество': qty }
-            ]);
+        async function initApp() {
+            const detailSelect = document.getElementById('detail');
+            
+            // Дърпаме само разрешените задачи от новия изглед
+            const { data, error } = await client.from('активни_задачи_за_отчитане').select('*');
+
+            if (error || !data || data.length === 0) {
+                detailSelect.innerHTML = '<option value="">Няма активен план в момента</option>';
+                return;
+            }
+
+            activeTasks = data;
+
+            // Извличаме само уникалните имена на детайли, за да няма повтарящи се в менюто
+            const uniqueDetails = [...new Set(activeTasks.map(task => task.разрешен_детайл))];
+            
+            detailSelect.innerHTML = '<option value="">-- Избери детайл --</option>';
+            uniqueDetails.forEach(det => {
+                detailSelect.innerHTML += `<option value="${det}">${det}</option>`;
+            });
+        }
+
+        // Когато работникът избере детайл, променяме менюто с операциите
+        document.getElementById('detail').addEventListener('change', function(e) {
+            const selectedDetail = e.target.value;
+            const opSelect = document.getElementById('operation');
+            
+            opSelect.innerHTML = '<option value="">-- Избери операция --</option>';
+            
+            if (!selectedDetail) return;
+
+            // Филтрираме операциите само за избрания детайл
+            const relevantOps = activeTasks.filter(task => task.разрешен_детайл === selectedDetail);
+            
+            relevantOps.forEach(op => {
+                opSelect.innerHTML += `<option value="${op.име_операция}">${op.номер_операция} - ${op.име_операция}</option>`;
+            });
+        });
+
+        // Какво се случва, когато се натисне бутонът "Изпрати"
+        document.getElementById('reportForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // Спира презареждането на страницата
+            
+            const btn = document.querySelector('button');
+            const msg = document.getElementById('message');
+            btn.disabled = true;
+            btn.innerText = 'Изпращане...';
+
+            const payload = {
+                "ID Детайл": document.getElementById('detail').value,
+                "Оператор": document.getElementById('operator').value,
+                "Количество": document.getElementById('quantity').value,
+                "Операция": document.getElementById('operation').value,
+                "Статус": "Отчетено", // Слагаме базов статус, за да не остава празна колоната
+                "Дата": new Date().toISOString() // Записва точния час и дата на изпращане
+            };
+
+            const { error } = await client.from('otcheti').insert([payload]);
 
             if (error) {
-                msg.innerText = "Грешка: " + error.message;
-                msg.style.color = "red";
+                msg.style.color = '#ef4444';
+                msg.innerText = 'Възникна грешка при изпращането!';
+                console.error(error);
             } else {
-                msg.innerText = "Успешно записано!";
-                msg.style.color = "green";
-                document.getElementById('dId').value = '';
-                document.getElementById('qty').value = '';
+                msg.style.color = '#16a34a';
+                msg.innerText = 'Отчетът е записан успешно!';
+                document.getElementById('reportForm').reset(); // Изчиства формата
+                document.getElementById('operation').innerHTML = '<option value="">-- Първо избери детайл --</option>';
             }
-        }
+
+            btn.disabled = false;
+            btn.innerText = 'Изпрати отчет';
+            setTimeout(() => msg.innerText = '', 4000); // Скрива съобщението след 4 секунди
+        });
+
+        // Стартираме приложението при отваряне на страницата
+        initApp();
     </script>
 </body>
 </html>
