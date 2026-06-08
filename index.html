@@ -2,29 +2,29 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>Производствен Монитор - Графика</title>
+    <title>Производствен Монитор</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
     <style>
         body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
-        h1 { border-bottom: 2px solid #334155; padding-bottom: 10px; }
+        h1 { border-bottom: 2px solid #334155; padding-bottom: 10px; font-size: 22px; }
         #graph-container { 
             background: #1e293b; 
-            padding: 20px; 
+            padding: 30px; 
             border-radius: 8px; 
             margin-top: 20px; 
-            overflow-x: auto; /* Позволява скролиране, ако графиката стане много голяма */
-            text-align: center;
+            overflow-x: auto; 
+            display: flex;
+            justify-content: center;
         }
     </style>
 </head>
 <body>
 
-    <h1>Активни производствени потоци</h1>
-    <div id="graph-container">Зареждане на графиката...</div>
+    <h1>Живо проследяване на производството</h1>
+    <div id="graph-container">Зареждане на данните...</div>
 
     <script>
-        // Инициализация на чертожника (с тъмна тема, за да си ходи с дизайна)
         mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
         const client = supabase.createClient(
@@ -35,44 +35,57 @@
         async function init() {
             const container = document.getElementById('graph-container');
             
-            const { data: materials, error } = await client.from('общ_план_материали').select('*');
+            // Зареждаме вече пресметнатите статуси от новия изглед
+            const { data: statusData, error } = await client.from('монитор_статус').select('*');
 
-            if (error || !materials || materials.length === 0) {
-                container.innerHTML = '<p style="color: #ef4444;">Грешка или липсващ план.</p>';
+            if (error || !statusData || statusData.length === 0) {
+                container.innerHTML = '<p style="color: #ef4444;">Няма активни процеси или възникна грешка.</p>';
                 return;
             }
 
-            // Започваме да пишем "кода" за графиката. RL означава Right-to-Left (от дясно на ляво)
-            let graphDefinition = 'graph RL\n';
+            // graph RL означава Right-to-Left (децата вдясно, крайният продукт вляво)
+            let graphDef = 'graph RL\n';
 
-            // Дефинираме цветовете
-            graphDefinition += 'classDef done fill:#16a34a,color:#fff,stroke:#fff;\n';    // Зелено
-            graphDefinition += 'classDef active fill:#2563eb,color:#fff,stroke:#fff;\n';  // Синьо
-            graphDefinition += 'classDef pending fill:#475569,color:#fff,stroke:#fff;\n'; // Сиво (чакащи)
+            // Дефинираме стиловете за кутийките
+            graphDef += 'classDef ready fill:#16a34a,color:#fff,stroke:#4ade80,stroke-width:2px;\n';   // Зелено
+            graphDef += 'classDef active fill:#2563eb,color:#fff,stroke:#60a5fa,stroke-width:2px;\n';  // Синьо
+            graphDef += 'classDef pending fill:#334155,color:#94a3b8,stroke:#475569,stroke-width:1px;\n'; // Тъмно сиво
 
-            materials.forEach(item => {
-                // Създаваме уникални ID-та за кутийките (премахваме интервали и символи)
-                let parentId = 'node_' + item.текущ_родител.replace(/[^a-zA-Z0-9]/g, '');
-                let childId = 'node_' + item.детайл_код.replace(/[^a-zA-Z0-9]/g, '');
+            // Винаги показваме крайните продукти (ниво 1), за да има корен дървото
+            const rootNodes = new Set();
 
-                // Рисуваме кутийките с имената на детайлите и нужните бройки
-                graphDefinition += `  ${parentId}["${item.текущ_родител}"]\n`;
-                graphDefinition += `  ${childId}["${item.детайл_код} (${item.общо_необходимо_количество} бр.)"]\n`;
+            statusData.forEach(item => {
+                let pId = 'node_' + item.текущ_родител.replace(/[^a-zA-Z0-9]/g, '');
+                let cId = 'node_' + item.детайл_код.replace(/[^a-zA-Z0-9]/g, '');
 
-                // Рисуваме стрелката между тях. За момента текстът е тестов.
-                graphDefinition += `  ${childId} -->|"Чака операция"| ${parentId}\n`;
-                
-                // За момента правим всичко сиво (pending). По-късно ще добавим логиката за зелено и синьо.
-                graphDefinition += `  class ${parentId} pending;\n`;
-                graphDefinition += `  class ${childId} pending;\n`;
+                if (item.ниво === 1) {
+                    rootNodes.add(item.текущ_родител);
+                    graphDef += `  ${pId}["${item.текущ_родител}"]\n`;
+                    graphDef += `  class ${pId} ready;\n`; // Крайният продукт по подразбиране го държим видим
+                }
+
+                // Логика за показване:
+                // Ако статусът е 'Чакащ', не чертаем стрелка и кутийка (скриваме го), 
+                // за да е чист екранът, освен ако не искаш да се вижда всичко.
+                if (item.статус !== 'Чакащ') {
+                    graphDef += `  ${cId}["${item.детайл_код}"]\n`;
+                    
+                    let opText = item.статус === 'Готов' ? 'Готов за монтаж' : (item.текуща_операция_име || 'В процес');
+                    
+                    // Рисуваме стрелката с операцията под/над нея
+                    graphDef += `  ${cId} -->|"${opText}"| ${pId}\n`;
+                    
+                    // Оцветяваме възела
+                    let cssClass = item.статус === 'Готов' ? 'ready' : 'active';
+                    graphDef += `  class ${cId} ${cssClass};\n`;
+                }
             });
 
-            // Караме библиотеката да нарисува графиката на екрана
             try {
-                const { svg } = await mermaid.render('productionGraph', graphDefinition);
+                const { svg } = await mermaid.render('prodTree', graphDef);
                 container.innerHTML = svg;
             } catch (err) {
-                console.error("Грешка при чертане:", err);
+                console.error("Грешка при чертане на дървото:", err);
             }
         }
         
