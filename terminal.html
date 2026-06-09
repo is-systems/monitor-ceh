@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MES Терминал</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+      body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
+      .container { padding: 10px; display: flex; flex-direction: column; align-items: center; }
+      
+      /* Подобрен хедър за кликане */
+      .app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
+      .editable-header { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 6px; transition: background 0.2s; }
+      .editable-header:active { background: #f1f5f9; }
+      .edit-icon { font-size: 0.9em; opacity: 0.4; }
+      
+      .machine-title { font-weight: 800; color: #2980b9; text-transform: uppercase; font-size: 1.1em;}
+      .operator-name { font-size: 0.85em; color: #7f8c8d; font-weight: bold; }
+      #tasksContainer { width: 100%; max-width: 450px; margin-top: 15px; }
+      .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 100%; box-sizing: border-box; position: relative; }
+      .card-blue { border-left: 8px solid #3498db; }
+      .card-green { border-left: 8px solid #2ecc71; }
+      .op-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+      .detail-title { font-size: 1.1em; font-weight: 800; color: #2c3e50; line-height: 1.2; max-width: 70%; }
+      .qty-badge { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; font-weight: bold; }
+      input[type="number"] { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; text-align: center; font-size: 1.3em; font-weight: bold; box-sizing: border-box; }
+      .btn, .btn-danger { color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em; }
+      .btn { background: #16a34a; flex: 1; }
+      .btn-danger { background: #e74c3c; flex: 0.4; }
+      .poka-yoke { margin-top: 12px; padding: 8px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 0.85em; }
+      .status-ok { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+      .status-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+      
+      .local-history { display: none; position: fixed; bottom: 80px; right: 15px; background: rgba(255,255,255,0.98); border: 1px solid #cbd5e1; padding: 15px 12px 12px 12px; border-radius: 12px; width: 300px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-size: 13px; z-index: 9000; }
+      .local-history h4 { margin: 0 0 10px 0; color: #475569; text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;}
+      .history-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+      .history-item { padding: 8px 0; border-bottom: 1px dashed #e2e8f0; color: #334155; display: flex; flex-direction: column; }
+      .history-item:last-child { border-bottom: none; }
+      .history-time { color: #64748b; font-weight: bold; font-size: 11px; margin-bottom: 2px;}
+      
+      .history-toggle-btn { position: fixed; bottom: 15px; right: 15px; background: #334155; color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; z-index: 9001; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+      .history-toggle-btn:active { background: #1e293b; transform: scale(0.95); }
+      .close-history-btn { position: absolute; top: 10px; right: 10px; background: transparent; border: none; font-size: 16px; cursor: pointer; color: #94a3b8; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="app-header">
+      <div class="editable-header" onclick="changeOperator()" title="Смени оператор">
+        <div>
+          <div style="font-weight:bold; color:#34495e;">MES ТЕРМИНАЛ</div>
+          <div class="operator-name" id="uiOperatorName">ОПЕРАТОР</div>
+        </div>
+        <span class="edit-icon">✏️</span>
+      </div>
+      
+      <div class="editable-header" onclick="changeMachine()" title="Смени машина">
+        <div class="machine-title" id="uiMachineName">ВСИЧКИ</div>
+        <span class="edit-icon">✏️</span>
+      </div>
+    </div>
+    
+    <div class="container">
+      <div id="tasksContainer">
+         <div id="loadingMsg" style="text-align:center; padding: 20px; font-weight:bold; color:#7f8c8d;">Търсене на задачи... 🔍</div>
+         <div id="cardsArea"></div>
+      </div>
+    </div>
+
+    <button class="history-toggle-btn" onclick="toggleHistory()" title="Покажи история">🕒</button>
+
+    <div class="local-history" id="historyPanel">
+      <button class="close-history-btn" onclick="toggleHistory()">✖</button>
+      <h4>🕒 История на този таблет</h4>
+      <ul id="historyList" class="history-list">
+        <li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>
+      </ul>
+    </div>
+
+    <script>
+      const client = supabase.createClient(
+        'https://zdythzcgcjxwbxufunuh.supabase.co', 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
+      );
+
+      let currentOperator = localStorage.getItem('mes_operator');
+      let currentMachine = localStorage.getItem('mes_machine');
+
+      if (!currentOperator) {
+        currentOperator = prompt("Добър ден! Моля, въведи своето име (напр. Иван Иванов):", "Оператор");
+        localStorage.setItem('mes_operator', currentOperator);
+      }
+      if (!currentMachine && currentMachine !== "") {
+        currentMachine = prompt("За коя машина е този таблет? (Остави празно за всички задачи)", "");
+        localStorage.setItem('mes_machine', currentMachine || "");
+      }
+
+      document.getElementById('uiOperatorName').innerText = currentOperator || "Анонимен";
+      document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
+
+      // ФУНКЦИИ ЗА СМЯНА В ДВИЖЕНИЕ
+      function changeOperator() {
+        let newOp = prompt("Смяна на оператор. Въведи ново име:", currentOperator);
+        if (newOp !== null && newOp.trim() !== "") {
+          currentOperator = newOp.trim();
+          localStorage.setItem('mes_operator', currentOperator);
+          document.getElementById('uiOperatorName').innerText = currentOperator;
+        }
+      }
+
+      function changeMachine() {
+        let newMach = prompt("Смяна на машина. Въведи име на машината (остави празно за всички задачи):", currentMachine);
+        if (newMach !== null) {
+          currentMachine = newMach.trim();
+          localStorage.setItem('mes_machine', currentMachine);
+          document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
+          // Автоматично презареждаме задачите за новата машина
+          loadTasks(); 
+        }
+      }
+
+      let globalTasks = []; 
+      let localHistoryData = [];
+      
+      function updateHistoryUI() {
+        var list = document.getElementById('historyList');
+        if (localHistoryData.length === 0) {
+          list.innerHTML = '<li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>';
+          return;
+        }
+        var html = '';
+        localHistoryData.forEach(item => {
+           var color = item.type === 'БРАК' ? '#e74c3c' : '#16a34a';
+           html += `<li class="history-item">
+                      <span class="history-time">${item.time}</span>
+                      <span><span style="color:${color}; font-weight:bold;">${item.qty} бр.</span> ${item.name}</span>
+                    </li>`;
+        });
+        list.innerHTML = html;
+      }
+
+      function toggleHistory() {
+        var panel = document.getElementById('historyPanel');
+        panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+      }
+
+      function addLogToHistory(type, qty, taskId) {
+         var now = new Date();
+         var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+         var titleEl = document.querySelector('#card_' + taskId + ' .detail-title');
+         var name = titleEl ? titleEl.innerText.replace(' 🔗', '') : 'Детайл';
+         
+         localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name });
+         if (localHistoryData.length > 6) localHistoryData.pop(); 
+         updateHistoryUI();
+      }
+
+      async function loadTasks() {
+        document.getElementById('cardsArea').innerHTML = '';
+        document.getElementById('loadingMsg').style.display = 'block';
+        
+        let query = client.from('канбан_екран').select('*');
+        
+        if (currentMachine && currentMachine.trim() !== "") {
+            query = query.ilike('machine', `%${currentMachine}%`);
+        }
+
+        const { data: tasks, error } = await query;
+
+        if (error) {
+            document.getElementById('loadingMsg').innerHTML = '❌ ' + error.message;
+            return;
+        }
+
+        globalTasks = tasks;
+        renderTasks(globalTasks);
+      }
+
+      function renderTasks(tasks) {
+        document.getElementById('loadingMsg').style.display = 'none';
+        var container = document.getElementById('cardsArea');
+        
+        var blueTasks = tasks.filter(t => t.type === "СИНЯ");
+        var greenTasks = tasks.filter(t => t.type === "ЗЕЛЕНА");
+        var tasksToRender = (blueTasks.length > 0) ? blueTasks : greenTasks;
+
+        if(tasksToRender.length === 0) { 
+          container.innerHTML = '<div style="text-align:center; margin-top:30px; font-size:1.2em; color: #27ae60; font-weight: bold;">🎉 Няма активни задачи за тази машина!</div>';
+          return;
+        }
+        
+        var html = '';
+        tasksToRender.forEach(function(t) {
+          var cardClass = (t.type === "ЗЕЛЕНА") ? "card-green" : "card-blue";
+          
+          var linkHtml = t.name;
+          if (t.drawing_link && t.drawing_link.startsWith('http')) {
+             linkHtml = `<a href="${t.drawing_link}" target="_blank" style="color: #1e3a8a; font-weight: bold; text-decoration: underline;">${t.name} 🔗</a>`;
+          }
+
+          var sopHtml = (t.sop_link && t.sop_link.startsWith('http')) 
+              ? `<a href="${t.sop_link}" target="_blank" style="display:inline-block; margin-top:8px; background:#f39c12; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px;">📑 Отвори СОП</a>` : '';
+              
+          var descHtml = t.desc 
+              ? `<div style="background-color: #fef9c3; border-left: 4px solid #facc15; padding: 8px; margin-top: 8px; font-size: 13px; color: #854d0e; font-weight: 600;">💡 ${t.desc}</div>` : '';
+
+          var planBadge = `<div style="font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">ПЛАН: ${t.plan_id}</div>`;
+
+          html += `
+            <div class="card ${cardClass}" id="card_${t.id}">
+              <div class="op-header">
+                <div style="flex: 1; padding-right: 10px;">
+                  ${planBadge}
+                  <div class="detail-title">${linkHtml}</div>
+                  ${sopHtml}
+                  ${descHtml}
+                </div>
+                <div class="qty-badge">${t.qty} бр.</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+                <span style="font-weight: 800; color: #2980b9; font-size: 1.1em;">▶ ${t.op}</span> 
+                <span style="color: #cbd5e1; font-weight: 900;">➔</span> 
+                <span style="color: #94a3b8; font-weight: 600;">${t.next_op}</span>
+              </div>
+              <div class="poka-yoke status-ok">Свободна за поемане</div>
+              
+              <div id="free_state_${t.id}" style="display: block;">
+                <button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:pointer;">🚀 ПОЕМИ ЗАДАЧА</button>
+              </div>
+
+              <div id="focus_state_${t.id}" style="display: none;">
+                <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin-top: 15px; border: 2px solid #bae6fd;">
+                  <p style="color: #0369a1; font-weight: bold; text-align:center; margin-top:0;">🟢 Работиш по тази задача</p>
+                  <input type="number" id="qty_${t.id}" value="${t.qty}" inputmode="numeric" style="margin-bottom:12px;">
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn" id="btn_${t.id}" onclick="finishTask('${t.id}', this)">✅ ОТЧЕТИ</button>
+                    <button class="btn-danger" id="btn_scrap_${t.id}" onclick="reportScrap('${t.id}', this)">БРАК</button>
+                  </div>
+                  <button onclick="pauseTaskDOM('${t.id}')" style="background: transparent; color: #1e3a8a; border: 1px solid #3498db; padding: 12px; border-radius: 6px; font-weight: bold; width: 100%; margin-top: 15px; cursor: pointer;">📋 ПОЕМИ ДРУГА ЗАДАЧА</button>
+                </div>
+              </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+      }
+
+      function claimCurrentTaskDOM(taskId) {
+        if (navigator.vibrate) navigator.vibrate(50);
+        document.querySelectorAll('.card').forEach(c => { if (c.id !== 'card_' + taskId) c.style.display = 'none'; });
+        document.getElementById('free_state_' + taskId).style.display = 'none';
+        document.getElementById('focus_state_' + taskId).style.display = 'block';
+        document.querySelector('#card_' + taskId + ' .poka-yoke').innerText = "Изпълнява се...";
+      }
+
+      function pauseTaskDOM(taskId) {
+        if (navigator.vibrate) navigator.vibrate(50);
+        document.querySelectorAll('.card').forEach(c => c.style.display = 'block');
+        document.getElementById('free_state_' + taskId).style.display = 'block';
+        document.getElementById('focus_state_' + taskId).style.display = 'none';
+        document.querySelector('#card_' + taskId + ' .poka-yoke').innerText = "Свободна за поемане";
+      }
+
+      async function finishTask(taskId, btn) {
+        var inputElem = document.getElementById('qty_' + taskId);
+        if (!inputElem) return; var val = parseFloat(inputElem.value);
+        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
+
+        let taskData = globalTasks.find(t => t.id === taskId);
+
+        Swal.fire({ 
+          title: 'Сигурен ли си?', 
+          html: `Ще отчетеш <b style="color:#16a34a; font-size:1.2em;">${val} здрави бройки</b>.<br>Предаваш ли ги напред?`, 
+          icon: 'question', showCancelButton: true, confirmButtonColor: '#16a34a', cancelButtonColor: '#e74c3c', 
+          confirmButtonText: '🟢 ДА, ПРЕДАЙ', cancelButtonText: '🔴 ОПА, ГРЕШКА'
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            btn.disabled = true; btn.innerHTML = "ЗАПИС...";
+            Swal.fire({ title: 'Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            
+            const { error } = await client.from('otcheti').insert([{
+                "ID Детайл": taskData.name,
+                "Оператор": currentOperator,
+                "Количество": val,
+                "Операция": taskData.op,
+                "Статус": "Отчетено",
+                "Дата": new Date().toISOString()
+            }]);
+
+            if(error) {
+              Swal.fire('❌ Системна грешка', error.message, 'error');
+              btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ";
+            } else {
+              addLogToHistory('ГОТОВО', val, taskId); 
+              Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
+            }
+          }
+        });
+      }
+
+      async function reportScrap(taskId, btn) {
+        var inputElem = document.getElementById('qty_' + taskId);
+        if (!inputElem) return; var val = parseFloat(inputElem.value);
+        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
+        
+        let taskData = globalTasks.find(t => t.id === taskId);
+
+        Swal.fire({ 
+          title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', 
+          showCancelButton: true, confirmButtonColor: '#e74c3c', cancelButtonColor: '#94a3b8', 
+          confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ' 
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ title: 'Бракуване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            
+            const { error } = await client.from('otcheti').insert([{
+                "ID Детайл": taskData.name,
+                "Оператор": currentOperator,
+                "Количество": val,
+                "Операция": taskData.op,
+                "Статус": "Брак",
+                "Дата": new Date().toISOString()
+            }]);
+
+            if(error) {
+               Swal.fire('❌ Системна грешка', error.message, 'error');
+            } else {
+               addLogToHistory('БРАК', val, taskId); 
+               Swal.close(); loadTasks(); 
+            }
+          }
+        });
+      }
+      
+      window.onload = loadTasks;
+    </script>
+  </body>
+</html>
