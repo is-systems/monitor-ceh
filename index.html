@@ -1,98 +1,24 @@
-<!DOCTYPE html>
-<html lang="bg">
-<head>
-    <meta charset="UTF-8">
-    <title>Производствен Монитор</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
-    <style>
-        body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
-        h1 { border-bottom: 2px solid #334155; padding-bottom: 10px; font-size: 22px; }
-        #graph-container { 
-            background: #1e293b; 
-            padding: 30px; 
-            border-radius: 8px; 
-            margin-top: 20px; 
-            overflow-x: auto; 
-            display: flex;
-            justify-content: center;
-        }
-    </style>
-</head>
-<body>
+statusData.forEach(item => {
+    let pId = 'node_' + item.текущ_родител.replace(/[^a-zA-Z0-9]/g, '');
+    let cId = 'node_' + item.детайл_код.replace(/[^a-zA-Z0-9]/g, '');
 
-    <h1>Живо проследяване на производството</h1>
-    <div id="graph-container">Зареждане на данните...</div>
+    if (item.ниво === 1) {
+        rootNodes.add(item.текущ_родител);
+        graphDef += `  ${pId}["${item.текущ_родител}"]\n`;
+        graphDef += `  class ${pId} ready;\n`;
+    }
 
-    <script>
-        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-
-        const client = supabase.createClient(
-            'https://zdythzcgcjxwbxufunuh.supabase.co', 
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
-        );
-
-        async function init() {
-            const container = document.getElementById('graph-container');
-            
-            // Зареждаме вече пресметнатите статуси от новия изглед
-            const { data: statusData, error } = await client.from('монитор_статус').select('*');
-
-            if (error || !statusData || statusData.length === 0) {
-                container.innerHTML = '<p style="color: #ef4444;">Няма активни процеси или възникна грешка.</p>';
-                return;
-            }
-
-            // graph RL означава Right-to-Left (децата вдясно, крайният продукт вляво)
-            let graphDef = 'graph RL\n';
-
-            // Дефинираме стиловете за кутийките
-            graphDef += 'classDef ready fill:#16a34a,color:#fff,stroke:#4ade80,stroke-width:2px;\n';   // Зелено
-            graphDef += 'classDef active fill:#2563eb,color:#fff,stroke:#60a5fa,stroke-width:2px;\n';  // Синьо
-            graphDef += 'classDef pending fill:#334155,color:#94a3b8,stroke:#475569,stroke-width:1px;\n'; // Тъмно сиво
-
-            // Винаги показваме крайните продукти (ниво 1), за да има корен дървото
-            const rootNodes = new Set();
-
-            statusData.forEach(item => {
-                let pId = 'node_' + item.текущ_родител.replace(/[^a-zA-Z0-9]/g, '');
-                let cId = 'node_' + item.детайл_код.replace(/[^a-zA-Z0-9]/g, '');
-
-                if (item.ниво === 1) {
-                    rootNodes.add(item.текущ_родител);
-                    graphDef += `  ${pId}["${item.текущ_родител}"]\n`;
-                    graphDef += `  class ${pId} ready;\n`; // Крайният продукт по подразбиране го държим видим
-                }
-
-                // Логика за показване:
-                // Ако статусът е 'Чакащ', не чертаем стрелка и кутийка (скриваме го), 
-                // за да е чист екранът, освен ако не искаш да се вижда всичко.
-                if (item.статус !== 'Чакащ') {
-                    graphDef += `  ${cId}["${item.детайл_код}"]\n`;
-                    
-                    let opText = item.статус === 'Готов' ? 'Готов за монтаж' : (item.текуща_операция_име || 'В процес');
-                    
-                    // Рисуваме стрелката с операцията под/над нея
-                    graphDef += `  ${cId} -->|"${opText}"| ${pId}\n`;
-                    
-                    // Оцветяваме възела
-                    let cssClass = item.статус === 'Готов' ? 'ready' : 'active';
-                    graphDef += `  class ${cId} ${cssClass};\n`;
-                }
-            });
-
-            // ПОПРАВКАТА Е ТУК: Правилно извикване на функцията за Mermaid v9
-            try {
-                mermaid.render('prodTree', graphDef, function(svgCode) {
-                    container.innerHTML = svgCode;
-                });
-            } catch (err) {
-                console.error("Грешка при чертане на дървото:", err);
-                container.innerHTML = '<p style="color: #ef4444;">Грешка при генериране на графиката.</p>';
-            }
-        }
+    if (item.статус !== 'Чакащ') {
+        // ДОБАВЕНО: Форматираме текста с малки цифри за бройките на нов ред
+        let nodeLabel = `${item.детайл_код}<br/><span style='font-size: 11px; opacity: 0.8;'>(${item.изработено_количество} / ${item.общо_необходимо_количество} бр.)</span>`;
         
-        init();
-    </script>
-</body>
-</html>
+        graphDef += `  ${cId}["${nodeLabel}"]\n`;
+        
+        let opText = item.статус === 'Готов' ? 'Готов за монтаж' : (item.текуща_операция_име || 'В процес');
+        
+        graphDef += `  ${cId} -->|"${opText}"| ${pId}\n`;
+        
+        let cssClass = item.статус === 'Готов' ? 'ready' : 'active';
+        graphDef += `  class ${cId} ${cssClass};\n`;
+    }
+});
