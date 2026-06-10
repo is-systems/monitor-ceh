@@ -99,7 +99,6 @@
       document.getElementById('uiOperatorName').innerText = currentOperator || "Анонимен";
       document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
 
-      // ФУНКЦИИ ЗА СМЯНА В ДВИЖЕНИЕ
       function changeOperator() {
         let newOp = prompt("Смяна на оператор. Въведи ново име:", currentOperator);
         if (newOp !== null && newOp.trim() !== "") {
@@ -115,7 +114,6 @@
           currentMachine = newMach.trim();
           localStorage.setItem('mes_machine', currentMachine);
           document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
-          // Автоматично презареждаме задачите за новата машина
           loadTasks(); 
         }
       }
@@ -161,23 +159,28 @@
         document.getElementById('loadingMsg').style.display = 'block';
         
         let query = client.from('канбан_екран').select('*');
-        
         if (currentMachine && currentMachine.trim() !== "") {
             query = query.ilike('machine', `%${currentMachine}%`);
         }
 
-        const { data: tasks, error } = await query;
+        // НОВО: Теглим едновременно задачите и дървото с материалите
+        const [tasksResponse, masterResponse] = await Promise.all([
+            query,
+            client.from('монитор_мастър_данни').select('*')
+        ]);
 
-        if (error) {
-            document.getElementById('loadingMsg').innerHTML = '❌ ' + error.message;
+        if (tasksResponse.error) {
+            document.getElementById('loadingMsg').innerHTML = '❌ ' + tasksResponse.error.message;
             return;
         }
 
-        globalTasks = tasks;
-        renderTasks(globalTasks);
+        globalTasks = tasksResponse.data;
+        let masterData = masterResponse.data || [];
+        
+        renderTasks(globalTasks, masterData);
       }
 
-      function renderTasks(tasks) {
+      function renderTasks(tasks, masterData) {
         document.getElementById('loadingMsg').style.display = 'none';
         var container = document.getElementById('cardsArea');
         
@@ -207,6 +210,64 @@
 
           var planBadge = `<div style="font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">ПЛАН: ${t.plan_id}</div>`;
 
+          // ==========================================
+          // НОВО: УМНА ПРОВЕРКА НА НАЛИЧНОСТИТЕ (BOM)
+          // ==========================================
+          let possibleQty = t.qty; 
+          let blockingChildren = [];
+          let hasChildren = false;
+
+          if (masterData && masterData.length > 0) {
+              let pData = masterData.find(m => m.code === t.name && m.plan_id === t.plan_id);
+              let children = masterData.filter(m => m.parent_code === t.name && m.plan_id === t.plan_id);
+              
+              if (children.length > 0) {
+                  hasChildren = true;
+                  let parentReady = pData ? parseFloat(pData.ready_qty) || 0 : 0;
+                  let parentPlan = pData ? parseFloat(pData.plan_qty) || parseFloat(t.qty) : parseFloat(t.qty);
+                  
+                  let minPossible = Infinity;
+                  
+                  children.forEach(c => {
+                      let cPlan = parseFloat(c.plan_qty) || 0;
+                      let cReady = parseFloat(c.ready_qty) || 0; 
+                      if (parentPlan > 0 && cPlan > 0) {
+                          let multiplier = cPlan / parentPlan;
+                          let unused = cReady - (parentReady * multiplier);
+                          let canBuild = Math.floor(unused / multiplier);
+                          
+                          if (canBuild < minPossible) minPossible = canBuild;
+                          if (canBuild <= 0) blockingChildren.push(c.code);
+                      }
+                  });
+                  
+                  if (minPossible === Infinity || minPossible < 0) minPossible = 0;
+                  possibleQty = minPossible;
+              }
+          }
+
+          let bomBadgeHtml = '';
+          let actionButtonHtml = '';
+          let inputMaxHtml = '';
+          let isBlocked = (hasChildren && possibleQty <= 0);
+
+          if (hasChildren) {
+              if (isBlocked) {
+                  bomBadgeHtml = `<div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 8px; margin-top: 8px; font-size: 13px; color: #991b1b; font-weight: 600;">🚫 Липсват под-детайли: ${blockingChildren.join(', ')}</div>`;
+                  actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:not-allowed;">ИЗЧАКВАНЕ НА ДЕТАЙЛИ</button>`;
+                  inputMaxHtml = `max="0"`;
+              } else {
+                  bomBadgeHtml = `<div style="background-color: #dcfce7; border-left: 4px solid #22c55e; padding: 8px; margin-top: 8px; font-size: 13px; color: #166534; font-weight: 600;">✅ Възможни: ${possibleQty} бр.</div>`;
+                  actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:pointer;">🚀 ПОЕМИ ЗАДАЧА</button>`;
+                  inputMaxHtml = `max="${possibleQty}"`;
+              }
+          } else {
+              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:pointer;">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              inputMaxHtml = ``; // За първичните детайли няма лимит
+          }
+
+          let finalInputValue = hasChildren ? (isBlocked ? 0 : possibleQty) : t.qty;
+
           html += `
             <div class="card ${cardClass}" id="card_${t.id}">
               <div class="op-header">
@@ -215,6 +276,7 @@
                   <div class="detail-title">${linkHtml}</div>
                   ${sopHtml}
                   ${descHtml}
+                  ${bomBadgeHtml}
                 </div>
                 <div class="qty-badge">${t.qty} бр.</div>
               </div>
@@ -226,13 +288,13 @@
               <div class="poka-yoke status-ok">Свободна за поемане</div>
               
               <div id="free_state_${t.id}" style="display: block;">
-                <button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:pointer;">🚀 ПОЕМИ ЗАДАЧА</button>
+                ${actionButtonHtml}
               </div>
 
               <div id="focus_state_${t.id}" style="display: none;">
                 <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin-top: 15px; border: 2px solid #bae6fd;">
                   <p style="color: #0369a1; font-weight: bold; text-align:center; margin-top:0;">🟢 Работиш по тази задача</p>
-                  <input type="number" id="qty_${t.id}" value="${t.qty}" inputmode="numeric" style="margin-bottom:12px;">
+                  <input type="number" id="qty_${t.id}" value="${finalInputValue}" ${inputMaxHtml} inputmode="numeric" style="margin-bottom:12px;">
                   <div style="display: flex; gap: 8px;">
                     <button class="btn" id="btn_${t.id}" onclick="finishTask('${t.id}', this)">✅ ОТЧЕТИ</button>
                     <button class="btn-danger" id="btn_scrap_${t.id}" onclick="reportScrap('${t.id}', this)">БРАК</button>
@@ -263,8 +325,16 @@
 
       async function finishTask(taskId, btn) {
         var inputElem = document.getElementById('qty_' + taskId);
-        if (!inputElem) return; var val = parseFloat(inputElem.value);
+        if (!inputElem) return; 
+        var val = parseFloat(inputElem.value);
         if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
+
+        // ЗАЩИТА: Проверка дали не опитва да въведе повече от възможните бройки
+        let possibleLimit = parseFloat(inputElem.getAttribute('max'));
+        if (!isNaN(possibleLimit) && val > possibleLimit) {
+            Swal.fire('Невъзможно', `Разполагаш с материали само за ${possibleLimit} бр.!`, 'error');
+            return;
+        }
 
         let taskData = globalTasks.find(t => t.id === taskId);
 
@@ -303,6 +373,12 @@
         if (!inputElem) return; var val = parseFloat(inputElem.value);
         if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
         
+        let possibleLimit = parseFloat(inputElem.getAttribute('max'));
+        if (!isNaN(possibleLimit) && val > possibleLimit) {
+            Swal.fire('Невъзможно', `Разполагаш с материали само за ${possibleLimit} бр.!`, 'error');
+            return;
+        }
+
         let taskData = globalTasks.find(t => t.id === taskId);
 
         Swal.fire({ 
