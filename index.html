@@ -176,89 +176,79 @@
     };
 
     async function loadData() {
-        try {
-            const [nodesResponse, tasksResponse] = await Promise.all([
-                client.from('монитор_мастър_данни').select('*'),
-                client.from('канбан_екран').select('*')
-            ]);
+    try {
+        const [nodesResponse, tasksResponse] = await Promise.all([
+            client.from('монитор_мастър_данни').select('*'),
+            client.from('канбан_екран').select('*')
+        ]);
 
-            if (nodesResponse.error) throw nodesResponse.error;
-            if (tasksResponse.error) throw tasksResponse.error;
+        if (nodesResponse.error) throw nodesResponse.error;
+        if (tasksResponse.error) throw tasksResponse.error;
 
-            const nodesData = nodesResponse.data;
-            const activeTasks = tasksResponse.data;
+        const nodesData = nodesResponse.data;
+        const activeTasks = tasksResponse.data;
 
-            let masterData = {
-                tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
-                var11: [], var25: [], bearings: [],
-                small_pins: [], small_studs: [], small_rotors: [], small_others: []
+        let masterData = {
+            tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
+            var11: [], var25: [], bearings: [],
+            small_pins: [], small_studs: [], small_rotors: [], small_others: []
+        };
+        let connections = [];
+
+        nodesData.forEach(row => {
+            let n = {
+                id: row.node_id,
+                planId: row.plan_id,
+                code: row.code,
+                planQty: row.plan_qty,
+                warehouseQty: row.ready_qty,
+                globalState: row.ready_qty >= row.plan_qty ? 'green' : (row.ready_qty > 0 ? 'blue' : 'gray'),
+                operations: [],
+                drawingUrl: row.drawing_url
             };
-            let connections = [];
 
-            nodesData.forEach(row => {
-                let n = {
-                    id: row.node_id,
-                    planId: row.plan_id,
-                    code: row.code,
-                    planQty: row.plan_qty,
-                    warehouseQty: row.ready_qty,
-                    globalState: row.ready_qty >= row.plan_qty ? 'green' : (row.ready_qty > 0 ? 'blue' : 'gray'),
-                    operations: [],
-                    drawingUrl: row.drawing_url
-                };
+            let active = activeTasks.find(t => t.plan_id === row.plan_id && t.name === row.code);
+            if (active) {
+                n.globalState = 'blue';
+                n.operations.push({ name: active.op, state: 'blue', completed: row.ready_qty });
+            } else if (row.ready_qty >= row.plan_qty) {
+                n.operations.push({ name: 'Готов', state: 'green', completed: row.plan_qty });
+            } else {
+                n.operations.push({ name: 'Чакащ', state: 'gray', completed: row.ready_qty });
+            }
 
-                let active = activeTasks.find(t => t.plan_id === row.plan_id && t.name === row.code);
-                if (active) {
-                    n.globalState = 'blue';
-                    n.operations.push({ name: active.op, state: 'blue', completed: row.ready_qty });
-                } else if (row.ready_qty >= row.plan_qty) {
-                    n.operations.push({ name: 'Готов', state: 'green', completed: row.plan_qty });
-                } else {
-                    n.operations.push({ name: 'Чакащ', state: 'gray', completed: row.ready_qty });
-                }
+            if (row.parent_code && row.level > 1) {
+                connections.push({ from: row.node_id, to: row.plan_id + '_' + row.parent_code });
+            }
 
-                if (row.parent_code && row.level > 1) {
-                    connections.push({ from: row.node_id, to: row.plan_id + '_' + row.parent_code });
-                }
+            let code = row.code ? String(row.code) : "";
+            let partType = row.part_type ? String(row.part_type) : "";
+            let typeStr = (partType + " " + code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
+            
+            if (code.startsWith("575-")) {
+                masterData.assembly.push(n);
+            } else if (typeStr.includes("тяло")) masterData.tiela.push(n);
+            else if (typeStr.includes("преден")) masterData.predni.push(n);
+            else if (typeStr.includes("заден")) masterData.zadni.push(n);
+            else if (typeStr.includes("мпр")) masterData.mpr.push(n);
+            else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) masterData.statori.push(n);
+            else if (typeStr.includes("ротор") && typeStr.includes("11")) masterData.var11.push(n);
+            else if (typeStr.includes("ротор") && typeStr.includes("25")) masterData.var25.push(n);
+            else if (typeStr.includes("лагер")) masterData.bearings.push(n);
+            else {
+                if (typeStr.includes("щифт")) masterData.small_pins.push(n);
+                else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
+                else if (typeStr.includes("роторенпакет")) masterData.small_rotors.push(n);
+                else masterData.small_others.push(n);
+            }
+        });
 
-                // Използваме предоставените данни, за да разберем ролята на детайла
-                let hasChildren = nodesData.some(r => r.parent_code === n.code && r.plan_id === n.planId);
-                let isTopParent = (n.level === 1 || !row.parent_code); 
+        drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
 
-                if (isTopParent && hasChildren) {
-                    masterData.assembly.push(n);
-                } else {
-                    // Обединяваме Типа от Номенклатурата с Кода
-                let typeStr = ((row.part_type || '') + ' ' + row.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
-                
-                // 1. АБСОЛЮТНА ГАРАНЦИЯ: Крайният продукт (Резолверите)
-                // Проверяваме дали кодът започва с "575-" (ти каза, че това са резолверите)
-                if (row.code.startsWith("575-")) {
-                    masterData.assembly.push(n);
-                } 
-                // 2. Сортиране по Тип (директно от твоята Номенклатура)
-                else if (typeStr.includes("тяло")) masterData.tiela.push(n);
-                else if (typeStr.includes("преден") || typeStr.includes("преденкапак")) masterData.predni.push(n);
-                else if (typeStr.includes("заден") || typeStr.includes("заденкапак")) masterData.zadni.push(n);
-                else if (typeStr.includes("мпр")) masterData.mpr.push(n); // Тук ще отиде "тефлонова макара"
-                else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) masterData.statori.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("11")) masterData.var11.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("25")) masterData.var25.push(n);
-                else if (typeStr.includes("лагер")) masterData.bearings.push(n);
-                else {
-                    if (typeStr.includes("щифт")) masterData.small_pins.push(n);
-                    else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
-                    else if (typeStr.includes("роторенпакет")) masterData.small_rotors.push(n);
-                    else masterData.small_others.push(n);
-                }
-            }); 
-
-            drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
-
-        } catch (err) {
-            document.getElementById('error-box').innerText = "Грешка при комуникация със Supabase: " + err.message;
-        }
+    } catch (err) {
+        document.getElementById('error-box').innerText = "Грешка: " + err.message;
     }
+}
 
     function toggleTooltip(event, nodeId) {
       if (event) event.stopPropagation();
