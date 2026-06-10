@@ -221,11 +221,15 @@
                     connections.push({ from: row.node_id, to: row.plan_id + '_' + row.parent_code });
                 }
 
-                // НОВО: Обединяваме Типа от Номенклатурата с Кода на детайла за 100% точност
+                // Обединяваме Типа от Номенклатурата с Кода на детайла за 100% точност
                 let typeStr = ((row.part_type || '') + ' ' + row.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
-                // Умна логика за сортиране, базирана на Типа от Номенклатура
-                if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
+                // 1. АБСОЛЮТНА ГАРАНЦИЯ: Крайният продукт на всеки план ВИНАГИ отива в СГЛОБЯВАНЕ
+                if (row.level === 1) {
+                    masterData.assembly.push(n);
+                } 
+                // 2. Умна логика за сортиране, базирана на Типа от Номенклатура
+                else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
                 else if (typeStr.includes("преден") || typeStr.includes("предни")) masterData.predni.push(n);
                 else if (typeStr.includes("заден") || typeStr.includes("задни")) masterData.zadni.push(n);
                 else if (typeStr.includes("мпр")) masterData.mpr.push(n);
