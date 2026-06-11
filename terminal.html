@@ -154,22 +154,20 @@
          updateHistoryUI();
       }
 
-      async function loadTasks() {
-        document.getElementById('cardsArea').innerHTML = '';
-        document.getElementById('loadingMsg').style.display = 'block';
-        
-        try {
-            const [bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
-                client.from('общ_план_материали').select('*'),
+      try {
+            // Връзваме се към твоите точни таблици: plan и bom
+            const [plansRes, bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
+                client.from('plan').select('*'),
+                client.from('bom').select('*'),
                 client.from('marshruti').select('*'),
                 client.from('otcheti').select('*').eq('Статус', 'Отчетено'),
                 client.from('sklad').select('*') 
             ]);
 
+            if (plansRes.error) throw plansRes.error;
             if (bomRes.error) throw bomRes.error;
             if (routesRes.error) throw routesRes.error;
             if (reportsRes.error) throw reportsRes.error;
-            if (skladRes.error) console.warn("Проблем с таблица sklad:", skladRes.error.message);
 
             let completedOps = {}; 
             reportsRes.data.forEach(r => {
@@ -178,7 +176,6 @@
                 completedOps[key] += parseFloat(r['Количество']);
             });
 
-            // НОВО: Търсенето в Склад вече игнорира малки/главни букви!
             let skladData = skladRes.data || [];
             let getSkladQty = (code) => {
                 let codeLower = code.toLowerCase();
@@ -197,9 +194,40 @@
             });
 
             let planGroups = {}; 
-            bomRes.data.forEach(r => {
-                if(!planGroups[r.plan_id]) planGroups[r.plan_id] = [];
-                planGroups[r.plan_id].push(r);
+            let bomData = bomRes.data || [];
+
+            plansRes.data.forEach(plan => {
+                // Създаваме уникално име на плана от Месец и Година
+                let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim();
+                let rootItem = String(plan['ID Детайл']).trim();
+                let targetQty = parseFloat(plan['Целево количество']) || 0;
+
+                if(!planGroups[planId]) planGroups[planId] = [];
+
+                planGroups[planId].push({
+                    детайл_код: rootItem,
+                    текущ_родител: '',
+                    общо_необходимо_количество: targetQty
+                });
+
+                // Пренаписано разгръщане по колони: ID Родител, ID Компонент и Количество
+                function traverseAndAdd(parentName, parentQty) {
+                    let children = bomData.filter(b => String(b['ID Родител']).trim() === parentName);
+                    children.forEach(c => {
+                        let childName = String(c['ID Компонент']).trim();
+                        let multiplier = parseFloat(c['Количество']) || 1;
+                        let neededQty = parentQty * multiplier;
+
+                        planGroups[planId].push({
+                            детайл_код: childName,
+                            текущ_родител: parentName,
+                            общо_необходимо_количество: neededQty
+                        });
+
+                        traverseAndAdd(childName, neededQty);
+                    });
+                }
+                traverseAndAdd(rootItem, targetQty);
             });
 
             globalTasks = [];
