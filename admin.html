@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES Административен Панел</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+      body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+      
+      /* Навигация и Хедър */
+      .navbar { background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.3em; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
+      .nav-tabs { display: flex; gap: 8px; }
+      .tab-btn { background: transparent; border: none; padding: 10px 20px; font-weight: 600; font-size: 0.95em; color: #64748b; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
+      .tab-btn:hover { background-color: #f1f5f9; color: #0f172a; }
+      .tab-btn.active { background-color: #e0e7ff; color: #4338ca; }
+      .tab-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* Контейнер и Контроли */
+      .main-container { max-width: 1200px; margin: 30px auto; padding: 0 20px; box-sizing: border-box; }
+      .controls-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; }
+      .search-box { flex: 1; max-width: 400px; position: relative; }
+      .search-box input { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95em; box-sizing: border-box; outline: none; transition: border 0.2s; }
+      .search-box input:focus { border-color: #4338ca; box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.1); }
+      
+      /* Бутони */
+      .btn-primary { background-color: #4338ca; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s; font-size: 0.95em; }
+      .btn-primary:hover { background-color: #3730a3; }
+      .action-btn { background: transparent; border: none; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 1.1em; transition: background 0.2s; }
+      .action-btn:hover { background-color: #f1f5f9; }
+      .btn-edit { color: #2563eb; }
+      .btn-delete { color: #ef4444; }
+
+      /* Таблица */
+      .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; overflow: hidden; }
+      table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95em; }
+      th { background-color: #f8fafc; padding: 16px; font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.5px; }
+      td { padding: 16px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background-color: #f8fafc; }
+      
+      /* Статуси и Аларми */
+      .badge-warn { background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.85em; display: inline-flex; align-items: center; gap: 4px; }
+      
+      /* Модален Прозорец (Pop-up) */
+      .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+      .modal { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); width: 100%; max-width: 500px; box-sizing: border-box; animation: slideUp 0.2s ease-out; }
+      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .modal-header { font-size: 1.25em; font-weight: 700; margin-bottom: 20px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+      .form-group { margin-bottom: 16px; }
+      .form-group label { display: block; font-size: 0.85em; font-weight: 600; color: #475569; margin-bottom: 6px; text-transform: uppercase; }
+      .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1em; outline: none; }
+      .form-group input:focus { border-color: #4338ca; }
+      .form-group input[readonly] { background-color: #f1f5f9; color: #64748b; cursor: not-allowed; font-weight: bold; }
+      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+      .btn-secondary { background-color: #f1f5f9; color: #475569; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+      .btn-secondary:hover { background-color: #e2e8f0; }
+
+      #loadingLayout { text-align: center; padding: 40px; color: #64748b; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+
+    <div class="navbar">
+      <div class="brand">⚙️ MES Контрол Panel</div>
+      <div class="nav-tabs">
+        <button class="tab-btn active">📦 Склад (sklad)</button>
+        <button class="tab-btn disabled" title="Очаквайте скоро">📋 Общ План</button>
+        <button class="tab-btn disabled" title="Очаквайте скоро">🔄 Маршрути</button>
+        <button class="tab-btn disabled" title="Очаквайте скоро">📊 Отчети</button>
+      </div>
+    </div>
+
+    <div class="main-container">
+      <div class="controls-row">
+        <div class="search-box">
+          <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Търси по име на детайл...">
+        </div>
+        <button class="btn-primary" onclick="openAddModal()">➕ Добави Нов Детайл</button>
+      </div>
+
+      <div class="table-container">
+        <div id="loadingLayout">Зареждане на складовите наличности... 🔍</div>
+        <table id="skladTable" style="display: none;">
+          <thead>
+            <tr>
+              <th>ID Детайл</th>
+              <th>Начална наличност</th>
+              <th>Доставено</th>
+              <th>Изразходено</th>
+              <th>Остатък</th>
+              <th>Мин. количество</th>
+              <th style="text-align: center; width: 100px;">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop">
+      <div class="modal">
+        <div class="modal-header" id="modalTitle">✏️ Редакция на складов ред</div>
+        <form id="skladForm" onsubmit="saveForm(event)">
+          <input type="hidden" id="originalId">
+          
+          <div class="form-group">
+            <label for="detailId">ID Детайл / Код</label>
+            <input type="text" id="detailId" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="initQty">Начална наличност</label>
+              <input type="number" id="initQty" value="0" min="0" oninput="calculateBalance()" required>
+            </div>
+            <div class="form-group">
+              <label for="deliveredQty">Доставено</label>
+              <input type="number" id="deliveredQty" value="0" min="0" oninput="calculateBalance()" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="usedQty">Изразходено</label>
+              <input type="number" id="usedQty" value="0" min="0" oninput="calculateBalance()" required>
+            </div>
+            <div class="form-group">
+              <label for="minQty">Минимално к-во</label>
+              <input type="number" id="minQty" value="0" min="0" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="balanceQty">Остатък (Изчислява се автоматично)</label>
+            <input type="number" id="balanceQty" value="0" readonly>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeModal()">Отказ</button>
+            <button type="submit" class="btn-primary">Запази</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const client = supabase.createClient(
+        'https://zdythzcgcjxwbxufunuh.supabase.co', 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
+      );
+
+      let rawSkladData = [];
+      let isEditMode = false;
+
+      // Зареждане на данните при старт
+      async function loadSkladData() {
+        document.getElementById('loadingLayout').style.display = 'block';
+        document.getElementById('skladTable').style.display = 'none';
+
+        try {
+          const { data, error } = await client.from('sklad').select('*').order('ID Детайл', { ascending: true });
+          if (error) throw error;
+
+          rawSkladData = data || [];
+          renderTable(rawSkladData);
+        } catch (err) {
+          console.error(err);
+          document.getElementById('loadingLayout').innerHTML = '❌ Грешка при връзка със Supabase: ' + err.message;
+        }
+      }
+
+      // Построяване на таблицата на екрана
+      function renderTable(items) {
+        document.getElementById('loadingLayout').style.display = 'none';
+        document.getElementById('skfbTable')?.style.display == 'none';
+        const table = document.getElementById('skladTable');
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        if(items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:30px;">Няма намерени съвпадащи детайли.</td></tr>`;
+            table.style.display = 'table';
+            return;
+        }
+
+        items.forEach(item => {
+          const init = parseFloat(item['Начална наличност']) || 0;
+          const deliv = parseFloat(item['Доставено']) || 0;
+          const used = parseFloat(item['Изразходено']) || 0;
+          const rem = parseFloat(item['Остатък']) || 0;
+          const min = parseFloat(item['Минимално количество']) || 0;
+
+          // Проверка за критичен минимум
+          let balanceHtml = `${rem}`;
+          if (rem <= min && min > 0) {
+            balanceHtml = `<span class="badge-warn">⚠️ ${rem}</span>`;
+          }
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td style="font-weight:600; color:#1e293b;">${item['ID Детайл']}</td>
+            <td>${init}</td>
+            <td>${deliv}</td>
+            <td>${used}</td>
+            <td style="font-weight:700;">${balanceHtml}</td>
+            <td>${min}</td>
+            <td style="text-align: center; display: flex; justify-content: center; gap: 8px;">
+              <button class="action-btn btn-edit" onclick="openEditModal('${encodeURIComponent(item['ID Детайл'])}')" title="Редактирай">✏️</button>
+              <button class="action-btn btn-delete" onclick="deleteItem('${encodeURIComponent(item['ID Детайл'])}')" title="Изтрий">🗑️</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        table.style.display = 'table';
+      }
+
+      // Търсачка
+      function filterTable() {
+        const query = document.getElementById('searchInput').value.trim().toLowerCase();
+        const filtered = rawSkladData.filter(item => 
+          String(item['ID Детайл']).toLowerCase().includes(query)
+        );
+        renderTable(filtered);
+      }
+
+      // Автоматично изчисляване на Остатъка в реално време в Модала
+      function calculateBalance() {
+        const init = parseFloat(document.getElementById('initQty').value) || 0;
+        const deliv = parseFloat(document.getElementById('deliveredQty').value) || 0;
+        const used = parseFloat(document.getElementById('usedQty').value) || 0;
+        
+        const res = init + deliv - used;
+        document.getElementById('balanceQty').value = res;
+      }
+
+      // Отваряне за Добавяне
+      function openAddModal() {
+        isEditMode = false;
+        document.getElementById('modalTitle').innerText = '➕ Добави нов детайл в склад';
+        document.getElementById('skladForm').reset();
+        document.getElementById('detailId').readOnly = false;
+        document.getElementById('originalId').value = '';
+        document.getElementById('modalBackdrop').style.display = 'flex';
+      }
+
+      // Отваряне за Редакция
+      function openEditModal(encodedId) {
+        isEditMode = true;
+        const targetId = decodeURIComponent(encodedId);
+        const item = rawSkladData.find(s => s['ID Детайл'] === targetId);
+        if (!item) return;
+
+        document.getElementById('modalTitle').innerText = '✏️ Редакция на складов ред';
+        document.getElementById('originalId').value = item['ID Детайл'];
+        
+        document.getElementById('detailId').value = item['ID Детайл'];
+        document.getElementById('detailId').readOnly = true; // Кодът не се сменя при редакция
+        
+        document.getElementById('initQty').value = item['Начална наличност'] || 0;
+        document.getElementById('deliveredQty').value = item['Доставено'] || 0;
+        document.getElementById('usedQty').value = item['Изразходено'] || 0;
+        document.getElementById('minQty').value = item['Минимално количество'] || 0;
+        document.getElementById('balanceQty').value = item['Остатък'] || 0;
+
+        document.getElementById('modalBackdrop').style.display = 'flex';
+      }
+
+      function closeModal() {
+        document.getElementById('modalBackdrop').style.display = 'none';
+      }
+
+      // Запис на формата (Insert или Update)
+      async function saveForm(e) {
+        e.preventDefault();
+        Swal.fire({ title: 'Запис в базата...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+        const id = document.getElementById('detailId').value.trim();
+        const init = parseFloat(document.getElementById('initQty').value) || 0;
+        const deliv = parseFloat(document.getElementById('deliveredQty').value) || 0;
+        const used = parseFloat(document.getElementById('usedQty').value) || 0;
+        const bal = parseFloat(document.getElementById('balanceQty').value) || 0;
+        const min = parseFloat(document.getElementById('minQty').value) || 0;
+
+        const record = {
+          "ID Детайл": id,
+          "Начална наличност": init,
+          "Доставено": deliv,
+          "Изразходено": used,
+          "Остатък": bal,
+          "Минимално количество": min
+        };
+
+        try {
+          if (isEditMode) {
+            // UPDATE
+            const origId = document.getElementById('originalId').value;
+            const { error } = await client.from('sklad').update(record).eq('ID Детайл', origId);
+            if (error) throw error;
+          } else {
+            // INSERT - проверка за дублиране на код
+            const exists = rawSkladData.some(s => s['ID Детайл'].toLowerCase() === id.toLowerCase());
+            if (exists) {
+              Swal.fire('Грешка', 'Детайл с този код вече съществува в склада!', 'error');
+              return;
+            }
+            const { error } = await client.from('sklad').insert([record]);
+            if (error) throw error;
+          }
+
+          Swal.fire({ icon: 'success', title: 'Успешно запазено!', timer: 1200, showConfirmButton: false });
+          closeModal();
+          loadSkladData();
+        } catch (err) {
+          console.error(err);
+          Swal.fire('❌ Системна грешка', err.message, 'error');
+        }
+      }
+
+      // ИЗТРИВАНЕ на ред
+      async function deleteItem(encodedId) {
+        const targetId = decodeURIComponent(encodedId);
+        
+        Swal.fire({
+          title: 'Сигурна ли си?',
+          text: `Ще изтриеш детайл "${targetId}" от склада изцяло!`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#ef4444',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'Да, изтрий го!',
+          cancelButtonText: 'Отказ'
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ title: 'Изтриване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            try {
+              const { error } = await client.from('sklad').delete().eq('ID Детайл', targetId);
+              if (error) throw error;
+
+              Swal.fire({ icon: 'success', title: 'Изтрито!', timer: 1200, showConfirmButton: false });
+              loadSkladData();
+            } catch (err) {
+              console.error(err);
+              Swal.fire('❌ Грешка при изтриване', err.message, 'error');
+            }
+          }
+        });
+      }
+
+      window.onload = loadSkladData;
+    </script>
+  </body>
+</html>
