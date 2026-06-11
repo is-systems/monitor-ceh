@@ -114,15 +114,27 @@
           ]
         },
         plan: {
-          label: '📋 Месечен План & БОМ',
-          table: 'общ_план_материали',
+          label: '📅 Месечен План',
+          table: 'plan',
           key: 'id',
           fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hint: 'Автоматично ID', hideOnAdd: true },
-            { name: 'plan_id', type: 'text', required: true, label: 'Месечен План ID (напр. Юни_2026)' },
-            { name: 'детайл_код', type: 'text', required: true, label: 'Код на детайл' },
-            { name: 'текущ_родител', type: 'text', label: 'Текущ Родител в БОМ дървото (остави празно за краен резолвер)' },
-            { name: 'общо_необходимо_количество', type: 'number', def: 0, label: 'Общо необходимо количество (за плана)' }
+            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
+            { name: 'ID Детайл', type: 'text', required: true, label: 'Крайно изделие / Детайл' },
+            { name: 'Целево количество', type: 'number', required: true, def: 0 },
+            { name: 'Месец', type: 'text', required: true, label: 'Месец (напр. Юни)' },
+            { name: 'Година', type: 'number', required: true, def: 2026 },
+            { name: 'Статус', type: 'select', options: ['Активен', 'Завършен'], required: true }
+          ]
+        },
+        bom: {
+          label: '🧩 БОМ',
+          table: 'bom',
+          key: 'id',
+          fields: [
+            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
+            { name: 'ID Родител', type: 'text', required: true, label: 'Родител (Възел)' },
+            { name: 'ID Компонент', type: 'text', required: true, label: 'Компонент (Дете / Материал)' },
+            { name: 'Количество', type: 'number', required: true, def: 1, label: 'Количество за 1 бр. Родител' }
           ]
         },
         marshruti: {
@@ -141,7 +153,7 @@
           ]
         },
         otcheti: {
-          label: '📊 Свежи Отчети',
+          label: '📊 Отчети',
           table: 'otcheti',
           key: 'id',
           fields: [
@@ -152,16 +164,6 @@
             { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак'], required: true },
             { name: 'Оператор', type: 'text', required: true },
             { name: 'Дата', type: 'text', def: () => new Date().toISOString(), label: 'Време на отчитане' }
-          ]
-        },
-        master: {
-          label: '💎 Мастър Данни',
-          table: 'монитор_мастър_данни',
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'code', type: 'text', required: true, label: 'Код на изделието' },
-            { name: 'ready_qty', type: 'number', def: 0, label: 'Готово налично количество (ready_qty)' }
           ]
         }
       };
