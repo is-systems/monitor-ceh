@@ -154,8 +154,11 @@
          updateHistoryUI();
       }
 
-      try {
-            // Връзваме се към твоите точни таблици: plan и bom
+      async function loadTasks() {
+        document.getElementById('cardsArea').innerHTML = '';
+        document.getElementById('loadingMsg').style.display = 'block';
+        
+        try {
             const [plansRes, bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
                 client.from('plan').select('*'),
                 client.from('bom').select('*'),
@@ -168,6 +171,7 @@
             if (bomRes.error) throw bomRes.error;
             if (routesRes.error) throw routesRes.error;
             if (reportsRes.error) throw reportsRes.error;
+            if (skladRes.error) console.warn("Проблем с таблица sklad:", skladRes.error.message);
 
             let completedOps = {}; 
             reportsRes.data.forEach(r => {
@@ -197,7 +201,6 @@
             let bomData = bomRes.data || [];
 
             plansRes.data.forEach(plan => {
-                // Създаваме уникално име на плана от Месец и Година
                 let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim();
                 let rootItem = String(plan['ID Детайл']).trim();
                 let targetQty = parseFloat(plan['Целево количество']) || 0;
@@ -210,7 +213,6 @@
                     общо_необходимо_количество: targetQty
                 });
 
-                // Пренаписано разгръщане по колони: ID Родител, ID Компонент и Количество
                 function traverseAndAdd(parentName, parentQty) {
                     let children = bomData.filter(b => String(b['ID Родител']).trim() === parentName);
                     children.forEach(c => {
@@ -252,7 +254,7 @@
                         
                         let maxAllowed = 0;
                         let hasLimit = true;
-                        let blockingReasons = []; // Списък с причините за блокиране
+                        let blockingReasons = []; 
 
                         if (idx > 0) {
                             let prevRoute = routes[idx - 1];
@@ -261,7 +263,6 @@
                             let prevDoneQty = completedOps[prevOpKey] || 0;
                             maxAllowed = prevDoneQty - doneQty;
                             
-                            // Записваме коя операция ни спира
                             if (maxAllowed <= 0) {
                                 blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
                             }
@@ -292,7 +293,6 @@
                                         let possibleSets = Math.floor(cDone / multiplier);
                                         if (possibleSets < minSets) minSets = possibleSets;
                                         
-                                        // Записваме кое точно дете е със стойност 0
                                         if (possibleSets <= 0) {
                                             let loc = isManufactured ? "Отчети" : "Склад";
                                             blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`);
@@ -337,7 +337,7 @@
                             maxAllowed: maxAllowed,
                             hasLimit: hasLimit,
                             isBlocked: isBlocked,
-                            blockingReasons: blockingReasons // Предаваме причините към дизайна
+                            blockingReasons: blockingReasons
                         });
                     });
                 });
@@ -382,7 +382,6 @@
           var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
 
           if (t.isBlocked) {
-              // НОВО: Показваме ТОЧНО кое липсва
               let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
               bomBadgeHtml = `<div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 8px; margin-top: 8px; font-size: 13px; color: #991b1b; font-weight: 600;">🚫 Липсва: ${reasonsText}</div>`;
               actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:not-allowed;">🛑 БЛОКИРАНА ЗАДАЧА</button>`;
