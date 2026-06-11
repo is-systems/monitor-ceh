@@ -178,9 +178,11 @@
                 completedOps[key] += parseFloat(r['Количество']);
             });
 
+            // НОВО: Търсенето в Склад вече игнорира малки/главни букви!
             let skladData = skladRes.data || [];
             let getSkladQty = (code) => {
-                let item = skladData.find(s => String(s['ID Детайл']).trim() === code);
+                let codeLower = code.toLowerCase();
+                let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === codeLower);
                 return item ? (parseFloat(item['Остатък']) || 0) : 0;
             };
 
@@ -206,7 +208,6 @@
                 let bomNodes = planGroups[planId];
                 let getChildren = (parentCode) => bomNodes.filter(n => String(n.текущ_родител).trim() === parentCode);
                 
-                // ТУК Е ФИКСЪТ: Добавяме nodeIndex, за да различаваме еднакви детайли
                 bomNodes.forEach((node, nodeIndex) => {
                     let code = String(node.детайл_код).trim();
                     let planQty = parseFloat(node.общо_необходимо_количество) || 0;
@@ -223,12 +224,19 @@
                         
                         let maxAllowed = 0;
                         let hasLimit = true;
+                        let blockingReasons = []; // Списък с причините за блокиране
 
                         if (idx > 0) {
                             let prevRoute = routes[idx - 1];
-                            let prevOpKey = code + '_' + String(prevRoute['Име на операция']).trim();
+                            let prevOpName = String(prevRoute['Име на операция']).trim();
+                            let prevOpKey = code + '_' + prevOpName;
                             let prevDoneQty = completedOps[prevOpKey] || 0;
                             maxAllowed = prevDoneQty - doneQty;
+                            
+                            // Записваме коя операция ни спира
+                            if (maxAllowed <= 0) {
+                                blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
+                            }
                         } else {
                             let children = getChildren(code);
                             if (children.length === 0) {
@@ -241,8 +249,9 @@
                                     let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
                                     let cRoutes = routesByDetail[cCode] || [];
                                     let cDone = 0;
+                                    let isManufactured = (cRoutes.length > 0);
                                     
-                                    if (cRoutes.length > 0) {
+                                    if (isManufactured) {
                                         let lastRoute = cRoutes[cRoutes.length - 1];
                                         let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
                                         cDone = completedOps[cOpKey] || 0;
@@ -254,6 +263,12 @@
                                         let multiplier = cPlan / planQty;
                                         let possibleSets = Math.floor(cDone / multiplier);
                                         if (possibleSets < minSets) minSets = possibleSets;
+                                        
+                                        // Записваме кое точно дете е със стойност 0
+                                        if (possibleSets <= 0) {
+                                            let loc = isManufactured ? "Отчети" : "Склад";
+                                            blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`);
+                                        }
                                     }
                                 });
                                 if (minSets === Infinity) minSets = 0;
@@ -277,7 +292,6 @@
                         if (defaultInput <= 0 && !hasLimit) defaultInput = 1; 
                         if (defaultInput <= 0 && isBlocked) defaultInput = 0;
 
-                        // ТУК Е ФИКСЪТ: Инжектираме nodeIndex в ID-то, за да е 100% уникално!
                         let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
                         globalTasks.push({
@@ -294,7 +308,8 @@
                             defaultQty: defaultInput,
                             maxAllowed: maxAllowed,
                             hasLimit: hasLimit,
-                            isBlocked: isBlocked
+                            isBlocked: isBlocked,
+                            blockingReasons: blockingReasons // Предаваме причините към дизайна
                         });
                     });
                 });
@@ -339,7 +354,9 @@
           var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
 
           if (t.isBlocked) {
-              bomBadgeHtml = `<div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 8px; margin-top: 8px; font-size: 13px; color: #991b1b; font-weight: 600;">🚫 Изчаква предходни детайли или материали от Склад</div>`;
+              // НОВО: Показваме ТОЧНО кое липсва
+              let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
+              bomBadgeHtml = `<div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 8px; margin-top: 8px; font-size: 13px; color: #991b1b; font-weight: 600;">🚫 Липсва: ${reasonsText}</div>`;
               actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 18px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; margin-top: 15px; cursor:not-allowed;">🛑 БЛОКИРАНА ЗАДАЧА</button>`;
           } else if (t.hasLimit) {
               bomBadgeHtml = `<div style="background-color: #dcfce7; border-left: 4px solid #22c55e; padding: 8px; margin-top: 8px; font-size: 13px; color: #166534; font-weight: 600;">✅ Налични за: ${t.maxAllowed} бр.</div>`;
@@ -424,7 +441,7 @@
             
             try {
                 const { error } = await client.from('otcheti').insert([{
-                    "ID Детайл": taskData.name,
+                    "ID Детайл": taskData.name, 
                     "Оператор": currentOperator,
                     "Количество": val,
                     "Операция": taskData.op,
