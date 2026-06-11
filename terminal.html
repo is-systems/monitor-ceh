@@ -158,143 +158,160 @@
         document.getElementById('cardsArea').innerHTML = '';
         document.getElementById('loadingMsg').style.display = 'block';
         
-        // 1. Изтегляме СУРОВАТА информация (Планове, Маршрути, Отчети)
-        const [bomRes, routesRes, reportsRes] = await Promise.all([
-            client.from('общ_план_материали').select('*'),
-            client.from('marshruti').select('*'),
-            client.from('otcheti').select('*').eq('Статус', 'Отчетено')
-        ]);
+        try {
+            // Теглим всичко едновременно (включително master_data за наличностите на купените материали)
+            const [bomRes, routesRes, reportsRes, masterRes] = await Promise.all([
+                client.from('общ_план_материали').select('*'),
+                client.from('marshruti').select('*'),
+                client.from('otcheti').select('*').eq('Статус', 'Отчетено'),
+                client.from('монитор_мастър_данни').select('*')
+            ]);
 
-        if (bomRes.error || routesRes.error || reportsRes.error) {
-            document.getElementById('loadingMsg').innerHTML = '❌ Грешка при изтегляне на данните.';
-            return;
-        }
+            if (bomRes.error) throw bomRes.error;
+            if (routesRes.error) throw routesRes.error;
+            if (reportsRes.error) throw reportsRes.error;
 
-        // 2. Събираме всички завършени бройки по детайл и операция
-        let completedOps = {}; 
-        reportsRes.data.forEach(r => {
-            let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
-            if(!completedOps[key]) completedOps[key] = 0;
-            completedOps[key] += parseFloat(r['Количество']);
-        });
+            let completedOps = {}; 
+            reportsRes.data.forEach(r => {
+                let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+                if(!completedOps[key]) completedOps[key] = 0;
+                completedOps[key] += parseFloat(r['Количество']);
+            });
 
-        // 3. Групираме маршрутите и ги СОРТИРАМЕ по номер (10, 20, 30...)
-        let routesByDetail = {};
-        routesRes.data.forEach(r => {
-            let code = String(r['Код на детайла']).trim();
-            if(!routesByDetail[code]) routesByDetail[code] = [];
-            routesByDetail[code].push(r);
-        });
-        Object.keys(routesByDetail).forEach(code => {
-            routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-        });
+            let masterData = masterRes.data || [];
+            let getMasterReady = (code) => {
+                let md = masterData.find(m => String(m.code).trim() === code);
+                return md ? parseFloat(md.ready_qty) : 0;
+            };
 
-        // 4. Групираме БОМ-а по планове
-        let planGroups = {}; 
-        bomRes.data.forEach(r => {
-            if(!planGroups[r.plan_id]) planGroups[r.plan_id] = [];
-            planGroups[r.plan_id].push(r);
-        });
+            let routesByDetail = {};
+            routesRes.data.forEach(r => {
+                let code = String(r['Код на детайла']).trim();
+                if(!routesByDetail[code]) routesByDetail[code] = [];
+                routesByDetail[code].push(r);
+            });
+            Object.keys(routesByDetail).forEach(code => {
+                routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
+            });
 
-        globalTasks = [];
+            let planGroups = {}; 
+            bomRes.data.forEach(r => {
+                if(!planGroups[r.plan_id]) planGroups[r.plan_id] = [];
+                planGroups[r.plan_id].push(r);
+            });
 
-        // 5. ЯДРОТО НА СИСТЕМАТА: Алгоритъм за отключване на задачи (Pull System)
-        for(let planId in planGroups) {
-            let bomNodes = planGroups[planId];
-            let getChildren = (parentCode) => bomNodes.filter(n => String(n.текущ_родител).trim() === parentCode);
-            
-            bomNodes.forEach(node => {
-                let code = String(node.детайл_код).trim();
-                let planQty = parseFloat(node.общо_необходимо_количество) || 0;
+            globalTasks = [];
+
+            for(let planId in planGroups) {
+                let bomNodes = planGroups[planId];
+                let getChildren = (parentCode) => bomNodes.filter(n => String(n.текущ_родител).trim() === parentCode);
                 
-                let routes = routesByDetail[code] || [];
-                if(routes.length === 0) return; // Няма карта = няма задачи
-                
-                routes.forEach((route, idx) => {
-                    let opName = String(route['Име на операция']).trim();
-                    let opKey = code + '_' + opName;
-                    let doneQty = completedOps[opKey] || 0;
+                bomNodes.forEach(node => {
+                    let code = String(node.детайл_код).trim();
+                    let planQty = parseFloat(node.общо_необходимо_количество) || 0;
                     
-                    if(doneQty >= planQty) return; // Операцията е завършена напълно
+                    let routes = routesByDetail[code] || [];
+                    if(routes.length === 0) return; 
                     
-                    let availableToWork = 0;
-
-                    if (idx > 0) {
-                        // ОПЕРАЦИЯ 20+: Зависи от предишната операция (напр. Оп 10)
-                        let prevRoute = routes[idx - 1];
-                        let prevOpKey = code + '_' + String(prevRoute['Име на операция']).trim();
-                        let prevDoneQty = completedOps[prevOpKey] || 0;
-                        availableToWork = prevDoneQty - doneQty;
-                    } else {
-                        // ОПЕРАЦИЯ 10: Зависи от ДЕЦАТА (БОМ)
-                        let children = getChildren(code);
-                        if (children.length === 0) {
-                            availableToWork = planQty - doneQty; // Листо (Внук) - директно отключено!
-                        } else {
-                            let minSets = planQty; 
-                            children.forEach(child => {
-                                let cCode = String(child.детайл_код).trim();
-                                let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
-                                let cRoutes = routesByDetail[cCode] || [];
-                                let cDone = 0;
-                                
-                                if (cRoutes.length > 0) {
-                                    // Взимаме ПОСЛЕДНАТА операция на детето
-                                    let lastRoute = cRoutes[cRoutes.length - 1];
-                                    let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
-                                    cDone = completedOps[cOpKey] || 0;
-                                } else {
-                                    cDone = cPlan; // Купените материали не спират процеса
-                                }
-                                
-                                let multiplier = cPlan / planQty;
-                                let possibleSets = Math.floor(cDone / multiplier);
-                                if (possibleSets < minSets) minSets = possibleSets;
-                            });
-                            availableToWork = minSets - doneQty;
-                        }
-                    }
-                    
-                    // Защита от "преизпълнение" на плана
-                    let remainingForPlan = planQty - doneQty;
-                    if (availableToWork > remainingForPlan) availableToWork = remainingForPlan;
-                    
-                    // СЪЗДАВАНЕ НА ЗАДАЧА (Само ако алгоритъмът е разрешил бройки)
-                    if (availableToWork > 0) {
-                        let machineName = route['Машина'] || '';
+                    routes.forEach((route, idx) => {
+                        let opName = String(route['Име на операция']).trim();
+                        let opKey = code + '_' + opName;
+                        let doneQty = completedOps[opKey] || 0;
                         
-                        if (currentMachine && currentMachine.trim() !== "") {
-                            if (!machineName.toLowerCase().includes(currentMachine.toLowerCase())) {
-                                return; // Пропускаме, ако е за друга машина
+                        // Показваме задачата САМО ако не сме изпълнили плана за тази стъпка
+                        if(doneQty >= planQty) return; 
+                        
+                        let maxAllowed = 0;
+                        let hasLimit = true;
+
+                        if (idx > 0) {
+                            // ОПЕРАЦИЯ 20+: Лимитът е това, което сме направили на предната операция
+                            let prevRoute = routes[idx - 1];
+                            let prevOpKey = code + '_' + String(prevRoute['Име на операция']).trim();
+                            let prevDoneQty = completedOps[prevOpKey] || 0;
+                            maxAllowed = prevDoneQty - doneQty;
+                        } else {
+                            // ОПЕРАЦИЯ 10: Гледаме има ли деца
+                            let children = getChildren(code);
+                            if (children.length === 0) {
+                                // ПЪРВА СТЪПКА В ЦЕХА: Няма лимит!
+                                hasLimit = false;
+                                maxAllowed = Infinity;
+                            } else {
+                                // СГЛОБЯВАНЕ: Лимитът зависи от наличните части
+                                let minSets = Infinity;
+                                children.forEach(child => {
+                                    let cCode = String(child.детайл_код).trim();
+                                    let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
+                                    let cRoutes = routesByDetail[cCode] || [];
+                                    let cDone = 0;
+                                    
+                                    if (cRoutes.length > 0) {
+                                        let lastRoute = cRoutes[cRoutes.length - 1];
+                                        let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
+                                        cDone = completedOps[cOpKey] || 0;
+                                    } else {
+                                        // Купен материал - четем наличността от склада
+                                        cDone = getMasterReady(cCode);
+                                    }
+                                    
+                                    if (cPlan > 0) {
+                                        let multiplier = cPlan / planQty;
+                                        let possibleSets = Math.floor(cDone / multiplier);
+                                        if (possibleSets < minSets) minSets = possibleSets;
+                                    }
+                                });
+                                maxAllowed = minSets - doneQty;
                             }
                         }
+                        
+                        // Ако имаме материали (или ако няма лимит), създаваме задачата
+                        if (maxAllowed > 0 || !hasLimit) {
+                            let machineName = route['Машина'] || '';
+                            
+                            if (currentMachine && currentMachine.trim() !== "") {
+                                if (!machineName.toLowerCase().includes(currentMachine.toLowerCase())) {
+                                    return; 
+                                }
+                            }
 
-                        globalTasks.push({
-                            id: planId + '_' + code + '_' + idx,
-                            plan_id: planId,
-                            name: code,
-                            qty: availableToWork, // Това е калкулираното разрешено количество!
-                            op: opName,
-                            next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово изделие",
-                            machine: machineName,
-                            drawing_link: route['Линк към чертеж'],
-                            sop_link: route['Линк към СОП'],
-                            desc: route['Описание'],
-                            type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ"
-                        });
-                    }
+                            // Колко да предложим в полето (оставащото по план или максимума)
+                            let defaultInput = (planQty - doneQty > 0) ? (planQty - doneQty) : 0;
+                            if (hasLimit && defaultInput > maxAllowed) defaultInput = maxAllowed;
+                            if (defaultInput === 0 && !hasLimit) defaultInput = 1; // За да не е 0 кутийката
+
+                            globalTasks.push({
+                                id: planId + '_' + code + '_' + idx,
+                                plan_id: planId,
+                                name: code,
+                                op: opName,
+                                next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово",
+                                machine: machineName,
+                                drawing_link: route['Линк към чертеж'],
+                                sop_link: route['Линк към СОП'],
+                                desc: route['Описание'],
+                                type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ",
+                                defaultQty: defaultInput,
+                                maxAllowed: maxAllowed,
+                                hasLimit: hasLimit
+                            });
+                        }
+                    });
                 });
-            });
+            }
+            
+            renderTasks(globalTasks);
+
+        } catch (err) {
+            console.error(err);
+            document.getElementById('loadingMsg').innerHTML = '❌ Критична грешка при зареждане: ' + err.message;
         }
-        
-        renderTasks(globalTasks);
       }
 
       function renderTasks(tasks) {
         document.getElementById('loadingMsg').style.display = 'none';
         var container = document.getElementById('cardsArea');
         
-        // Показваме ВСИЧКИ разрешени задачи, защото алгоритъмът гарантира, че те са на ход
         if(tasks.length === 0) { 
           container.innerHTML = '<div style="text-align:center; margin-top:30px; font-size:1.2em; color: #27ae60; font-weight: bold;">🎉 Няма чакащи задачи за тази машина!</div>';
           return;
@@ -317,7 +334,11 @@
 
           var planBadge = `<div style="font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">ПЛАН: ${t.plan_id} | МАШИНА: ${t.machine || 'Обща'}</div>`;
 
-          var bomBadgeHtml = `<div style="background-color: #dcfce7; border-left: 4px solid #22c55e; padding: 8px; margin-top: 8px; font-size: 13px; color: #166534; font-weight: 600;">✅ Отключени за работа: ${t.qty} бр.</div>`;
+          var bomBadgeHtml = t.hasLimit 
+              ? `<div style="background-color: #dcfce7; border-left: 4px solid #22c55e; padding: 8px; margin-top: 8px; font-size: 13px; color: #166534; font-weight: 600;">✅ Налични за: ${t.maxAllowed} бр.</div>`
+              : `<div style="background-color: #e0e7ff; border-left: 4px solid #6366f1; padding: 8px; margin-top: 8px; font-size: 13px; color: #3730a3; font-weight: 600;">⚡ Първа стъпка (свободно производство)</div>`;
+              
+          var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
 
           html += `
             <div class="card ${cardClass}" id="card_${t.id}">
@@ -329,7 +350,6 @@
                   ${descHtml}
                   ${bomBadgeHtml}
                 </div>
-                <div class="qty-badge">${t.qty} бр.</div>
               </div>
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
                 <span style="font-weight: 800; color: #2980b9; font-size: 1.1em;">▶ ${t.op}</span> 
@@ -344,7 +364,7 @@
               <div id="focus_state_${t.id}" style="display: none;">
                 <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin-top: 15px; border: 2px solid #bae6fd;">
                   <p style="color: #0369a1; font-weight: bold; text-align:center; margin-top:0;">🟢 Работиш по тази задача</p>
-                  <input type="number" id="qty_${t.id}" value="${t.qty}" max="${t.qty}" inputmode="numeric" style="margin-bottom:12px;">
+                  <input type="number" id="qty_${t.id}" value="${t.defaultQty}" ${inputMaxHtml} inputmode="numeric" style="margin-bottom:12px;">
                   <div style="display: flex; gap: 8px;">
                     <button class="btn" id="btn_${t.id}" onclick="finishTask('${t.id}', this)">✅ ОТЧЕТИ</button>
                     <button class="btn-danger" id="btn_scrap_${t.id}" onclick="reportScrap('${t.id}', this)">БРАК</button>
@@ -375,15 +395,13 @@
         var inputElem = document.getElementById('qty_' + taskId);
         if (!inputElem) return; 
         var val = parseFloat(inputElem.value);
-        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
-
-        let possibleLimit = parseFloat(inputElem.getAttribute('max'));
-        if (!isNaN(possibleLimit) && val > possibleLimit) {
-            Swal.fire('Невъзможно', `Алгоритъмът позволява изработка на максимум ${possibleLimit} бр. за тази стъпка!`, 'error');
-            return;
-        }
+        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи валидна бройка!', 'error'); return; }
 
         let taskData = globalTasks.find(t => t.id === taskId);
+        if (taskData.hasLimit && val > taskData.maxAllowed) {
+            Swal.fire('Невъзможно', `Разполагаш с материали само за ${taskData.maxAllowed} бр.!`, 'error');
+            return;
+        }
 
         Swal.fire({ 
           title: 'Сигурен ли си?', 
@@ -395,21 +413,24 @@
             btn.disabled = true; btn.innerHTML = "ЗАПИС...";
             Swal.fire({ title: 'Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
             
-            const { error } = await client.from('otcheti').insert([{
-                "ID Детайл": taskData.name,
-                "Оператор": currentOperator,
-                "Количество": val,
-                "Операция": taskData.op,
-                "Статус": "Отчетено",
-                "Дата": new Date().toISOString()
-            }]);
+            try {
+                const { error } = await client.from('otcheti').insert([{
+                    "ID Детайл": taskData.name,
+                    "Оператор": currentOperator,
+                    "Количество": val,
+                    "Операция": taskData.op,
+                    "Статус": "Отчетено",
+                    "Дата": new Date().toISOString()
+                }]);
 
-            if(error) {
-              Swal.fire('❌ Системна грешка', error.message, 'error');
-              btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ";
-            } else {
-              addLogToHistory('ГОТОВО', val, taskId); 
-              Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
+                if(error) throw error;
+
+                addLogToHistory('ГОТОВО', val, taskId); 
+                Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
+            } catch(err) {
+                console.error(err);
+                Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
+                btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ";
             }
           }
         });
@@ -418,15 +439,13 @@
       async function reportScrap(taskId, btn) {
         var inputElem = document.getElementById('qty_' + taskId);
         if (!inputElem) return; var val = parseFloat(inputElem.value);
-        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи бройка!', 'error'); return; }
+        if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи валидна бройка!', 'error'); return; }
         
-        let possibleLimit = parseFloat(inputElem.getAttribute('max'));
-        if (!isNaN(possibleLimit) && val > possibleLimit) {
-            Swal.fire('Невъзможно', `Имаш материал само за ${possibleLimit} бр.!`, 'error');
+        let taskData = globalTasks.find(t => t.id === taskId);
+        if (taskData.hasLimit && val > taskData.maxAllowed) {
+            Swal.fire('Невъзможно', `Имаш материал само за ${taskData.maxAllowed} бр.!`, 'error');
             return;
         }
-
-        let taskData = globalTasks.find(t => t.id === taskId);
 
         Swal.fire({ 
           title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', 
@@ -436,20 +455,23 @@
           if (result.isConfirmed) {
             Swal.fire({ title: 'Бракуване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
             
-            const { error } = await client.from('otcheti').insert([{
-                "ID Детайл": taskData.name,
-                "Оператор": currentOperator,
-                "Количество": val,
-                "Операция": taskData.op,
-                "Статус": "Брак",
-                "Дата": new Date().toISOString()
-            }]);
+            try {
+                const { error } = await client.from('otcheti').insert([{
+                    "ID Детайл": taskData.name,
+                    "Оператор": currentOperator,
+                    "Количество": val,
+                    "Операция": taskData.op,
+                    "Статус": "Брак",
+                    "Дата": new Date().toISOString()
+                }]);
 
-            if(error) {
-               Swal.fire('❌ Системна грешка', error.message, 'error');
-            } else {
-               addLogToHistory('БРАК', val, taskId); 
-               Swal.close(); loadTasks(); 
+                if(error) throw error;
+
+                addLogToHistory('БРАК', val, taskId); 
+                Swal.close(); loadTasks(); 
+            } catch(err) {
+                console.error(err);
+                Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
             }
           }
         });
