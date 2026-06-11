@@ -98,7 +98,6 @@
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
       );
 
-      // Глобална конфигурация на структурата на софтуера
       const tableConfigs = {
         sklad: {
           label: '📦 Склад',
@@ -173,7 +172,6 @@
       let isEditMode = false;
       let editingIndex = null;
 
-      // Генериране на горното навигационно меню
       function buildNavbar() {
         const container = document.getElementById('tabsContainer');
         container.innerHTML = '';
@@ -194,17 +192,13 @@
         loadCurrentTableData();
       }
 
-      // Изтегляне на данните от Supabase в съответствие с избрания таб
       async function loadCurrentTableData() {
         document.getElementById('loadingLayout').style.display = 'block';
         document.getElementById('mainTable').style.display = 'none';
-        
         const config = tableConfigs[currentTab];
-
         try {
           const { data, error } = await client.from(config.table).select('*');
           if (error) throw error;
-
           globalRows = data || [];
           renderDynamicTable();
         } catch (err) {
@@ -213,23 +207,18 @@
         }
       }
 
-      // Начертаване на таблицата динамично на база полетата от конфигурацията
       function renderDynamicTable(itemsToRender = null) {
         const items = itemsToRender || globalRows;
         const config = tableConfigs[currentTab];
-        
         document.getElementById('loadingLayout').style.display = 'none';
         const table = document.getElementById('mainTable');
         const thead = document.getElementById('tableHead');
         const tbody = document.getElementById('tableBody');
-        
-        thead.innerHTML = '';
-        tbody.innerHTML = '';
+        thead.innerHTML = ''; tbody.innerHTML = '';
 
-        // 1. Построяване на заглавната част (Headers)
         const headerRow = document.createElement('tr');
         config.fields.forEach(f => {
-          if (f.hideOnAdd && currentTab !== 'sklad') return; // скриваме авто-генерираните ID от таблицата, ако желаеш
+          if (f.hideOnAdd && currentTab !== 'sklad') return;
           const th = document.createElement('th');
           th.innerText = f.label || f.name;
           headerRow.appendChild(th);
@@ -241,7 +230,6 @@
         headerRow.appendChild(thActions);
         thead.appendChild(headerRow);
 
-        // 2. Построяване на редовете с данни
         if (items.length === 0) {
           tbody.innerHTML = `<tr><td colspan="${config.fields.length + 1}" style="text-align:center; color:#94a3b8; padding:40px;">Няма открити записи.</td></tr>`;
           table.style.display = 'table';
@@ -250,59 +238,42 @@
 
         items.forEach((item, index) => {
           const row = document.createElement('tr');
-          
           config.fields.forEach(f => {
             const td = document.createElement('td');
             let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
-            
-            // Специално форматиране за Склад (минимуми)
             if (currentTab === 'sklad' && f.name === 'Остатък') {
               const minVal = parseFloat(item['Минимално количество']) || 0;
               if (parseFloat(val) <= minVal && minVal > 0) {
                 td.innerHTML = `<span class="badge-warn">⚠️ ${val}</span>`;
-                row.appendChild(td);
-                return;
+                row.appendChild(td); return;
               }
             }
-
-            // Специално форматиране за Отчети (Брак/Отчетено)
             if (currentTab === 'otcheti' && f.name === 'Статус') {
               const cls = val === 'Брак' ? 'status-scrap' : 'status-ok';
               td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`;
-              row.appendChild(td);
-              return;
+              row.appendChild(td); return;
             }
-
             td.innerText = val;
             row.appendChild(td);
           });
 
-          // Бутоните за Редакция и Изтриване се обвързват с ИНДЕКСА от масива
           const tdActions = document.createElement('td');
           tdActions.style.textAlign = 'center';
-          tdActions.innerHTML = `
-            <button class="action-btn btn-edit" onclick="openEditModal(${index})" title="Редактирай">✏️</button>
-            <button class="action-btn btn-delete" onclick="deleteItem(${index})" title="Изтрий">🗑️</button>
-          `;
+          tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${index})" title="Редактирай">✏️</button>
+                                 <button class="action-btn btn-delete" onclick="deleteItem(${index})" title="Изтрий">🗑️</button>`;
           row.appendChild(tdActions);
           tbody.appendChild(row);
         });
-
         table.style.display = 'table';
       }
 
-      // Търсачка за всички полета
       function filterTable() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
         if(!query) { renderDynamicTable(); return; }
-
-        const filtered = globalRows.filter(row => {
-          return Object.values(row).some(val => String(val).toLowerCase().includes(query));
-        });
+        const filtered = globalRows.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query)));
         renderDynamicTable(filtered);
       }
 
-      // Динамично изчисляване на склад в реално време вътре във формата
       function liveCalculateSklad() {
         if (currentTab !== 'sklad') return;
         const init = parseFloat(document.getElementById('field_Начална_наличност').value) || 0;
@@ -311,130 +282,71 @@
         document.getElementById('field_Остатък').value = (init + deliv) - used;
       }
 
-      // Отваряне за ДОБАВЯНЕ (Формата се строи на секундата според таба)
       function openAddModal() {
-        isEditMode = false;
-        editingIndex = null;
+        isEditMode = false; editingIndex = null;
         const config = tableConfigs[currentTab];
-        document.getElementById('modalTitle').innerText = `➕ Нов запис в таблица [ ${config.table} ]`;
-        
-        const area = document.getElementById('formFieldsArea');
-        area.innerHTML = '';
+        document.getElementById('modalTitle').innerText = `➕ Нов запис`;
+        const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
 
         config.fields.forEach(f => {
           if (f.hideOnAdd) return;
-          
-          const group = document.createElement('div');
-          group.className = 'form-group';
-          
-          const label = document.createElement('label');
-          label.innerText = f.label || f.name;
+          const group = document.createElement('div'); group.className = 'form-group';
+          const label = document.createElement('label'); label.innerText = f.label || f.name;
           group.appendChild(label);
-
           let input;
-          if (f.type === 'textarea') {
-            input = document.createElement('textarea');
-            input.rows = 3;
-          } else if (f.type === 'select') {
+          if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; }
+          else if (f.type === 'select') {
             input = document.createElement('select');
-            f.options.forEach(opt => {
-              const o = document.createElement('option');
-              o.value = opt; o.innerText = opt;
-              input.appendChild(o);
-            });
-          } else {
-            input = document.createElement('input');
-            input.type = f.type;
-          }
+            f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); });
+          } else { input = document.createElement('input'); input.type = f.type; }
 
           input.id = `field_${f.name.replace(/ /g, '_')}`;
-          
-          // Взимане на дефолтна стойност, ако има попълнена в конфигурацията
-          let defaultVal = '';
-          if (typeof f.def === 'function') defaultVal = f.def();
-          else if (f.def !== undefined) defaultVal = f.def;
+          let defaultVal = typeof f.def === 'function' ? f.def() : (f.def !== undefined ? f.def : '');
           input.value = defaultVal;
-
           if (f.required) input.required = true;
           if (f.readonly) input.readOnly = true;
           if (f.hint) input.placeholder = f.hint;
-
-          if (currentTab === 'sklad') {
-            input.oninput = liveCalculateSklad;
-          }
-
-          group.appendChild(input);
-          area.appendChild(group);
+          if (currentTab === 'sklad') input.oninput = liveCalculateSklad;
+          group.appendChild(input); area.appendChild(group);
         });
-
         document.getElementById('modalBackdrop').style.display = 'flex';
       }
 
-      // Отваряне за РЕДАКЦИЯ
       function openEditModal(index) {
-        isEditMode = true;
-        editingIndex = index;
+        isEditMode = true; editingIndex = index;
         const config = tableConfigs[currentTab];
         const record = globalRows[index];
-
-        document.getElementById('modalTitle').innerText = `✏️ Редактиране на избран ред`;
-        
-        const area = document.getElementById('formFieldsArea');
-        area.innerHTML = '';
+        document.getElementById('modalTitle').innerText = `✏️ Редактиране`;
+        const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
 
         config.fields.forEach(f => {
-          const group = document.createElement('div');
-          group.className = 'form-group';
-          
-          const label = document.createElement('label');
-          label.innerText = f.label || f.name;
+          const group = document.createElement('div'); group.className = 'form-group';
+          const label = document.createElement('label'); label.innerText = f.label || f.name;
           group.appendChild(label);
-
           let input;
-          if (f.type === 'textarea') {
-            input = document.createElement('textarea');
-            input.rows = 3;
-          } else if (f.type === 'select') {
+          if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; }
+          else if (f.type === 'select') {
             input = document.createElement('select');
-            f.options.forEach(opt => {
-              const o = document.createElement('option');
-              o.value = opt; o.innerText = opt;
-              input.appendChild(o);
-            });
-          } else {
-            input = document.createElement('input');
-            input.type = f.type;
-          }
+            f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); });
+          } else { input = document.createElement('input'); input.type = f.type; }
 
           input.id = `field_${f.name.replace(/ /g, '_')}`;
           input.value = record[f.name] !== undefined && record[f.name] !== null ? record[f.name] : '';
-
           if (f.required) input.required = true;
           if (f.readonly || f.readonlyOnEdit) input.readOnly = true;
-
-          if (currentTab === 'sklad') {
-            input.oninput = liveCalculateSklad;
-          }
-
-          group.appendChild(input);
-          area.appendChild(group);
+          if (currentTab === 'sklad') input.oninput = liveCalculateSklad;
+          group.appendChild(input); area.appendChild(group);
         });
-
         document.getElementById('modalBackdrop').style.display = 'flex';
       }
 
-      function closeModal() {
-        document.getElementById('modalBackdrop').style.display = 'none';
-      }
+      function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
 
-      // Автоматизиран запис (Прави INSERT или UPDATE според режима)
       async function saveForm(e) {
         e.preventDefault();
         Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-
         const config = tableConfigs[currentTab];
         let recordToSave = {};
-
         config.fields.forEach(f => {
           const el = document.getElementById(`field_${f.name.replace(/ /g, '_')}`);
           if (el) {
@@ -443,85 +355,52 @@
             recordToSave[f.name] = val;
           }
         });
-
         try {
           if (isEditMode) {
-            // Режим РЕДАКЦИЯ
             const oldRecord = globalRows[editingIndex];
             let query = client.from(config.table).update(recordToSave);
-            
-            // Защита: Филтрираме по първичния ключ на конфигурацията
-            if (oldRecord[config.key] !== undefined) {
-                query = query.eq(config.key, oldRecord[config.key]);
-            } else {
-                // Ако няма ясен ключ, използваме пълно съвпадение (match) на стария ред
-                query = query.match(oldRecord);
-            }
-            
+            if (oldRecord[config.key] !== undefined) query = query.eq(config.key, oldRecord[config.key]);
+            else query = query.match(oldRecord);
             const { error } = await query;
             if (error) throw error;
           } else {
-            // Режим ДОБАВЯНЕ на нов ред
             const { error } = await client.from(config.table).insert([recordToSave]);
             if (error) throw error;
           }
-
           Swal.fire({ icon: 'success', title: 'Успешен запис!', timer: 1000, showConfirmButton: false });
-          closeModal();
-          loadCurrentTableData();
+          closeModal(); loadCurrentTableData();
         } catch (err) {
-          console.error(err);
-          Swal.fire('❌ Грешка при запис', err.message, 'error');
+          console.error(err); Swal.fire('❌ Грешка при запис', err.message, 'error');
         }
       }
 
-      // Глобална функция за ИЗТРИВАНЕ на записи
       async function deleteItem(index) {
         const config = tableConfigs[currentTab];
         const record = globalRows[index];
-        
-        // Определяме кратко описание за изскачащото съобщение
-        let desc = record['ID Детайл'] || record['Код на детайла'] || record['code'] || record['plan_id'] || `Ред №${index+1}`;
-
+        let desc = record['ID Детайл'] || record['Код на детайла'] || `Ред №${index+1}`;
         Swal.fire({
-          title: 'Сигурна ли си?',
-          text: `Ще изтриеш трайно изработения запис "${desc}" от таблица ${config.table}!`,
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonColor: '#ef4444',
-          cancelButtonColor: '#94a3b8',
-          confirmButtonText: 'Да, изтрий го!',
-          cancelButtonText: 'Отказ'
+          title: 'Сигурна ли си?', text: `Ще изтриеш трайно "${desc}" от таблица ${config.table}!`, icon: 'warning',
+          showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'Да, изтрий го!', cancelButtonText: 'Отказ'
         }).then(async (result) => {
           if (result.isConfirmed) {
             Swal.fire({ title: 'Премахване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-            
             try {
               let query = client.from(config.table).delete();
-              
-              if (record[config.key] !== undefined) {
-                  query = query.eq(config.key, record[config.key]);
-              } else {
-                  query = query.match(record);
-              }
-
+              if (record[config.key] !== undefined) query = query.eq(config.key, record[config.key]);
+              else query = query.match(record);
               const { error } = await query;
               if (error) throw error;
-
               Swal.fire({ icon: 'success', title: 'Премахнато!', timer: 1000, showConfirmButton: false });
               loadCurrentTableData();
             } catch (err) {
-              console.error(err);
-              Swal.fire('❌ Системна грешка при изтриване', err.message, 'error');
+              console.error(err); Swal.fire('❌ Системна грешка при изтриване', err.message, 'error');
             }
           }
         });
       }
 
-      window.onload = () => {
-        buildNavbar();
-        loadCurrentTableData();
-      };
+      window.onload = () => { buildNavbar(); loadCurrentTableData(); };
     </script>
   </body>
 </html>
