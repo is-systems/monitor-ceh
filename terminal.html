@@ -159,11 +159,12 @@
         document.getElementById('loadingMsg').style.display = 'block';
         
         try {
+            // Взимаме абсолютно всички отчети (и Отчетено, и Брак) без лимити
             const [plansRes, bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
                 client.from('plan').select('*').limit(10000),
                 client.from('bom').select('*').limit(10000),
                 client.from('marshruti').select('*').limit(10000),
-                client.from('otcheti').select('*').eq('Статус', 'Отчетено').limit(10000),
+                client.from('otcheti').select('*').limit(10000), 
                 client.from('sklad').select('*').limit(10000) 
             ]);
 
@@ -174,10 +175,20 @@
             if (skladRes.error) console.warn("Проблем с таблица sklad:", skladRes.error.message);
 
             let completedOps = {}; 
+            let scrappedOps = {}; 
+
+            // Разделяме здравите бройки от бракуваните
             reportsRes.data.forEach(r => {
                 let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
-                if(!completedOps[key]) completedOps[key] = 0;
-                completedOps[key] += parseFloat(r['Количество']);
+                let qty = parseFloat(r['Количество']) || 0;
+                
+                if (r['Статус'] === 'Брак') {
+                    if(!scrappedOps[key]) scrappedOps[key] = 0;
+                    scrappedOps[key] += qty;
+                } else {
+                    if(!completedOps[key]) completedOps[key] = 0;
+                    completedOps[key] += qty;
+                }
             });
 
             let skladData = skladRes.data || [];
@@ -248,9 +259,22 @@
                     routes.forEach((route, idx) => {
                         let opName = String(route['Име на операция']).trim();
                         let opKey = code + '_' + opName;
-                        let doneQty = completedOps[opKey] || 0;
                         
-                        if(doneQty >= planQty) return; 
+                        let doneQty = completedOps[opKey] || 0;
+                        let scrapQty = scrappedOps[opKey] || 0;
+                        let consumedHere = doneQty + scrapQty; // Колко физически детайла сме унищожили/използвали
+                        
+                        // МАГИЯТА ЗА БРАК: Изчисляваме колко детайла са бракувани НАПРЕД по веригата
+                        let scrapStrictlyDownstream = 0;
+                        for(let j = idx + 1; j < routes.length; j++) {
+                            let dKey = code + '_' + String(routes[j]['Име на операция']).trim();
+                            scrapStrictlyDownstream += (scrappedOps[dKey] || 0);
+                        }
+                        
+                        // Ако някой напред е счупил 5, ние трябва да произведем план + 5
+                        let effectivePlanQty = planQty + scrapStrictlyDownstream;
+
+                        if(doneQty >= effectivePlanQty) return; 
                         
                         let maxAllowed = 0;
                         let hasLimit = true;
@@ -261,7 +285,8 @@
                             let prevOpName = String(prevRoute['Име на операция']).trim();
                             let prevOpKey = code + '_' + prevOpName;
                             let prevDoneQty = completedOps[prevOpKey] || 0;
-                            maxAllowed = prevDoneQty - doneQty;
+                            
+                            maxAllowed = prevDoneQty - consumedHere;
                             
                             if (maxAllowed <= 0) {
                                 blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
@@ -300,7 +325,7 @@
                                     }
                                 });
                                 if (minSets === Infinity) minSets = 0;
-                                maxAllowed = minSets - doneQty;
+                                maxAllowed = minSets - consumedHere;
                             }
                         }
                         
@@ -315,7 +340,7 @@
                             }
                         }
 
-                        let defaultInput = (planQty - doneQty > 0) ? (planQty - doneQty) : 0;
+                        let defaultInput = (effectivePlanQty - doneQty > 0) ? (effectivePlanQty - doneQty) : 0;
                         if (hasLimit && defaultInput > maxAllowed) defaultInput = maxAllowed;
                         if (defaultInput <= 0 && !hasLimit) defaultInput = 1; 
                         if (defaultInput <= 0 && isBlocked) defaultInput = 0;
