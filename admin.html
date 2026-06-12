@@ -218,7 +218,7 @@
 
         const headerRow = document.createElement('tr');
         config.fields.forEach(f => {
-          if (f.hideOnAdd && currentTab !== 'sklad') return;
+          if (f.hideOnAdd) return; // Скриваме ID-то навсякъде
           const th = document.createElement('th');
           th.innerText = f.label || f.name;
           headerRow.appendChild(th);
