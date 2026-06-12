@@ -197,7 +197,7 @@
         document.getElementById('mainTable').style.display = 'none';
         const config = tableConfigs[currentTab];
         try {
-          const { data, error } = await client.from(config.table).select('*');
+          const { data, error } = await client.from(config.table).select('*').limit(10000);
           if (error) throw error;
           globalRows = data || [];
           renderDynamicTable();
