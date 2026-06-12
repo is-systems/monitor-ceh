@@ -160,11 +160,11 @@
         
         try {
             const [plansRes, bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
-                client.from('plan').select('*'),
-                client.from('bom').select('*'),
-                client.from('marshruti').select('*'),
-                client.from('otcheti').select('*').eq('Статус', 'Отчетено'),
-                client.from('sklad').select('*') 
+                client.from('plan').select('*').limit(10000),
+                client.from('bom').select('*').limit(10000),
+                client.from('marshruti').select('*').limit(10000),
+                client.from('otcheti').select('*').eq('Статус', 'Отчетено').limit(10000),
+                client.from('sklad').select('*').limit(10000) 
             ]);
 
             if (plansRes.error) throw plansRes.error;
