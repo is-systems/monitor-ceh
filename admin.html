@@ -238,7 +238,9 @@
 
         items.forEach((item, index) => {
           const row = document.createElement('tr');
+          
           config.fields.forEach(f => {
+            if (f.hideOnAdd) return; // Скриваме ID-то и от редовете, за да няма разместване
             const td = document.createElement('td');
             let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             if (currentTab === 'sklad' && f.name === 'Остатък') {
