@@ -464,7 +464,7 @@
                 let opsHTML = '';
                 let titleClass = 'title-gray';
 
-                // --- ЧИСТА И ПРОСТА ЛУПА (БЕЗ РОДИТЕЛИ И ДЕЦА) ---
+                // --- ЧИСТА И ПРОСТА ЛУПА + УМЕН РОДИТЕЛ ---
                 let len = node.operations.length;
                 if (len > 0) {
                     let currIdx = node.operations.findIndex(o => o.completed < node.planQty);
@@ -474,6 +474,16 @@
                     const formatFocusBlue = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFocusGray = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFocusGreen = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
+
+                    const getParentNext = () => {
+                        let pId = parentMap[node.id];
+                        if(!pId) return '';
+                        let pNode = allNodesMap[pId];
+                        if(!pNode || !pNode.operations || pNode.operations.length === 0) return '';
+                        
+                        let pOp = pNode.operations[0]; // Първата операция на родителя (обикновено Оп. 10)
+                        return ` <span class="arr" style="color:#a855f7;">➔</span> <span class="op-text op-future" style="color:#a855f7; opacity:0.8; border-bottom: 1px dashed #a855f7;" title="Родител">[Родител: ${pOp.name}]</span>`;
+                    };
 
                     if (currIdx === -1) {
                         // Всички операции са готови (100%)
@@ -493,6 +503,7 @@
                         }
                         
                         html += formatFocusGreen(node.operations[lastIdx]);
+                        html += getParentNext(); // Показва родителя чак като приключи целият детайл
 
                         opsHTML = `<div class="vsm-ops">${html}</div>`;
                         
@@ -522,6 +533,8 @@
                         // 4. Следваща операция (Видима)
                         if (currIdx < len - 1) {
                             html += ' <span class="arr">➔</span> ' + formatFuture(node.operations[currIdx + 1]);
+                        } else {
+                            html += getParentNext(); // Показва родителя, защото текущата е ПОСЛЕДНАТА за детайла
                         }
 
                         // 5. Скрито Бъдеще
