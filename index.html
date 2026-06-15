@@ -331,7 +331,6 @@
       document.getElementById('loading').style.display = 'none';
       globalConnections = data.connections || [];
 
-      // Картографиране на всички връзки за умната лупа
       const allNodesMap = {};
       if (data.nodes) {
         Object.values(data.nodes).forEach(bucket => {
@@ -465,7 +464,7 @@
                 let opsHTML = '';
                 let titleClass = 'title-gray';
 
-                // --- НОВАТА СУПЕР ЛУПА ---
+                // --- ЧИСТА И ПРОСТА ЛУПА (БЕЗ РОДИТЕЛИ И ДЕЦА) ---
                 let len = node.operations.length;
                 if (len > 0) {
                     let currIdx = node.operations.findIndex(o => o.completed < node.planQty);
@@ -476,26 +475,8 @@
                     const formatFocusGray = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFocusGreen = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
 
-                    // Връзки към родител/деца
-                    const getParentNext = () => {
-                        let pId = parentMap[node.id];
-                        if(!pId) return '';
-                        let pNode = allNodesMap[pId];
-                        if(!pNode || !pNode.operations || pNode.operations.length === 0) return '';
-                        let pCurr = pNode.operations.findIndex(o => o.completed < pNode.planQty);
-                        if(pCurr === -1) pCurr = pNode.operations.length - 1;
-                        let pOp = pNode.operations[pCurr];
-                        return ` <span class="arr" style="color:#c084fc;">➔</span> <span class="op-text op-future" style="color:#c084fc; border-bottom: 1px dashed #c084fc;" title="Отива към">[Родител: ${pOp.name}]</span>`;
-                    };
-
-                    const getChildPrev = () => {
-                        let cIds = childMap[node.id];
-                        if(!cIds || cIds.length === 0) return '';
-                        return `<span class="op-text op-past" style="color:#fb923c; border-bottom: 1px dashed #fb923c;" title="Чака се от децата">[От Децата]</span> <span class="arr" style="color:#fb923c;">➔</span> `;
-                    };
-
                     if (currIdx === -1) {
-                        // 100% ЗАВЪРШЕН ДЕТАЙЛ
+                        // Всички операции са готови (100%)
                         titleClass = 'title-green';
                         let lastIdx = len - 1;
                         
@@ -512,12 +493,11 @@
                         }
                         
                         html += formatFocusGreen(node.operations[lastIdx]);
-                        html += getParentNext(); // Показва към коя операция на родителя отива
 
                         opsHTML = `<div class="vsm-ops">${html}</div>`;
                         
                     } else {
-                        // В ПРОЦЕС НА РАБОТА ИЛИ ИЗЧАКВАНЕ
+                        // Имаме текуща операция за работа или чакаща
                         let isWorking = node.operations[currIdx].completed > 0 || currIdx > 0;
                         if (isWorking) titleClass = 'title-blue';
 
@@ -534,8 +514,6 @@
                         // 2. Предходна операция (Видима)
                         if (currIdx > 0) {
                             html += formatPast(node.operations[currIdx - 1]) + ' <span class="arr">➔</span> ';
-                        } else {
-                            html += getChildPrev(); // Показва, че чака от децата
                         }
 
                         // 3. Текуща операция (Лупа)
@@ -544,8 +522,6 @@
                         // 4. Следваща операция (Видима)
                         if (currIdx < len - 1) {
                             html += ' <span class="arr">➔</span> ' + formatFuture(node.operations[currIdx + 1]);
-                        } else {
-                            html += getParentNext(); // Показва, че след тази стъпка отива в родителя
                         }
 
                         // 5. Скрито Бъдеще
@@ -560,7 +536,6 @@
                     }
                 }
                 
-                // Проверка за жълт статус (готовност за старт при сглобяване)
                 let isNodeReadyStart = false;
                 if (children.length > 0) {
                     isNodeReadyStart = children.every(cId => {
