@@ -84,43 +84,12 @@
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
       );
 
-      let currentOperator = localStorage.getItem('mes_operator');
-      let currentMachine = localStorage.getItem('mes_machine');
-
-      if (!currentOperator) {
-        currentOperator = prompt("Добър ден! Моля, въведи своето име:", "Оператор");
-        localStorage.setItem('mes_operator', currentOperator);
-      }
-      if (!currentMachine && currentMachine !== "") {
-        currentMachine = prompt("За коя машина е този таблет? (Остави празно за всички задачи)", "");
-        localStorage.setItem('mes_machine', currentMachine || "");
-      }
-
-      document.getElementById('uiOperatorName').innerText = currentOperator || "Анонимен";
-      document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
-
-      function changeOperator() {
-        let newOp = prompt("Смяна на оператор:", currentOperator);
-        if (newOp !== null && newOp.trim() !== "") {
-          currentOperator = newOp.trim();
-          localStorage.setItem('mes_operator', currentOperator);
-          document.getElementById('uiOperatorName').innerText = currentOperator;
-        }
-      }
-
-      function changeMachine() {
-        let newMach = prompt("Смяна на машина (остави празно за всички):", currentMachine);
-        if (newMach !== null) {
-          currentMachine = newMach.trim();
-          localStorage.setItem('mes_machine', currentMachine);
-          document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
-          loadTasks(); 
-        }
-      }
-
+      let currentOperator = "";
+      let currentMachine = "";
       let globalTasks = []; 
       let localHistoryData = [];
-      
+
+      // --- СИСТЕМА ЗА ИСТОРИЯ ---
       function updateHistoryUI() {
         var list = document.getElementById('historyList');
         if (localHistoryData.length === 0) {
@@ -154,12 +123,116 @@
          updateHistoryUI();
       }
 
+      // --- ИНИЦИАЛИЗАЦИЯ И МЕНЮТА ---
+      async function initTerminal() {
+          currentOperator = localStorage.getItem('mes_operator');
+          let savedMachine = localStorage.getItem('mes_machine');
+
+          // Пита за име на оператор с красиво меню
+          if (!currentOperator) {
+              const { value: opName } = await Swal.fire({
+                  title: 'Добре дошли!',
+                  text: 'Моля, въведете своето име:',
+                  input: 'text',
+                  allowOutsideClick: false,
+                  confirmButtonText: 'Продължи',
+                  confirmButtonColor: '#2563eb'
+              });
+              currentOperator = (opName && opName.trim() !== "") ? opName.trim() : "Оператор";
+              localStorage.setItem('mes_operator', currentOperator);
+          }
+          document.getElementById('uiOperatorName').innerText = currentOperator;
+
+          // Пита за машина, ако не е запаметена
+          if (savedMachine === null) {
+              await changeMachine(true); 
+          } else {
+              currentMachine = savedMachine;
+              document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
+              loadTasks();
+          }
+      }
+
+      async function changeOperator() {
+          const { value: opName } = await Swal.fire({
+              title: 'Смяна на оператор',
+              input: 'text',
+              inputValue: currentOperator,
+              showCancelButton: true,
+              confirmButtonText: 'Запази',
+              cancelButtonText: 'Отказ',
+              confirmButtonColor: '#2563eb'
+          });
+          if (opName && opName.trim() !== "") {
+              currentOperator = opName.trim();
+              localStorage.setItem('mes_operator', currentOperator);
+              document.getElementById('uiOperatorName').innerText = currentOperator;
+          }
+      }
+
+      // Умното меню за избор на машини от базата
+      async function changeMachine(isInitial = false) {
+          Swal.fire({ title: 'Търсене на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          
+          try {
+              // Дърпаме всички маршрути, за да видим какви машини съществуват
+              const { data, error } = await client.from('marshruti').select('Машина').limit(10000);
+              if (error) throw error;
+              
+              let uniqueMachines = [];
+              if (data) {
+                  data.forEach(r => {
+                      let m = r['Машина'];
+                      if (m && m.trim() !== "" && !uniqueMachines.includes(m.trim())) {
+                          uniqueMachines.push(m.trim());
+                      }
+                  });
+              }
+              uniqueMachines.sort(); // Подреждаме ги по азбучен ред
+
+              // Създаваме обекта за падащото меню
+              let optionsMap = { "": "🌍 ВСИЧКИ МАШИНИ" };
+              uniqueMachines.forEach(m => { optionsMap[m] = m; });
+
+              Swal.close();
+
+              const { value: selectedMachine } = await Swal.fire({
+                  title: 'Избери работно място',
+                  text: 'Списъкът се генерира автоматично от твоите Маршрутни карти',
+                  input: 'select',
+                  inputOptions: optionsMap,
+                  inputValue: currentMachine || "",
+                  showCancelButton: !isInitial,
+                  allowOutsideClick: !isInitial,
+                  confirmButtonText: 'Избери',
+                  cancelButtonText: 'Отказ',
+                  confirmButtonColor: '#2563eb'
+              });
+
+              if (selectedMachine !== undefined) {
+                  currentMachine = selectedMachine;
+                  localStorage.setItem('mes_machine', currentMachine);
+                  document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
+                  loadTasks();
+              } else if (isInitial) {
+                  currentMachine = "";
+                  localStorage.setItem('mes_machine', currentMachine);
+                  document.getElementById('uiMachineName').innerText = "ВСИЧКИ";
+                  loadTasks();
+              }
+          } catch (err) {
+              console.error(err);
+              Swal.fire('Грешка', 'Не успях да заредя списъка с машини.', 'error');
+              if (isInitial) loadTasks();
+          }
+      }
+
+      // --- ОСНОВНА ЛОГИКА ЗА ЗАДАЧИ ---
       async function loadTasks() {
         document.getElementById('cardsArea').innerHTML = '';
         document.getElementById('loadingMsg').style.display = 'block';
         
         try {
-            // Взимаме абсолютно всички отчети (и Отчетено, и Брак) без лимити
             const [plansRes, bomRes, routesRes, reportsRes, skladRes] = await Promise.all([
                 client.from('plan').select('*').limit(10000),
                 client.from('bom').select('*').limit(10000),
@@ -172,16 +245,13 @@
             if (bomRes.error) throw bomRes.error;
             if (routesRes.error) throw routesRes.error;
             if (reportsRes.error) throw reportsRes.error;
-            if (skladRes.error) console.warn("Проблем с таблица sklad:", skladRes.error.message);
 
             let completedOps = {}; 
             let scrappedOps = {}; 
 
-            // Разделяме здравите бройки от бракуваните
             reportsRes.data.forEach(r => {
                 let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
                 let qty = parseFloat(r['Количество']) || 0;
-                
                 if (r['Статус'] === 'Брак') {
                     if(!scrappedOps[key]) scrappedOps[key] = 0;
                     scrappedOps[key] += qty;
@@ -262,16 +332,14 @@
                         
                         let doneQty = completedOps[opKey] || 0;
                         let scrapQty = scrappedOps[opKey] || 0;
-                        let consumedHere = doneQty + scrapQty; // Колко физически детайла сме унищожили/използвали
+                        let consumedHere = doneQty + scrapQty; 
                         
-                        // МАГИЯТА ЗА БРАК: Изчисляваме колко детайла са бракувани НАПРЕД по веригата
                         let scrapStrictlyDownstream = 0;
                         for(let j = idx + 1; j < routes.length; j++) {
                             let dKey = code + '_' + String(routes[j]['Име на операция']).trim();
                             scrapStrictlyDownstream += (scrappedOps[dKey] || 0);
                         }
                         
-                        // Ако някой напред е счупил 5, ние трябва да произведем план + 5
                         let effectivePlanQty = planQty + scrapStrictlyDownstream;
 
                         if(doneQty >= effectivePlanQty) return; 
@@ -555,7 +623,8 @@
         });
       }
       
-      window.onload = loadTasks;
+      // Започваме от тук, когато страницата се зареди!
+      window.onload = initTerminal;
     </script>
   </body>
 </html>
