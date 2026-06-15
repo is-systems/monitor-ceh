@@ -88,6 +88,8 @@
       let currentMachine = "";
       let globalTasks = []; 
       let localHistoryData = [];
+      let globalBomData = [];
+      let globalRoutesByDetail = {};
 
       // --- СИСТЕМА ЗА ИСТОРИЯ ---
       function updateHistoryUI() {
@@ -128,7 +130,6 @@
           currentOperator = localStorage.getItem('mes_operator');
           let savedMachine = localStorage.getItem('mes_machine');
 
-          // Пита за име на оператор с красиво меню
           if (!currentOperator) {
               const { value: opName } = await Swal.fire({
                   title: 'Добре дошли!',
@@ -143,7 +144,6 @@
           }
           document.getElementById('uiOperatorName').innerText = currentOperator;
 
-          // Пита за машина, ако не е запаметена
           if (savedMachine === null) {
               await changeMachine(true); 
           } else {
@@ -170,12 +170,10 @@
           }
       }
 
-      // Умното меню за избор на машини от базата
       async function changeMachine(isInitial = false) {
           Swal.fire({ title: 'Търсене на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           
           try {
-              // Дърпаме всички маршрути, за да видим какви машини съществуват
               const { data, error } = await client.from('marshruti').select('Машина').limit(10000);
               if (error) throw error;
               
@@ -188,9 +186,8 @@
                       }
                   });
               }
-              uniqueMachines.sort(); // Подреждаме ги по азбучен ред
+              uniqueMachines.sort(); 
 
-              // Създаваме обекта за падащото меню
               let optionsMap = { "": "🌍 ВСИЧКИ МАШИНИ" };
               uniqueMachines.forEach(m => { optionsMap[m] = m; });
 
@@ -246,6 +243,18 @@
             if (routesRes.error) throw routesRes.error;
             if (reportsRes.error) throw reportsRes.error;
 
+            globalBomData = bomRes.data || [];
+            globalRoutesByDetail = {};
+            
+            routesRes.data.forEach(r => {
+                let code = String(r['Код на детайла']).trim();
+                if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = [];
+                globalRoutesByDetail[code].push(r);
+            });
+            Object.keys(globalRoutesByDetail).forEach(code => {
+                globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
+            });
+
             let completedOps = {}; 
             let scrappedOps = {}; 
 
@@ -268,18 +277,7 @@
                 return item ? (parseFloat(item['Остатък']) || 0) : 0;
             };
 
-            let routesByDetail = {};
-            routesRes.data.forEach(r => {
-                let code = String(r['Код на детайла']).trim();
-                if(!routesByDetail[code]) routesByDetail[code] = [];
-                routesByDetail[code].push(r);
-            });
-            Object.keys(routesByDetail).forEach(code => {
-                routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-            });
-
             let planGroups = {}; 
-            let bomData = bomRes.data || [];
 
             plansRes.data.forEach(plan => {
                 let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim();
@@ -294,20 +292,27 @@
                     общо_необходимо_количество: targetQty
                 });
 
-                function traverseAndAdd(parentName, parentQty) {
-                    let children = bomData.filter(b => String(b['ID Родител']).trim() === parentName);
+                // Динамично изчисляване на нуждата на родителя ПРЕДИ спускане към децата
+                function traverseAndAdd(parentName, parentBaseQty) {
+                    let parentScrapTotal = 0;
+                    for (let key in scrappedOps) {
+                        if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
+                    }
+                    let actualParentNeed = parentBaseQty + parentScrapTotal;
+
+                    let children = globalBomData.filter(b => String(b['ID Родител']).trim() === parentName);
                     children.forEach(c => {
                         let childName = String(c['ID Компонент']).trim();
                         let multiplier = parseFloat(c['Количество']) || 1;
-                        let neededQty = parentQty * multiplier;
+                        let childNeededQty = actualParentNeed * multiplier;
 
                         planGroups[planId].push({
                             детайл_код: childName,
                             текущ_родител: parentName,
-                            общо_необходимо_количество: neededQty
+                            общо_необходимо_количество: childNeededQty
                         });
 
-                        traverseAndAdd(childName, neededQty);
+                        traverseAndAdd(childName, childNeededQty);
                     });
                 }
                 traverseAndAdd(rootItem, targetQty);
@@ -323,7 +328,7 @@
                     let code = String(node.детайл_код).trim();
                     let planQty = parseFloat(node.общо_необходимо_количество) || 0;
                     
-                    let routes = routesByDetail[code] || [];
+                    let routes = globalRoutesByDetail[code] || [];
                     if(routes.length === 0) return; 
                     
                     routes.forEach((route, idx) => {
@@ -369,7 +374,7 @@
                                 children.forEach(child => {
                                     let cCode = String(child.детайл_код).trim();
                                     let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
-                                    let cRoutes = routesByDetail[cCode] || [];
+                                    let cRoutes = globalRoutesByDetail[cCode] || [];
                                     let cDone = 0;
                                     let isManufactured = (cRoutes.length > 0);
                                     
@@ -378,7 +383,8 @@
                                         let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
                                         cDone = completedOps[cOpKey] || 0;
                                     } else {
-                                        cDone = getSkladQty(cCode);
+                                        // Четем от склада + евентуално спасени суровини при брак
+                                        cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0);
                                     }
                                     
                                     if (cPlan > 0) {
@@ -593,37 +599,114 @@
             return;
         }
 
+        // --- УМНАТА ЛОГИКА ЗА БРАК НА СЪСТАВНИ ДЕТАЙЛИ (#) ---
+        if (taskData.name.includes('#')) {
+            let children = globalBomData.filter(b => String(b['ID Родител']).trim() === taskData.name);
+            
+            if (children.length > 0) {
+                let checkboxHtml = '<div style="text-align:left; margin-top:15px; font-size:14px; max-height: 250px; overflow-y: auto;">';
+                checkboxHtml += '<p style="color:#e74c3c; font-weight:bold; margin-bottom:12px;">Кои компоненти вътре бяха счупени?<br><span style="font-size: 0.8em; color: #64748b;">(Отмаркирайте спасените детайли, за да не се произвеждат пак)</span></p>';
+                
+                children.forEach(c => {
+                    let cName = String(c['ID Компонент']).trim();
+                    checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:8px; cursor:pointer; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;">
+                                       <input type="checkbox" class="scrap-child-cb" value="${cName}" checked style="transform: scale(1.5); margin-right:15px; cursor:pointer;">
+                                       <span style="font-weight:700; font-size: 1.1em; color: #1e293b;">${cName}</span>
+                                     </label>`;
+                });
+                checkboxHtml += '</div>';
+
+                const { value: formValues, isConfirmed } = await Swal.fire({
+                    title: 'Бракуване на ' + taskData.name,
+                    html: `Ще бракувате <b>${val} бр.</b><br>` + checkboxHtml,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e74c3c',
+                    cancelButtonColor: '#94a3b8',
+                    confirmButtonText: 'Да, бракувай!',
+                    cancelButtonText: 'Отказ',
+                    preConfirm: () => {
+                        let checkboxes = document.querySelectorAll('.scrap-child-cb');
+                        let scrapped = [];
+                        checkboxes.forEach(cb => { if (cb.checked) scrapped.push(cb.value); });
+                        return scrapped;
+                    }
+                });
+
+                if (isConfirmed) {
+                    await executeScrapLogic(taskData, val, children, formValues);
+                }
+                return;
+            }
+        }
+
+        // Стандартен Брак (За обикновени детайли без деца)
         Swal.fire({ 
           title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', 
           showCancelButton: true, confirmButtonColor: '#e74c3c', cancelButtonColor: '#94a3b8', 
           confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ' 
         }).then(async (result) => {
           if (result.isConfirmed) {
-            Swal.fire({ title: 'Бракуване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-            
-            try {
-                const { error } = await client.from('otcheti').insert([{
-                    "ID Детайл": taskData.name,
-                    "Оператор": currentOperator,
-                    "Количество": val,
-                    "Операция": taskData.op,
-                    "Статус": "Брак",
-                    "Дата": new Date().toISOString()
-                }]);
-
-                if(error) throw error;
-
-                addLogToHistory('БРАК', val, taskId); 
-                Swal.close(); loadTasks(); 
-            } catch(err) {
-                console.error(err);
-                Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
-            }
+              await executeScrapLogic(taskData, val, [], []);
           }
         });
       }
+
+      // --- ИЗПЪЛНЕНИЕ И ЗАПИСВАНЕ НА БРАКА В БАЗАТА ---
+      async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNames) {
+          Swal.fire({ title: 'Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+          try {
+              // 1. Записваме основния брак за възела
+              let inserts = [{
+                  "ID Детайл": taskData.name,
+                  "Оператор": currentOperator,
+                  "Количество": val,
+                  "Операция": taskData.op,
+                  "Статус": "Брак",
+                  "Дата": new Date().toISOString()
+              }];
+
+              // 2. Връщаме виртуално на масата всички "Спасени" (отмаркирани) детайли
+              allChildren.forEach(child => {
+                  let cName = String(child['ID Компонент']).trim();
+                  
+                  if (!scrappedChildrenNames.includes(cName)) {
+                      let multiplier = parseFloat(child['Количество']) || 1;
+                      let savedQty = val * multiplier;
+
+                      let cRoutes = globalRoutesByDetail[cName] || [];
+                      let operationToLog = "Възстановен"; 
+
+                      // Записваме ги на тяхната ПОСЛЕДНА операция, за да се броят за завършени
+                      if (cRoutes.length > 0) {
+                          let lastRoute = cRoutes[cRoutes.length - 1];
+                          operationToLog = String(lastRoute['Име на операция']).trim();
+                      }
+
+                      inserts.push({
+                          "ID Детайл": cName,
+                          "Оператор": "СИСТЕМА (Спасен)",
+                          "Количество": savedQty,
+                          "Операция": operationToLog,
+                          "Статус": "Отчетено",
+                          "Дата": new Date().toISOString()
+                      });
+                  }
+              });
+
+              const { error } = await client.from('otcheti').insert(inserts);
+              if (error) throw error;
+
+              addLogToHistory('БРАК', val, taskData.id); 
+              Swal.close(); 
+              loadTasks(); 
+          } catch(err) {
+              console.error(err);
+              Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
+          }
+      }
       
-      // Започваме от тук, когато страницата се зареди!
       window.onload = initTerminal;
     </script>
   </body>
