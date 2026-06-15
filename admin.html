@@ -99,6 +99,22 @@
       );
 
       const tableConfigs = {
+        nomenklatura: {
+          label: '🗂️ Номенклатура',
+          table: 'Номенклатура', 
+          key: 'id',
+          fields: [
+            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
+            { name: 'ID Детайл', type: 'text', required: true, label: 'Код / ID на детайла' },
+            { name: 'Вътрешно име', type: 'text', label: 'Вътрешно име / Описание' },
+            { name: 'Тип', type: 'text', label: 'Тип (напр. Възел, Материал)' },
+            { name: 'ID Родител', type: 'text', label: 'Родител (ако е приложимо)' },
+            { name: 'Разходна норма', type: 'number', def: 1 },
+            { name: 'Единици', type: 'text', def: 'бр.', label: 'Мерна единица (бр., кг, м)' },
+            { name: 'Линк към чертеж', type: 'text' },
+            { name: 'Имейл на доставчик', type: 'text', label: 'Имейл на доставчик (за поръчки)' }
+          ]
+        },
         sklad: {
           label: '📦 Склад',
           table: 'sklad',
