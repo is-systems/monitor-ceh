@@ -179,7 +179,7 @@
 
     let globalConnections = [];
     
-    // БЕЗОПАСНИ ID-та: Предотвратяват чупене на HTML заради кавички и странни символи!
+    // БЕЗОПАСНИ ID-та за детайлите със специални символи
     let domIdMap = {};
     let domIdCounter = 0;
     function getDomId(realId) {
@@ -342,7 +342,6 @@
       document.getElementById('loading').style.display = 'none';
       globalConnections = data.connections || [];
       
-      // Нулираме речника за да са винаги пресни ID-тата
       domIdMap = {};
       domIdCounter = 0;
 
@@ -460,7 +459,6 @@
               let colHTML = `<div class="bom-column">`;
               
               levels[lvl].forEach(node => {
-                // Създаваме напълно безопасно ID за HTML-а
                 let dId = getDomId(node.id);
 
                 const isRoot = !node.parentCode; 
@@ -476,39 +474,6 @@
                    warningHTML = `<span class="tooltip-container hide-on-machine"><span class="material-warning-trigger" onclick="toggleTooltip(event, '${dId}')">⚠️</span><div id="tooltip_${dId}" class="vsm-tooltip">✗ ${node.materialWarning}</div></span>`;
                 }
 
-                let isHiddenNode = false;
-                let children = childMap[node.id] || [];
-                let allChildrenDone = true;
-                
-                if (children.length > 0) {
-                    allChildrenDone = children.every(cId => {
-                        let chNode = allNodesMap[cId];
-                        if(!chNode || !chNode.operations) return false;
-                        return chNode.operations.findIndex(o => o.completed < chNode.planQty) === -1;
-                    });
-                }
-
-                let hasStarted = false;
-                let is100PercentDone = false;
-                if (node.operations && node.operations.length > 0) {
-                    hasStarted = node.operations[0].completed > 0;
-                    is100PercentDone = node.operations.findIndex(o => o.completed < node.planQty) === -1;
-                }
-
-                if (children.length > 0 && !hasStarted && !allChildrenDone) {
-                    isHiddenNode = true;
-                }
-
-                let pId = parentMap[node.id];
-                if (is100PercentDone && pId) {
-                    let pNode = allNodesMap[pId];
-                    if (pNode && pNode.operations && pNode.operations.length > 0) {
-                        if (pNode.operations[0].completed > 0) {
-                            isHiddenNode = true;
-                        }
-                    }
-                }
-
                 let opsHTML = '';
                 let titleClass = 'title-gray';
 
@@ -516,89 +481,89 @@
                 if (len > 0) {
                     let currIdx = node.operations.findIndex(o => o.completed < node.planQty);
 
-                    let pastHiddenArr = [];
-                    function collectPast(nId, isStart) {
-                        let cIds = childMap[nId] || [];
-                        cIds.forEach(cId => collectPast(cId, false)); 
-
-                        let n = allNodesMap[nId];
-                        if (n && n.operations) {
-                            let cIdx = n.operations.findIndex(o => o.completed < n.planQty);
-                            let endIdx = (cIdx === -1) ? n.operations.length - 1 : cIdx - 1;
-                            if (isStart) endIdx = (cIdx === -1) ? n.operations.length - 2 : cIdx - 2;
-                            
-                            for(let i = 0; i <= endIdx; i++) {
-                                let badge = (!isStart) ? `<span style="color:#fb923c;">[${n.code}]</span> ` : '';
-                                pastHiddenArr.push(`<span class="op-text op-past">${badge}${n.operations[i].name} | ${n.operations[i].completed}/${n.planQty}</span>`);
-                            }
-                        }
-                    }
-                    collectPast(node.id, true);
-
-                    let futureHiddenArr = [];
-                    function collectFuture(nId, isStart) {
-                        let n = allNodesMap[nId];
-                        if (n && n.operations) {
-                            let cIdx = n.operations.findIndex(o => o.completed < n.planQty);
-                            if (cIdx !== -1) {
-                                let startIdx = isStart ? cIdx + 2 : 0;
-                                for(let i = startIdx; i < n.operations.length; i++) {
-                                    let badge = (!isStart) ? `<span style="color:#a855f7;">[${n.code}]</span> ` : '';
-                                    futureHiddenArr.push(`<span class="op-text op-future" style="${badge ? 'color:#a855f7; opacity:0.9;' : ''}">${badge}${n.operations[i].name} | 0/${n.planQty}</span>`);
-                                }
-                            }
-                        }
-                        let parentId = parentMap[nId];
-                        if (parentId) collectFuture(parentId, false); 
-                    }
-                    collectFuture(node.id, true);
-
                     const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFuture = (op) => `<span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
                     const formatFocusBlue = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFocusGray = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFocusGreen = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
 
+                    let pastHiddenArr = [];
+                    let futureHiddenArr = [];
                     let html = '';
 
-                    if (pastHiddenArr.length > 0) {
-                        html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}" title="Минали операции (и от децата)">⋯</span> `;
-                        html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
-                    }
-
                     if (currIdx === -1) {
+                        // Детайлът е напълно готов
                         titleClass = 'title-green';
                         let lastIdx = len - 1;
-                        if (lastIdx > 0) html += formatPast(node.operations[lastIdx - 1]) + ' <span class="arr">➔</span> ';
+                        
+                        // Събираме миналото до предпоследната операция
+                        for(let i=0; i < lastIdx - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
+                        
+                        if(pastHiddenArr.length > 0) {
+                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}" title="Минали операции">⋯</span> `;
+                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
+                        }
+                        
+                        // Предпоследна (видима)
+                        if(lastIdx > 0) {
+                            html += formatPast(node.operations[lastIdx - 1]) + ' <span class="arr">➔</span> ';
+                        }
+                        
+                        // Последна (голяма зелена)
                         html += formatFocusGreen(node.operations[lastIdx]);
+                        
                     } else {
+                        // Детайлът се работи или чака
                         let isWorking = node.operations[currIdx].completed > 0 || currIdx > 0;
                         if (isWorking) titleClass = 'title-blue';
 
-                        if (currIdx > 0) html += formatPast(node.operations[currIdx - 1]) + ' <span class="arr">➔</span> ';
-                        
-                        html += isWorking ? formatFocusBlue(node.operations[currIdx]) : formatFocusGray(node.operations[currIdx]);
-                        
-                        if (currIdx < len - 1) html += ' <span class="arr">➔</span> ' + formatFuture(node.operations[currIdx + 1]);
-                    }
+                        // 1. Събираме скритото минало
+                        for(let i=0; i < currIdx - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
+                        if(pastHiddenArr.length > 0) {
+                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}" title="Минали операции">⋯</span> `;
+                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
+                        }
 
-                    if (futureHiddenArr.length > 0) {
-                        html += `<span id="hist_future_${dId}" class="hidden-history"> <span class="arr">➔</span> ${futureHiddenArr.join(' <span class="arr">➔</span> ')}</span>`;
-                        html += ` <span class="harmony-toggle" onclick="toggleHarmony('future_${dId}')" id="btn_future_${dId}" title="Бъдещи операции (и към родителите)">⋯</span>`;
+                        // 2. Предходна операция (видима)
+                        if (currIdx > 0) {
+                            html += formatPast(node.operations[currIdx - 1]) + ' <span class="arr">➔</span> ';
+                        }
+
+                        // 3. Текуща операция
+                        html += isWorking ? formatFocusBlue(node.operations[currIdx]) : formatFocusGray(node.operations[currIdx]);
+
+                        // 4. Следваща операция (видима)
+                        if (currIdx < len - 1) {
+                            html += ' <span class="arr">➔</span> ' + formatFuture(node.operations[currIdx + 1]);
+                        }
+
+                        // 5. Събираме скритото бъдеще
+                        for(let i = currIdx + 2; i < len; i++) futureHiddenArr.push(formatFuture(node.operations[i]));
+                        if(futureHiddenArr.length > 0) {
+                            html += `<span id="hist_future_${dId}" class="hidden-history"> <span class="arr">➔</span> ${futureHiddenArr.join(' <span class="arr">➔</span> ')}</span>`;
+                            html += ` <span class="harmony-toggle" onclick="toggleHarmony('future_${dId}')" id="btn_future_${dId}" title="Бъдещи операции">⋯</span>`;
+                        }
                     }
 
                     opsHTML = `<div class="vsm-ops">${html}</div>`;
                 }
                 
                 let isAssemblyWindow = (containerId === 'w-assembly'); 
-                if (children.length > 0 && allChildrenDone && isAssemblyWindow && titleClass !== 'title-green') {
-                    titleClass = 'title-yellow'; 
+                let children = childMap[node.id] || [];
+                if (children.length > 0 && isAssemblyWindow && titleClass !== 'title-green') {
+                    let allChildrenDone = children.every(cId => {
+                        let chNode = allNodesMap[cId];
+                        if(!chNode || !chNode.operations) return false;
+                        return chNode.operations.findIndex(o => o.completed < chNode.planQty) === -1;
+                    });
+                    if (allChildrenDone) {
+                        titleClass = 'title-yellow'; 
+                    }
                 }
 
-                let cardStyle = isHiddenNode ? 'display: none;' : '';
-
+                // КАРТИТЕ ВЕЧЕ НИКОГА НЕ СЕ СКРИВАТ
                 colHTML += `
-                  <div class="vsm-node" id="card_${dId}" style="${cardStyle}">
+                  <div class="vsm-node" id="card_${dId}">
                     <div class="vsm-header">
                       <span class="vsm-title ${titleClass}">${rootMarker}${packageIcon}${node.code}${drawingLinkHTML}</span>
                       <span class="vsm-qty">| ${warehouseQty}/${node.planQty}</span>
@@ -671,8 +636,6 @@
           const winChild = cardChild.closest('.window-body');
           const winParent = cardParent.closest('.window-body');
           if (winChild !== winParent) return;
-
-          if (cardChild.style.display === 'none' || cardParent.style.display === 'none') return;
 
           const sourceEl = cardChild.querySelector('.vsm-title');
           const targetEl = cardParent.querySelector('.vsm-title');
