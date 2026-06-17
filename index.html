@@ -24,7 +24,7 @@
     
     #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; z-index: 1000; font-weight: 800; font-size: 24px; letter-spacing: 2px; flex-direction: column; text-align: center; padding: 20px;}
     #error-box { color: #ef4444; margin-top: 20px; font-size: 18px; max-width: 800px; word-wrap: break-word; }
-    #svg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; } /* Стрелките са отзад */
+    #svg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
 
     /* СТРУКТУРА НА ТАБЛОТО */
     .layout-wrapper { display: flex; flex-direction: column; gap: 12px; min-height: 95vh; position: relative; z-index: 10; min-width: max-content; padding-right: 12px; padding-bottom: 20px;}
@@ -59,7 +59,7 @@
 
     .plan-group { border-left: 3px solid #475569; padding-left: 12px; margin-bottom: 8px; display: flex; flex-direction: column; }
     .plan-label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 8px; }
-    .family-row { display: flex; flex-direction: row; gap: 40px; padding: 5px 0; border-bottom: none; align-items: center; }
+    .family-row { display: flex; flex-direction: row; gap: 30px; padding: 5px 0; border-bottom: none; align-items: center; }
     .family-row:last-child { border-bottom: none; padding-bottom: 0; }
     .bom-column { display: flex; flex-direction: column; gap: 14px; justify-content: center; position: relative; z-index: 2;}
 
@@ -68,73 +68,46 @@
     .vsm-tooltip { display: none; position: absolute; left: 50%; bottom: 125%; transform: translateX(-50%); background: #020617; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: 800; z-index: 110; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid #ef4444; }
     .vsm-tooltip::before { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #020617 transparent transparent transparent; }
 
-    /* --- НОВИЯТ ДИЗАЙН НА КАРТИТЕ (КАНБАН СТИЛ) --- */
-    .vsm-node { 
-        display: flex; flex-direction: column; gap: 6px; 
-        padding: 8px 10px; width: min-content; min-width: 220px; 
-        background: rgba(15, 23, 42, 0.9); border: 1px solid #334155; 
-        border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
+    /* GPS ВИЗУАЛИЗАЦИЯ */
+    .vsm-node { display: flex; flex-direction: column; gap: 2px; padding: 0; width: max-content; background: transparent; border: none; }
+    .vsm-header { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; border: none; padding-bottom: 2px; margin-bottom: 0px;}
     
-    .vsm-header { 
-        display: flex; justify-content: space-between; align-items: center; 
-        border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 2px;
-    }
-    
-    .vsm-title { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap;}
+    .vsm-title { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
     .title-green { color: #22c55e !important; }     
     .title-blue { color: #60a5fa !important; }      
     .title-yellow { color: #facc15 !important; text-shadow: 0 0 10px rgba(250,204,21,0.3); } 
     .title-gray { color: #cbd5e1 !important; }      
     
-    .vsm-qty-header { 
-        font-size: 13px; font-weight: 800; color: #94a3b8; 
-        background: #1e293b; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    .vsm-qty { font-size: 14px; font-weight: 800; color: #64748b; }
+
+    /* УМНИ ОПЕРАЦИИ (ЛУПА) */
+    .vsm-ops { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+    .op-text { white-space: nowrap; font-family: 'Sofia Sans', sans-serif; }
+    
+    /* Завършена операция (малка и зелена) */
+    .op-past { font-size: 13px; font-weight: 600; color: #22c55e; opacity: 0.9; }
+    
+    /* Текуща операция (голяма) */
+    .op-focus { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
+    .op-focus.active { color: #60a5fa; text-shadow: 0 0 8px rgba(59,130,246,0.4); } /* Започната (Синя) */
+    .op-focus.waiting { color: #94a3b8; } /* Още не е започната (Светло сива) */
+    
+    /* Следваща операция (малка и сива) */
+    .op-future { font-size: 13px; font-weight: 600; color: #64748b; opacity: 0.7; }
+
+    /* Всички операции са приключили (голямо зелено) */
+    .op-finished-all { font-size: 18px; font-weight: 900; color: #22c55e; text-shadow: 0 0 8px rgba(34,197,94,0.4); }
+    
+    /* БУТОНИ ЗА РАЗГЪВАНЕ (ТРИ ТОЧКИ) */
+    .harmony-toggle { 
+        color: #64748b; font-weight: 900; font-size: 16px; cursor: pointer; 
+        user-select: none; transition: all 0.2s; padding: 0 6px; 
+        background: rgba(255,255,255,0.05); border-radius: 4px; display: inline-block;
     }
+    .harmony-toggle:hover { color: #60a5fa; background: rgba(255,255,255,0.1); }
+    .hidden-history { display: none !important; }
 
-    /* ВЕРТИКАЛНИ ОПЕРАЦИИ */
-    .vsm-ops-vertical { display: flex; flex-direction: column; gap: 4px; }
-    
-    .op-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 3px 0; }
-    
-    .op-name { 
-        font-size: 13px; white-space: nowrap; overflow: hidden; 
-        text-overflow: ellipsis; max-width: 140px; font-family: 'Sofia Sans', sans-serif;
-    }
-    
-    .op-badge { 
-        font-size: 12px; font-weight: 800; padding: 2px 6px; 
-        border-radius: 12px; white-space: nowrap; font-variant-numeric: tabular-nums;
-    }
-
-    /* Статуси на операциите */
-    .op-past-row .op-name { color: #4ade80; opacity: 0.8; font-weight: 600; }
-    .op-past-row .op-badge { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-
-    .op-current-row.active .op-name { color: #60a5fa; font-weight: 900; font-size: 14px; }
-    .op-current-row.active .op-badge { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: 0 0 8px rgba(59,130,246,0.2); }
-
-    .op-current-row.waiting .op-name { color: #cbd5e1; font-weight: 800; font-size: 14px; }
-    .op-current-row.waiting .op-badge { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
-
-    .op-future-row .op-name { color: #64748b; font-weight: 600; }
-    .op-future-row .op-badge { background: rgba(51, 65, 85, 0.5); color: #64748b; }
-
-    .op-all-done-row .op-name { color: #22c55e; font-weight: 900; font-size: 14px; text-shadow: 0 0 8px rgba(34, 197, 94, 0.3); }
-    .op-all-done-row .op-badge { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.5); }
-    
-    /* БУТОНИ ЗА РАЗГЪВАНЕ (...) ВЕРТИКАЛНИ */
-    .harmony-toggle-vertical { 
-        text-align: center; color: #475569; cursor: pointer; font-size: 18px; 
-        font-weight: 900; line-height: 0.6; padding: 4px 0; margin: 2px 0;
-        border-radius: 4px; background: rgba(255,255,255,0.02); 
-        transition: all 0.2s; user-select: none; letter-spacing: 2px;
-    }
-    .harmony-toggle-vertical:hover { background: rgba(255,255,255,0.05); color: #60a5fa; }
-    
-    .hidden-history-vertical { display: none; }
-    .hidden-history-vertical.show { display: flex; flex-direction: column; gap: 4px; }
-
+    .arr { color: #475569; font-weight: bold; font-size: 12px; margin: 0 2px;}
     .machine-view .hide-on-machine { display: none !important; }
   </style>
 </head>
@@ -206,6 +179,7 @@
 
     let globalConnections = [];
     
+    // БЕЗОПАСНИ ID-та за детайлите със специални символи (" , /)
     let domIdMap = {};
     let domIdCounter = 0;
     function getDomId(realId) {
@@ -225,14 +199,14 @@
         const histEl = document.getElementById('hist_' + idStr);
         const btnEl = document.getElementById('btn_' + idStr);
         if (histEl && btnEl) {
-            if (histEl.classList.contains('show')) {
-                histEl.classList.remove('show');
-                btnEl.style.color = ''; 
-                btnEl.style.background = '';
-            } else {
-                histEl.classList.add('show');
+            if (histEl.classList.contains('hidden-history')) {
+                histEl.classList.remove('hidden-history');
                 btnEl.style.color = '#60a5fa'; 
                 btnEl.style.background = 'rgba(59,130,246,0.15)';
+            } else {
+                histEl.classList.add('hidden-history');
+                btnEl.style.color = '';
+                btnEl.style.background = '';
             }
             setTimeout(() => drawArrows(), 50);
         }
@@ -503,6 +477,7 @@
                 let opsHTML = '';
                 let titleClass = 'title-gray';
 
+                // --- ЛОГИКА ЗА СКРИВАНЕ НА ОПЕРАЦИИ (РОДИТЕЛИ, КОИТО ЧАКАТ) ---
                 let children = childMap[node.id] || [];
                 let allChildrenDone = true;
                 
@@ -519,89 +494,72 @@
                     hasStarted = node.operations.some(o => o.completed > 0);
                 }
 
+                // АКО ИМА ДЕЦА, НО ТЕ НЕ СА ГОТОВИ И РОДИТЕЛЯТ НЕ Е ЗАПОЧНАТ -> СКРИВАМЕ ОПЕРАЦИИТЕ
                 let shouldShowOps = true;
                 if (children.length > 0 && !hasStarted && !allChildrenDone) {
                     shouldShowOps = false;
                 }
 
-                // Хелпър функция за рендиране на 1 ред операция
-                const formatRow = (op, status) => {
-                    let rowClass = '';
-                    let badgeClass = '';
-
-                    if (status === 'past') {
-                        rowClass = 'op-past-row';
-                        badgeClass = 'badge-green';
-                    } else if (status === 'current-active') {
-                        rowClass = 'op-current-row active';
-                        badgeClass = 'badge-blue';
-                    } else if (status === 'current-waiting') {
-                        rowClass = 'op-current-row waiting';
-                        badgeClass = 'badge-gray-blue';
-                    } else if (status === 'future') {
-                        rowClass = 'op-future-row';
-                        badgeClass = 'badge-gray';
-                    } else if (status === 'all-done') {
-                        rowClass = 'op-all-done-row';
-                        badgeClass = 'badge-green';
-                    }
-
-                    return `
-                    <div class="op-row ${rowClass}">
-                        <span class="op-name" title="${op.name}">${op.name}</span>
-                        <span class="op-badge">${op.completed} / ${node.planQty}</span>
-                    </div>
-                    `;
-                };
-
                 if (shouldShowOps && node.operations.length > 0) {
                     let len = node.operations.length;
                     let currIdx = node.operations.findIndex(o => o.completed < node.planQty);
+
+                    const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
+                    const formatFuture = (op) => `<span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
+                    const formatFocusBlue = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
+                    const formatFocusGray = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
+                    const formatFocusGreen = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
 
                     let pastHiddenArr = [];
                     let futureHiddenArr = [];
                     let html = '';
 
                     if (currIdx === -1) {
+                        // Детайлът е 100% готов
                         titleClass = 'title-green';
                         let lastIdx = len - 1;
                         
-                        for(let i=0; i < lastIdx - 1; i++) pastHiddenArr.push(formatRow(node.operations[i], 'past'));
+                        for(let i=0; i < lastIdx - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
                         
                         if(pastHiddenArr.length > 0) {
-                            html += `<div class="harmony-toggle-vertical" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</div>`;
-                            html += `<div id="hist_past_${dId}" class="hidden-history-vertical">${pastHiddenArr.join('')}</div>`;
+                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
+                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
                         
-                        if(lastIdx > 0) html += formatRow(node.operations[lastIdx - 1], 'past');
+                        if(lastIdx > 0) html += formatPast(node.operations[lastIdx - 1]) + ' <span class="arr">➔</span> ';
                         
-                        html += formatRow(node.operations[lastIdx], 'all-done');
+                        html += formatFocusGreen(node.operations[lastIdx]);
                         
                     } else {
+                        // Детайлът се работи (или е готов за стартиране)
                         let isWorking = node.operations[currIdx].completed > 0 || currIdx > 0;
                         if (isWorking) titleClass = 'title-blue';
-                        let currStatus = isWorking ? 'current-active' : 'current-waiting';
 
-                        for(let i=0; i < currIdx - 1; i++) pastHiddenArr.push(formatRow(node.operations[i], 'past'));
+                        // Минало
+                        for(let i=0; i < currIdx - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
                         if(pastHiddenArr.length > 0) {
-                            html += `<div class="harmony-toggle-vertical" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</div>`;
-                            html += `<div id="hist_past_${dId}" class="hidden-history-vertical">${pastHiddenArr.join('')}</div>`;
+                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
+                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
 
-                        if (currIdx > 0) html += formatRow(node.operations[currIdx - 1], 'past');
+                        // Предходна (Зелена)
+                        if (currIdx > 0) html += formatPast(node.operations[currIdx - 1]) + ' <span class="arr">➔</span> ';
                         
-                        html += formatRow(node.operations[currIdx], currStatus);
+                        // Текуща (Голяма Синя или Сива)
+                        html += isWorking ? formatFocusBlue(node.operations[currIdx]) : formatFocusGray(node.operations[currIdx]);
                         
-                        if (currIdx < len - 1) html += formatRow(node.operations[currIdx + 1], 'future');
+                        // Следваща (Сива)
+                        if (currIdx < len - 1) html += ' <span class="arr">➔</span> ' + formatFuture(node.operations[currIdx + 1]);
 
-                        for(let i = currIdx + 2; i < len; i++) futureHiddenArr.push(formatRow(node.operations[i], 'future'));
+                        // Бъдеще
+                        for(let i = currIdx + 2; i < len; i++) futureHiddenArr.push(formatFuture(node.operations[i]));
                         if(futureHiddenArr.length > 0) {
-                            html += `<div id="hist_future_${dId}" class="hidden-history-vertical">${futureHiddenArr.join('')}</div>`;
-                            html += `<div class="harmony-toggle-vertical" onclick="toggleHarmony('future_${dId}')" id="btn_future_${dId}">⋯</div>`;
+                            html += `<span id="hist_future_${dId}" class="hidden-history"> <span class="arr">➔</span> ${futureHiddenArr.join(' <span class="arr">➔</span> ')}</span>`;
+                            html += ` <span class="harmony-toggle" onclick="toggleHarmony('future_${dId}')" id="btn_future_${dId}">⋯</span>`;
                         }
                     }
 
-                    opsHTML = `<div class="vsm-ops-vertical">${html}</div>`;
+                    opsHTML = `<div class="vsm-ops">${html}</div>`;
                 }
                 
                 let isAssemblyWindow = (containerId === 'w-assembly'); 
@@ -609,16 +567,13 @@
                     titleClass = 'title-yellow'; 
                 }
 
-                // КАРТИТЕ СА СТАБИЛНИ КОНТЕЙНЕРИ
+                // КАРТИТЕ СТОЯТ ВИНАГИ ВИДИМИ, ЗА ДА СЕ ВИЖДА ДЪРВОТО И СТРЕЛКИТЕ
                 colHTML += `
                   <div class="vsm-node" id="card_${dId}">
                     <div class="vsm-header">
-                      <div style="display:flex; align-items: center; gap: 4px;">
-                        <span class="vsm-title ${titleClass}">${rootMarker}${packageIcon}${node.code}</span>
-                        ${drawingLinkHTML}
-                        ${warningHTML}
-                      </div>
-                      <span class="vsm-qty-header">${warehouseQty}/${node.planQty}</span>
+                      <span class="vsm-title ${titleClass}">${rootMarker}${packageIcon}${node.code}${drawingLinkHTML}</span>
+                      <span class="vsm-qty">| ${warehouseQty}/${node.planQty}</span>
+                      ${warningHTML}
                     </div>
                     ${opsHTML !== '' ? opsHTML : ''}
                   </div>
@@ -688,9 +643,8 @@
           const winParent = cardParent.closest('.window-body');
           if (winChild !== winParent) return;
 
-          // Стрелките вече се връзват към самите кутии (картите)
-          const sourceEl = cardChild;
-          const targetEl = cardParent;
+          const sourceEl = cardChild.querySelector('.vsm-title');
+          const targetEl = cardParent.querySelector('.vsm-title');
 
           if (sourceEl && targetEl) {
               const rs = sourceEl.getBoundingClientRect();
