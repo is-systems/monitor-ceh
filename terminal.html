@@ -170,6 +170,7 @@
           }
       }
 
+      // --- МУЛТИ-ИЗБОР НА МАШИНИ ЧРЕЗ ЧЕКБОКСОВЕ ---
       async function changeMachine(isInitial = false) {
           Swal.fire({ title: 'Зареждане на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           
@@ -188,7 +189,6 @@
               }
               uniqueMachines.sort(); 
 
-              // Създаваме HTML за чекбоксове
               let checkboxHtml = '<div style="text-align:left; margin-top:15px; max-height: 300px; overflow-y: auto;">';
               let currentSelections = currentMachine ? currentMachine.split(',') : [];
               
@@ -220,9 +220,6 @@
               });
 
               if (isConfirmed) {
-                  let selected = Swal.getValidationMessage() ? [] : Swal.getPopup().querySelector('.swal2-confirm').getAttribute('data-value') || Swal.getPopup().querySelector('.swal2-confirm')._tippy ? [] : /*това е малък хак, виж долу*/ null;
-                  
-                  // Взимаме стойностите директно
                   let finalSelection = [];
                   document.querySelectorAll('.machine-cb:checked').forEach(cb => finalSelection.push(cb.value));
                   
@@ -234,47 +231,6 @@
           } catch (err) {
               console.error(err);
               Swal.fire('Грешка', 'Не успях да заредя списъка.', 'error');
-          }
-      }
-              uniqueMachines.sort(); 
-
-              let optionsMap = { "": "🌍 ВСИЧКИ МАШИНИ" };
-              uniqueMachines.forEach(m => { optionsMap[m] = m; });
-
-              Swal.close();
-
-              const { value: selectedMachine } = await Swal.fire({
-                  title: 'Избери работно място',
-                  text: 'Списъкът се генерира автоматично от твоите Маршрутни карти',
-                  input: 'select',
-                  inputOptions: optionsMap,
-                  inputValue: currentMachine || "",
-                  showCancelButton: !isInitial,
-                  allowOutsideClick: !isInitial,
-                  confirmButtonText: 'Избери',
-                  cancelButtonText: 'Отказ',
-                  confirmButtonColor: '#2563eb'
-              });
-
-             // --- НОВА ЛОГИКА ЗА ФИЛТРИРАНЕ НА НЯКОЛКО МАШИНИ ---
-                        let machineName = route['Машина'] || '';
-                        let shouldShow = true;
-
-                        if (currentMachine && currentMachine.trim() !== "") {
-                            let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim());
-                            let routeMachine = machineName.toLowerCase();
-                            
-                            // Проверка дали машината на операцията присъства в избраните от него
-                            let match = selectedMachines.some(m => routeMachine.includes(m));
-                            if (!match) {
-                                return; // Прескачаме тази задача, ако не е за избраните машини
-                            }
-                        
-              }
-          } catch (err) {
-              console.error(err);
-              Swal.fire('Грешка', 'Не успях да заредя списъка с машини.', 'error');
-              if (isInitial) loadTasks();
           }
       }
 
@@ -346,7 +302,6 @@
                     общо_необходимо_количество: targetQty
                 });
 
-                // Динамично изчисляване на нуждата на родителя ПРЕДИ спускане към децата
                 function traverseAndAdd(parentName, parentBaseQty) {
                     let parentScrapTotal = 0;
                     for (let key in scrappedOps) {
@@ -437,7 +392,6 @@
                                         let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
                                         cDone = completedOps[cOpKey] || 0;
                                     } else {
-                                        // Четем от склада + евентуално спасени суровини при брак
                                         cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0);
                                     }
                                     
@@ -460,11 +414,18 @@
                         if (maxAllowed < 0) maxAllowed = 0;
                         let isBlocked = hasLimit && maxAllowed <= 0;
                         
+                        // --- НОВА ЛОГИКА ЗА ФИЛТРИРАНЕ НА НЯКОЛКО МАШИНИ ---
                         let machineName = route['Машина'] || '';
-                        
+                        let shouldShow = true;
+
                         if (currentMachine && currentMachine.trim() !== "") {
-                            if (!machineName.toLowerCase().includes(currentMachine.toLowerCase())) {
-                                return; 
+                            let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim());
+                            let routeMachine = machineName.toLowerCase();
+                            
+                            // Проверка дали машината на операцията присъства в избраните
+                            let match = selectedMachines.some(m => routeMachine.includes(m));
+                            if (!match) {
+                                return; // Прескачаме тази задача, ако не е за избраните машини
                             }
                         }
 
@@ -509,7 +470,7 @@
         var container = document.getElementById('cardsArea');
         
         if(tasks.length === 0) { 
-          container.innerHTML = '<div style="text-align:center; margin-top:30px; font-size:1.2em; color: #27ae60; font-weight: bold;">🎉 Няма чакащи задачи за тази машина!</div>';
+          container.innerHTML = '<div style="text-align:center; margin-top:30px; font-size:1.2em; color: #27ae60; font-weight: bold;">🎉 Няма чакащи задачи за избраните машини!</div>';
           return;
         }
         
@@ -653,7 +614,6 @@
             return;
         }
 
-        // --- УМНАТА ЛОГИКА ЗА БРАК НА СЪСТАВНИ ДЕТАЙЛИ (#) ---
         if (taskData.name.includes('#')) {
             let children = globalBomData.filter(b => String(b['ID Родител']).trim() === taskData.name);
             
@@ -694,7 +654,6 @@
             }
         }
 
-        // Стандартен Брак (За обикновени детайли без деца)
         Swal.fire({ 
           title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', 
           showCancelButton: true, confirmButtonColor: '#e74c3c', cancelButtonColor: '#94a3b8', 
@@ -706,12 +665,10 @@
         });
       }
 
-      // --- ИЗПЪЛНЕНИЕ И ЗАПИСВАНЕ НА БРАКА В БАЗАТА ---
       async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNames) {
           Swal.fire({ title: 'Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
           try {
-              // 1. Записваме основния брак за възела
               let inserts = [{
                   "ID Детайл": taskData.name,
                   "Оператор": currentOperator,
@@ -721,7 +678,6 @@
                   "Дата": new Date().toISOString()
               }];
 
-              // 2. Връщаме виртуално на масата всички "Спасени" (отмаркирани) детайли
               allChildren.forEach(child => {
                   let cName = String(child['ID Компонент']).trim();
                   
@@ -732,7 +688,6 @@
                       let cRoutes = globalRoutesByDetail[cName] || [];
                       let operationToLog = "Възстановен"; 
 
-                      // Записваме ги на тяхната ПОСЛЕДНА операция, за да се броят за завършени
                       if (cRoutes.length > 0) {
                           let lastRoute = cRoutes[cRoutes.length - 1];
                           operationToLog = String(lastRoute['Име на операция']).trim();
