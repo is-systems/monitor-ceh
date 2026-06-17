@@ -480,9 +480,18 @@
                 // --- ЛОГИКА ЗА СКРИВАНЕ НА ОПЕРАЦИИ (РОДИТЕЛИ, КОИТО ЧАКАТ) ---
                 let children = childMap[node.id] || [];
                 let allChildrenDone = true;
+                let anyChildDone = false; // <--- НОВО: Променлива за "поне едно дете е готово"
                 
                 if (children.length > 0) {
+                    // Проверяваме дали ВСИЧКИ деца са готови (пазим го за оцветяването в жълто на финала)
                     allChildrenDone = children.every(cId => {
+                        let chNode = allNodesMap[cId];
+                        if(!chNode || !chNode.operations) return false;
+                        return chNode.operations.findIndex(o => o.completed < chNode.planQty) === -1;
+                    });
+
+                    // <--- НОВО: Проверяваме дали ПОНЕ ЕДНО дете е на 100% готово
+                    anyChildDone = children.some(cId => {
                         let chNode = allNodesMap[cId];
                         if(!chNode || !chNode.operations) return false;
                         return chNode.operations.findIndex(o => o.completed < chNode.planQty) === -1;
@@ -496,7 +505,8 @@
 
                 // АКО ИМА ДЕЦА, НО ТЕ НЕ СА ГОТОВИ И РОДИТЕЛЯТ НЕ Е ЗАПОЧНАТ -> СКРИВАМЕ ОПЕРАЦИИТЕ
                 let shouldShowOps = true;
-                if (children.length > 0 && !hasStarted && !allChildrenDone) {
+                // <--- ПРОМЯНА: Използваме !anyChildDone вместо !allChildrenDone
+                if (children.length > 0 && !hasStarted && !anyChildDone) {
                     shouldShowOps = false;
                 }
 
