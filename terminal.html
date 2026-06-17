@@ -171,7 +171,7 @@
       }
 
       async function changeMachine(isInitial = false) {
-          Swal.fire({ title: 'Търсене на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          Swal.fire({ title: 'Зареждане на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           
           try {
               const { data, error } = await client.from('marshruti').select('Машина').limit(10000);
@@ -186,6 +186,56 @@
                       }
                   });
               }
+              uniqueMachines.sort(); 
+
+              // Създаваме HTML за чекбоксове
+              let checkboxHtml = '<div style="text-align:left; margin-top:15px; max-height: 300px; overflow-y: auto;">';
+              let currentSelections = currentMachine ? currentMachine.split(',') : [];
+              
+              uniqueMachines.forEach(m => {
+                  let isChecked = currentSelections.includes(m) ? 'checked' : '';
+                  checkboxHtml += `
+                    <label style="display:flex; align-items:center; margin-bottom:10px; cursor:pointer; padding:10px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;">
+                        <input type="checkbox" class="machine-cb" value="${m}" ${isChecked} style="transform: scale(1.5); margin-right:15px;">
+                        <span style="font-weight:700;">${m}</span>
+                    </label>`;
+              });
+              checkboxHtml += '</div>';
+
+              Swal.close();
+
+              const { isConfirmed } = await Swal.fire({
+                  title: 'Избери работни места',
+                  html: checkboxHtml,
+                  showCancelButton: !isInitial,
+                  allowOutsideClick: !isInitial,
+                  confirmButtonText: 'Потвърди избор',
+                  cancelButtonText: 'Отказ',
+                  confirmButtonColor: '#2563eb',
+                  preConfirm: () => {
+                      let selected = [];
+                      document.querySelectorAll('.machine-cb:checked').forEach(cb => selected.push(cb.value));
+                      return selected;
+                  }
+              });
+
+              if (isConfirmed) {
+                  let selected = Swal.getValidationMessage() ? [] : Swal.getPopup().querySelector('.swal2-confirm').getAttribute('data-value') || Swal.getPopup().querySelector('.swal2-confirm')._tippy ? [] : /*това е малък хак, виж долу*/ null;
+                  
+                  // Взимаме стойностите директно
+                  let finalSelection = [];
+                  document.querySelectorAll('.machine-cb:checked').forEach(cb => finalSelection.push(cb.value));
+                  
+                  currentMachine = finalSelection.join(',');
+                  localStorage.setItem('mes_machine', currentMachine);
+                  document.getElementById('uiMachineName').innerText = (finalSelection.length > 0) ? finalSelection.join(', ') : "ВСИЧКИ";
+                  loadTasks();
+              }
+          } catch (err) {
+              console.error(err);
+              Swal.fire('Грешка', 'Не успях да заредя списъка.', 'error');
+          }
+      }
               uniqueMachines.sort(); 
 
               let optionsMap = { "": "🌍 ВСИЧКИ МАШИНИ" };
