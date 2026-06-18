@@ -400,7 +400,9 @@
             if (currentTab === 'otcheti' && (f.name === 'Дата' || f.name === 'Време Старт')) {
                 if (val) {
                     try {
-                        let d = new Date(val);
+                        // Застраховаме се, че компютърът винаги ще добавя +3 часа за България
+                        let safeVal = String(val).endsWith('Z') ? val : val + 'Z';
+                        let d = new Date(safeVal);
                         td.innerHTML = `<span style="color: #475569; font-weight: 600;">${d.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'})}</span> <span style="font-size: 0.8em; color: #94a3b8;">(${d.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit'})})</span>`;
                     } catch(e) { td.innerText = val; }
                 } else {
