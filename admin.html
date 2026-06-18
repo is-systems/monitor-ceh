@@ -244,10 +244,12 @@
             try {
               const { data, error } = await client.from(config.table).select('*').limit(10000);
               if (error) throw error;
-              globalRows = data || [];
+              // Сортираме по код за прегледност
+              globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']));
               filterTable(); // <--- ПРОМЕНЕНО: От renderDynamicTable(); на filterTable();
-            } catch (err) {
-              console.error(err);
+
+          } catch (err) {
+              console.error("Грешка при изчисление на склад ГП:", err);
               document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
             }
         }
