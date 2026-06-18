@@ -100,15 +100,14 @@
 
       const tableConfigs = {
         sklad_gp: {
-          label: '🏭 Склад Цех (ГП)',
+          label: '🏭 Склад Цех (WIP/ГП)',
           table: 'computed_sklad_gp', 
           readOnlyTab: true, 
           fields: [
             { name: 'ID Детайл', type: 'text', label: 'Код на детайл' },
             { name: 'Име', type: 'text', label: 'Вътрешно име' },
-            { name: 'Използвани в Плана', type: 'number', label: 'Използвани по План' },
-            { name: 'Общо Произведени', type: 'number', label: 'Общо Произведени' },
-            { name: 'Остатък', type: 'number', label: 'Свободен Остатък' }
+            { name: 'Операция', type: 'text', label: 'Последна завършена стъпка' },
+            { name: 'Наличност в цеха', type: 'number', label: 'Количество на изчакване' }
           ]
         },
         nomenklatura: {
@@ -150,7 +149,7 @@
             { name: 'Целево количество', type: 'number', required: true, def: 0 },
             { name: 'Месец', type: 'text', required: true, label: 'Месец (напр. Юни)' },
             { name: 'Година', type: 'number', required: true, def: 2026 },
-            { name: 'Статус', type: 'select', options: ['Активен', 'Завършен'], required: true }
+            { name: 'Статус', type: 'select', options: ['Active', 'Завършен'], required: true }
           ]
         },
         bom: {
@@ -190,7 +189,7 @@
             { name: 'Количество', type: 'number', def: 1, required: true },
             { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак'], required: true },
             { name: 'Оператор', type: 'text', required: true },
-            { name: 'Време Старт', type: 'text', label: '⌚ СТАРТ' },
+            { name: 'Време Старт', type: 'text', label: '⌚ СТАРТ' }, 
             { name: 'Дата', type: 'text', def: () => new Date().toISOString(), label: '🏁 КРАЙ (Отчетено)' }
           ]
         }
@@ -240,7 +239,6 @@
         } else {
             try {
               let query = client.from(config.table).select('*').limit(10000);
-              // За Отчетите ги сортираме от най-новия към най-стария
               if (currentTab === 'otcheti') query = query.order('Дата', { ascending: false });
               
               const { data, error } = await query;
@@ -254,17 +252,21 @@
         }
       }
 
+      // АКТУАЛИЗИРАНА ЛОГИКА ЗА СМЕТАНЕ НА WIP (НЕЗАВЪРШЕНО ПРОИЗВОДСТВО) ПО СТЪПКИ
       async function loadComputedVirtualWarehouse() {
           try {
               const [plansRes, bomRes, routesRes, reportsRes, nomRes] = await Promise.all([
                   client.from('plan').select('*'),
                   client.from('bom').select('*'),
                   client.from('marshruti').select('*'),
-                  client.from('otcheti').select('*').eq('Статус', 'Отчетено'),
+                  client.from('otcheti').select('*'), // Теглим целия лог (вкл. Брак)
                   client.from('Номенклатура').select('*')
               ]);
 
               if (plansRes.error) throw plansRes.error;
+              if (bomRes.error) throw bomRes.error;
+              if (routesRes.error) throw routesRes.error;
+              if (reportsRes.error) throw reportsRes.error;
 
               let namesMap = {};
               if (nomRes.data) { nomRes.data.forEach(n => namesMap[String(n['ID Детайл']).trim()] = n['Вътрешно име']); }
@@ -283,6 +285,7 @@
                   plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0));
               }
 
+              // Групираме и сортираме маршрутите по детайли
               let routesByDetail = {};
               if (routesRes.data) {
                   routesRes.data.forEach(r => {
@@ -291,44 +294,66 @@
                       routesByDetail[code].push(r);
                   });
               }
+              Object.keys(routesByDetail).forEach(code => {
+                  routesByDetail[code].sort((a,b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
+              });
 
-              let lastOps = {};
-              for(let code in routesByDetail) {
-                  let routes = routesByDetail[code].sort((a,b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-                  lastOps[code] = String(routes[routes.length - 1]['Име на операция']).trim();
-              }
-
-              let totalProduced = {};
+              // Разпределяме отчетените бройки по ОПЕРАЦИИ (Здрави срещу Брак)
+              let completedOps = {};
+              let scrappedOps = {};
               if (reportsRes.data) {
                   reportsRes.data.forEach(r => {
-                      let code = String(r['ID Детайл']).trim();
-                      let op = String(r['Операция']).trim();
-                      if (lastOps[code] && lastOps[code] === op) {
-                          totalProduced[code] = (totalProduced[code] || 0) + (parseFloat(r['Количество']) || 0);
+                      let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+                      let qty = parseFloat(r['Количество']) || 0;
+                      if (r['Статус'] === 'Брак') {
+                          scrappedOps[key] = (scrappedOps[key] || 0) + qty;
+                      } else {
+                          completedOps[key] = (completedOps[key] || 0) + qty;
                       }
                   });
               }
 
               globalRows = [];
-              let allDistinctCodes = new Set([...Object.keys(totalNeeded), ...Object.keys(totalProduced)]);
 
-              allDistinctCodes.forEach(code => {
-                  let produced = totalProduced[code] || 0;
-                  let needed = totalNeeded[code] || 0;
-                  let surplus = produced - needed;
+              // Обхождаме всеки детайл и пресмятаме баланса на всяка отделна операция
+              Object.keys(routesByDetail).forEach(code => {
+                  let routes = routesByDetail[code];
+                  
+                  routes.forEach((route, idx) => {
+                      let opName = String(route['Име на операция']).trim();
+                      let opKey = code + '_' + opName;
+                      
+                      let doneHere = completedOps[opKey] || 0;
+                      let sittingHere = 0;
 
-                  if (surplus > 0) {
-                      globalRows.push({
-                          'ID Детайл': code,
-                          'Име': namesMap[code] || '---',
-                          'Използвани в Плана': needed,
-                          'Общо Произведени': produced,
-                          'Остатък': surplus
-                      });
-                  }
+                      if (idx < routes.length - 1) {
+                          // Ако сме на междинна операция: това, което е направено тук, минус това, което е направено/бракувано на СЛЕДВАЩАТА стъпка
+                          let nextOpName = String(routes[idx+1]['Име на операция']).trim();
+                          let nextOpKey = code + '_' + nextOpName;
+                          let doneNext = completedOps[nextOpKey] || 0;
+                          let scrapNext = scrappedOps[nextOpKey] || 0;
+                          
+                          sittingHere = doneHere - (doneNext + scrapNext);
+                      } else {
+                          // Ако сме на последна операция (Завършен детайл): готови бройки минус нужните по план
+                          let needed = totalNeeded[code] || 0;
+                          sittingHere = doneHere - needed;
+                      }
+
+                      // Показваме само редовете, в които реално стоят бройки
+                      if (sittingHere > 0) {
+                          globalRows.push({
+                              'ID Детайл': code,
+                              'Име': namesMap[code] || '---',
+                              'Операция': opName,
+                              'Наличност в цеха': sittingHere
+                          });
+                      }
+                  });
               });
 
-              globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']));
+              // Сортираме по име на детайла и номер на операцията
+              globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']) || a['Операция'].localeCompare(b['Операция']));
               filterTable();
 
           } catch (err) {
@@ -386,21 +411,22 @@
                 row.appendChild(td); return;
               }
             }
-            if (currentTab === 'sklad_gp' && f.name === 'Остатък' && parseFloat(val) > 0) {
-                td.innerHTML = `<b style="color: #3b82f6; font-size: 1.1em;">+${val} бр.</b>`;
+            
+            // ПРОМЕНЕНО: Визуализация за остатъка в цеха
+            if (currentTab === 'sklad_gp' && f.name === 'Наличност в цеха' && parseFloat(val) > 0) {
+                td.innerHTML = `<b style="color: #2563eb; font-size: 1.1em;">${val} бр.</b>`;
                 row.appendChild(td); return;
             }
+            
             if (currentTab === 'otcheti' && f.name === 'Статус') {
               const cls = val === 'Брак' ? 'status-scrap' : 'status-ok';
               td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`;
               row.appendChild(td); return;
             }
             
-            // КРАСИВО ФОРМАТИРАНЕ НА ЧАСОВЕТЕ
             if (currentTab === 'otcheti' && (f.name === 'Дата' || f.name === 'Време Старт')) {
                 if (val) {
                     try {
-                        // Застраховаме се, че компютърът винаги ще добавя +3 часа за България
                         let safeVal = String(val).endsWith('Z') ? val : val + 'Z';
                         let d = new Date(safeVal);
                         td.innerHTML = `<span style="color: #475569; font-weight: 600;">${d.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'})}</span> <span style="font-size: 0.8em; color: #94a3b8;">(${d.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit'})})</span>`;
