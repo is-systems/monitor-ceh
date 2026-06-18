@@ -41,7 +41,7 @@
       .status-scrap { background-color: #fee2e2; color: #991b1b; }
       
       .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
-      .modal { background: white; padding: 30px; border-radius: 166px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+      .modal { background: white; padding: 30px; border-radius: 16px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
       .modal-header { font-size: 1.2em; font-weight: 700; margin-bottom: 20px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
       .dynamic-form-area { display: grid; grid-template-columns: 1fr; gap: 14px; }
       .form-group { display: flex; flex-direction: column; }
@@ -99,11 +99,10 @@
       );
 
       const tableConfigs = {
-        // ДОБАВЕНО: Склад Готова Продукция (Умен Таб)
         sklad_gp: {
           label: '🏭 Склад Цех (ГП)',
-          table: 'computed_sklad_gp', // Dummy table name for identification
-          readOnlyTab: true, // Флаг, че това е само за четене
+          table: 'computed_sklad_gp', 
+          readOnlyTab: true, 
           fields: [
             { name: 'ID Детайл', type: 'text', label: 'Код на детайл' },
             { name: 'Име', type: 'text', label: 'Вътрешно име' },
@@ -196,7 +195,6 @@
         }
       };
 
-      // ПРОМЕНЕНО: Зареждаме новия склад по подразбиране
       let currentTab = 'sklad_gp'; 
       let globalRows = [];
       let isEditMode = false;
@@ -220,9 +218,8 @@
         document.getElementById('searchInput').value = '';
         const config = tableConfigs[tabKey];
         const addBtn = document.getElementById('addNewBtn');
-        addBtn.innerText = `➕ Нов запис в ${config.label.substring(2)}`; // Clean up emoji
+        addBtn.innerText = `➕ Нов запис в ${config.label.substring(2)}`; 
         
-        // ПРОМЕНЕНО: Скриваме бутона "Добави", ако сме в умния склад
         if (config.readOnlyTab) {
             addBtn.style.display = 'none';
         } else {
@@ -237,28 +234,23 @@
         document.getElementById('mainTable').style.display = 'none';
         const config = tableConfigs[currentTab];
         
-        // ПРОМЕНЕНО: Логика за зареждане - или отSupabase, или изчисляване
         if (currentTab === 'sklad_gp') {
             await loadComputedVirtualWarehouse();
         } else {
             try {
               const { data, error } = await client.from(config.table).select('*').limit(10000);
               if (error) throw error;
-              // Сортираме по код за прегледност
-              globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']));
-              filterTable(); // <--- ПРОМЕНЕНО: От renderDynamicTable(); на filterTable();
-
-          } catch (err) {
-              console.error("Грешка при изчисление на склад ГП:", err);
+              globalRows = data || [];
+              filterTable(); // <-- Запазваме филтъра на търсачката при рефреш
+            } catch (err) {
+              console.error(err);
               document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
             }
         }
       }
 
-      // ДОБАВЕНО: Масивна логика за изчисляване на склада за готова продукция в реално време
       async function loadComputedVirtualWarehouse() {
           try {
-              // 1. Теглим всичко необходимо
               const [plansRes, bomRes, routesRes, reportsRes, nomRes] = await Promise.all([
                   client.from('plan').select('*'),
                   client.from('bom').select('*'),
@@ -269,14 +261,12 @@
 
               if (plansRes.error) throw plansRes.error;
 
-              // 2. Създаваме речник за имена
               let namesMap = {};
               if (nomRes.data) { nomRes.data.forEach(n => namesMap[String(n['ID Детайл']).trim()] = n['Вътрешно име']); }
 
               let totalNeeded = {};
               let bomData = bomRes.data || [];
 
-              // 3. Функция за рекурсивно разбиване на BOM
               function addNeed(itemCode, qty) {
                   let cleanCode = String(itemCode).trim();
                   totalNeeded[cleanCode] = (totalNeeded[cleanCode] || 0) + qty;
@@ -284,12 +274,10 @@
                   children.forEach(c => addNeed(c['ID Компонент'], qty * (parseFloat(c['Количество']) || 1)));
               }
 
-              // 4. Изчисляваме колко бройки са нужни по план
               if (plansRes.data) {
                   plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0));
               }
 
-              // 5. Намираме последната операция за всеки детайл
               let routesByDetail = {};
               if (routesRes.data) {
                   routesRes.data.forEach(r => {
@@ -305,7 +293,6 @@
                   lastOps[code] = String(routes[routes.length - 1]['Име на операция']).trim();
               }
 
-              // 6. Сумираме произведените бройки от отчетите (само за посл. операция)
               let totalProduced = {};
               if (reportsRes.data) {
                   reportsRes.data.forEach(r => {
@@ -317,10 +304,7 @@
                   });
               }
 
-              // 7. Подготвяме данните за визуализация
               globalRows = [];
-              
-              // Обединяваме всички детайли, които се споменават или в план, или в производство
               let allDistinctCodes = new Set([...Object.keys(totalNeeded), ...Object.keys(totalProduced)]);
 
               allDistinctCodes.forEach(code => {
@@ -328,7 +312,6 @@
                   let needed = totalNeeded[code] || 0;
                   let surplus = produced - needed;
 
-                  // 8. Показваме само тези, от които имаме свободен излишък
                   if (surplus > 0) {
                       globalRows.push({
                           'ID Детайл': code,
@@ -340,9 +323,8 @@
                   }
               });
 
-              // Сортираме по код за прегледност
               globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']));
-              renderDynamicTable();
+              filterTable(); // <-- Запазваме филтъра на търсачката при рефреш
 
           } catch (err) {
               console.error("Грешка при изчисление на склад ГП:", err);
@@ -361,13 +343,12 @@
 
         const headerRow = document.createElement('tr');
         config.fields.forEach(f => {
-          if (f.hideOnAdd) return; // Скриваме ID-то навсякъде
+          if (f.hideOnAdd) return; 
           const th = document.createElement('th');
           th.innerText = f.label || f.name;
           headerRow.appendChild(th);
         });
         
-        // ПРОМЕНЕНО: Показваме "Действия" само ако табът не е ReadOnly
         if (!config.readOnlyTab) {
             const thActions = document.createElement('th');
             thActions.innerText = 'Действия';
@@ -386,14 +367,13 @@
 
        items.forEach((item) => {
           const row = document.createElement('tr');
-          const trueIndex = globalRows.indexOf(item); // 🔑 ТУК Е МАГИЯТА: Намираме истинския номер от главната база!
+          const trueIndex = globalRows.indexOf(item); 
 
           config.fields.forEach(f => {
             if (f.hideOnAdd) return; 
             const td = document.createElement('td');
             let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             
-            // Дизайн за Склад Материали (⚠️ при малко количество)
             if (currentTab === 'sklad' && f.name === 'Остатък') {
               const minVal = parseFloat(item['Минимално количество']) || 0;
               if (parseFloat(val) <= minVal && minVal > 0) {
@@ -401,13 +381,10 @@
                 row.appendChild(td); return;
               }
             }
-            // Дизайн за Умния Склад ГП (оцветяване на остатъка)
             if (currentTab === 'sklad_gp' && f.name === 'Остатък' && parseFloat(val) > 0) {
                 td.innerHTML = `<b style="color: #3b82f6; font-size: 1.1em;">+${val} бр.</b>`;
                 row.appendChild(td); return;
             }
-            
-            // Дизайн за Отчети
             if (currentTab === 'otcheti' && f.name === 'Статус') {
               const cls = val === 'Брак' ? 'status-scrap' : 'status-ok';
               td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`;
@@ -417,7 +394,6 @@
             row.appendChild(td);
           });
 
-          // ПРОМЕНЕНО: Показваме бутоните за действия само за нормални таблици
           if (!config.readOnlyTab) {
               const tdActions = document.createElement('td');
               tdActions.style.textAlign = 'center';
@@ -448,7 +424,7 @@
       function openAddModal() {
         isEditMode = false; editingIndex = null;
         const config = tableConfigs[currentTab];
-        if (config.readOnlyTab) return; // Сигурност
+        if (config.readOnlyTab) return; 
         
         document.getElementById('modalTitle').innerText = `➕ Нов запис`;
         const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
@@ -480,13 +456,14 @@
       function openEditModal(index) {
         isEditMode = true; editingIndex = index;
         const config = tableConfigs[currentTab];
-        if (config.readOnlyTab) return; // Сигурност
+        if (config.readOnlyTab) return; 
         
         const record = globalRows[index];
         document.getElementById('modalTitle').innerText = `✏️ Редактиране`;
         const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
 
         config.fields.forEach(f => {
+          if (f.hideOnAdd) return;
           const group = document.createElement('div'); group.className = 'form-group';
           const label = document.createElement('label'); label.innerText = f.label || f.name;
           group.appendChild(label);
@@ -567,7 +544,6 @@
         });
       }
 
-      // При стартиране - изграждаме навигацията и зареждаме склада
       window.onload = () => { buildNavbar(); loadCurrentTableData(); };
     </script>
   </body>
