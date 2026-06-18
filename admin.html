@@ -245,7 +245,7 @@
               const { data, error } = await client.from(config.table).select('*').limit(10000);
               if (error) throw error;
               globalRows = data || [];
-              renderDynamicTable();
+              filterTable(); // <--- ПРОМЕНЕНО: От renderDynamicTable(); на filterTable();
             } catch (err) {
               console.error(err);
               document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
