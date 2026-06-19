@@ -256,7 +256,6 @@
                 return true;
             });
 
-            // --- НОВАТА ЛОГИКА: ОБЕДИНЯВАНЕ НА ЕДНАКВИ ДЕТАЙЛИ ЗА ДАДЕН МЕСЕЦ ---
             let mergedNodes = {};
             let connections = [];
 
@@ -265,7 +264,6 @@
                 let pMonthStr = pData ? `${pData['Месец']} ${pData['Година']}` : `ПЛАН ${row.plan_id}`;
                 let codeStr = row.code ? String(row.code).trim() : "";
                 
-                // Създаваме уникален идентификатор за "Месец + Детайл"
                 let mergedId = pMonthStr + '___' + codeStr;
 
                 if (!mergedNodes[mergedId]) {
@@ -274,41 +272,26 @@
                         planMonth: pMonthStr,
                         code: codeStr,
                         planQty: 0, 
-                        warehouseQty: row.ready_qty || 0, // Склада не се събира, той е общ
+                        warehouseQty: row.ready_qty || 0,
                         globalState: 'gray',
                         operations: [],
                         drawingUrl: row.drawing_url,
                         partType: row.part_type ? String(row.part_type) : "",
-                        hasParent: false,
-                        hasChildren: false
                     };
                 }
 
-                // Събираме необходимите количества от различните поръчки
                 mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
 
-                // Създаваме връзките (стрелките)
                 if (row.parent_code && row.level > 1) {
                     let parentCodeStr = String(row.parent_code).trim();
                     let parentMergedId = pMonthStr + '___' + parentCodeStr;
                     
-                    // Добавяме стрелка само ако вече не съществува
                     if (!connections.find(c => c.from === mergedId && c.to === parentMergedId)) {
                         connections.push({ from: mergedId, to: parentMergedId });
                     }
-                    mergedNodes[mergedId].hasParent = true;
                 }
             });
 
-            // Отбелязваме кои възли имат деца (сочат към тях със стрелка)
-            let parentIds = new Set(connections.map(c => c.to));
-            Object.values(mergedNodes).forEach(n => {
-                if (parentIds.has(n.id)) {
-                    n.hasChildren = true;
-                }
-            });
-
-            // --- РАЗПРЕДЕЛЯНЕ ПО ПРОЗОРЦИ ---
             let masterData = {
                 tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
                 var11: [], var25: [], bearings: [],
@@ -333,9 +316,18 @@
                 }
 
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
-                let isResolverByName = n.partType.toLowerCase().includes("резолвер");
+                
+                // ПО-УМНА ПРОВЕРКА ЗА РЕЗОЛВЕРИ: Търсим в името ИЛИ в операциите
+                let isResolverByName = typeStr.includes("резолвер");
+                let hasAssemblyOp = n.operations.some(o => {
+                    let op = o.name.toLowerCase();
+                    return op.includes("сглобяване") || op.includes("зареждане") || op.includes("измерване");
+                });
 
-                if (isResolverByName && !n.hasParent && n.hasChildren) {
+                // Проверяваме дали детайлът е "корен" (няма стрелки, които да излизат от него към друг детайл)
+                let isRootNode = !connections.some(c => c.from === n.id);
+
+                if (isRootNode && (isResolverByName || hasAssemblyOp)) {
                     masterData.assembly.push(n);
                 } 
                 else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
@@ -503,10 +495,14 @@
               levels[lvl].forEach(node => {
                 let dId = getDomId(node.id);
 
-                const isRoot = !node.hasParent; 
-                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
-                const warehouseQty = node.warehouseQty || 0; 
+                // ТОЧНА ПРОВЕРКА ЗА ЧЕРВЕНА ТОЧКА:
+                // 1. Детайлът няма никой над него (не е child)
+                // 2. Намира се САМО в прозореца за Сглобяване (Резолвери)
+                const isRoot = !parentMap[node.id]; 
+                const isAssemblyWindow = (containerId === 'w-assembly');
+                const rootMarker = (isRoot && isAssemblyWindow) ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
                 
+                const warehouseQty = node.warehouseQty || 0; 
                 const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
                   ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
 
@@ -556,7 +552,6 @@
                     let html = '';
 
                     if (currIdx === -1) {
-                        // 100% ГОТОВО (Зелено)
                         titleClass = 'title-green';
                         let lastIdx = len - 1;
                         
@@ -565,11 +560,8 @@
                             html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
                             html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
-                        
                         html += formatFocusGreen(node.operations[lastIdx]);
-                        
                     } else {
-                        // В ПРОЦЕС ИЛИ ЧАКАЩА
                         let isWorking = node.operations[currIdx].completed > 0;
                         if (isWorking) titleClass = 'title-blue';
 
@@ -591,7 +583,6 @@
                     opsHTML = `<div class="vsm-ops">${html}</div>`;
                 }
                 
-                let isAssemblyWindow = (containerId === 'w-assembly'); 
                 if (children.length > 0 && allChildrenDone && isAssemblyWindow && titleClass !== 'title-green') {
                     titleClass = 'title-yellow'; 
                 }
