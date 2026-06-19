@@ -149,7 +149,8 @@
             { name: 'Целево количество', type: 'number', required: true, def: 0 },
             { name: 'Месец', type: 'text', required: true, label: 'Месец (напр. Юни)' },
             { name: 'Година', type: 'number', required: true, def: 2026 },
-            { name: 'Статус', type: 'select', options: ['Active', 'Завършен'], required: true }
+            // ПРОМЯНА: Добавени нови статуси за експедиция
+            { name: 'Статус', type: 'select', options: ['Активен', 'Завършен', '📦 Опакован', '🚚 Изпратен'], required: true }
           ]
         },
         bom: {
@@ -187,15 +188,15 @@
             { name: 'ID Детайл', type: 'text', required: true },
             { name: 'Операция', type: 'text', required: true },
             { name: 'Количество', type: 'number', def: 1, required: true },
-            { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак'], required: true },
+            { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак', 'Изпратено'], required: true },
             { name: 'Оператор', type: 'text', required: true },
             { name: 'Време Старт', type: 'text', label: '⌚ СТАРТ' }, 
-            { name: 'Дата', type: 'text', def: () => new Date().toISOString(), label: '🏁 КРАЙ (Отчетено)' }
+            { name: 'Дата', type: 'text', def: () => new Date().toISOString(), label: '🏁 КРАЙ' }
           ]
         }
       };
 
-      let currentTab = 'sklad_gp'; 
+      let currentTab = 'plan'; 
       let globalRows = [];
       let isEditMode = false;
       let editingIndex = null;
@@ -236,6 +237,48 @@
         
         if (currentTab === 'sklad_gp') {
             await loadComputedVirtualWarehouse();
+        } else if (currentTab === 'plan') {
+            // ПРОМЯНА 1: Умно зареждане и сортиране на Плановете според БОМ-а
+            try {
+              const [planRes, bomRes] = await Promise.all([
+                  client.from(config.table).select('*').limit(10000),
+                  client.from('bom').select('*').limit(10000)
+              ]);
+              if (planRes.error) throw planRes.error;
+              
+              let plans = planRes.data || [];
+              let bom = bomRes.data || [];
+              
+              // Търсим варианта в децата
+              plans.forEach(p => {
+                  let code = String(p['ID Детайл']).trim();
+                  let group = '0'; // по подразбиране
+                  let children = bom.filter(b => String(b['ID Родител']).trim() === code);
+                  
+                  let has11 = children.some(c => String(c['ID Компонент']).includes('11'));
+                  let has25 = children.some(c => String(c['ID Компонент']).includes('25'));
+                  
+                  if (has11) group = '11';
+                  else if (has25) group = '25';
+                  
+                  p._group = group; // Скрит маркер за подреждане и оцветяване
+              });
+              
+              // Подреждаме: Вар 11 най-отгоре, после Вар 25, после всичко останало
+              plans.sort((a, b) => {
+                  if (a._group === '11' && b._group !== '11') return -1;
+                  if (a._group !== '11' && b._group === '11') return 1;
+                  if (a._group === '25' && b._group !== '25') return -1;
+                  if (a._group !== '25' && b._group === '25') return 1;
+                  return 0;
+              });
+              
+              globalRows = plans;
+              filterTable();
+            } catch (err) {
+              console.error(err);
+              document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
+            }
         } else {
             try {
               let query = client.from(config.table).select('*').limit(10000);
@@ -252,14 +295,13 @@
         }
       }
 
-      // АКТУАЛИЗИРАНА ЛОГИКА ЗА СМЕТАНЕ НА WIP (НЕЗАВЪРШЕНО ПРОИЗВОДСТВО) ПО СТЪПКИ
       async function loadComputedVirtualWarehouse() {
           try {
               const [plansRes, bomRes, routesRes, reportsRes, nomRes] = await Promise.all([
                   client.from('plan').select('*'),
                   client.from('bom').select('*'),
                   client.from('marshruti').select('*'),
-                  client.from('otcheti').select('*'), // Теглим целия лог (вкл. Брак)
+                  client.from('otcheti').select('*'), 
                   client.from('Номенклатура').select('*')
               ]);
 
@@ -274,18 +316,20 @@
               let totalNeeded = {};
               let bomData = bomRes.data || [];
 
-              function addNeed(itemCode, qty) {
+              // ПРОМЯНА 3: Крайните продукти (които се продават) НЕ ги изваждаме от склада, докато не се изпратят
+              function addNeed(itemCode, qty, isRoot = false) {
                   let cleanCode = String(itemCode).trim();
-                  totalNeeded[cleanCode] = (totalNeeded[cleanCode] || 0) + qty;
+                  if (!isRoot) {
+                      totalNeeded[cleanCode] = (totalNeeded[cleanCode] || 0) + qty;
+                  }
                   let children = bomData.filter(b => String(b['ID Родител']).trim() === cleanCode);
-                  children.forEach(c => addNeed(c['ID Компонент'], qty * (parseFloat(c['Количество']) || 1)));
+                  children.forEach(c => addNeed(c['ID Компонент'], qty * (parseFloat(c['Количество']) || 1), false));
               }
 
               if (plansRes.data) {
-                  plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0));
+                  plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0, true));
               }
 
-              // Групираме и сортираме маршрутите по детайли
               let routesByDetail = {};
               if (routesRes.data) {
                   routesRes.data.forEach(r => {
@@ -298,15 +342,20 @@
                   routesByDetail[code].sort((a,b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
               });
 
-              // Разпределяме отчетените бройки по ОПЕРАЦИИ (Здрави срещу Брак)
               let completedOps = {};
               let scrappedOps = {};
+              let shippedOps = {}; // Бройки, които вече са напуснали фабриката
+
               if (reportsRes.data) {
                   reportsRes.data.forEach(r => {
-                      let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+                      let code = String(r['ID Детайл']).trim();
+                      let key = code + '_' + String(r['Операция']).trim();
                       let qty = parseFloat(r['Количество']) || 0;
+                      
                       if (r['Статус'] === 'Брак') {
                           scrappedOps[key] = (scrappedOps[key] || 0) + qty;
+                      } else if (r['Статус'] === 'Изпратено') {
+                          shippedOps[code] = (shippedOps[code] || 0) + qty;
                       } else {
                           completedOps[key] = (completedOps[key] || 0) + qty;
                       }
@@ -315,7 +364,6 @@
 
               globalRows = [];
 
-              // Обхождаме всеки детайл и пресмятаме баланса на всяка отделна операция
               Object.keys(routesByDetail).forEach(code => {
                   let routes = routesByDetail[code];
                   
@@ -327,7 +375,6 @@
                       let sittingHere = 0;
 
                       if (idx < routes.length - 1) {
-                          // Ако сме на междинна операция: това, което е направено тук, минус това, което е направено/бракувано на СЛЕДВАЩАТА стъпка
                           let nextOpName = String(routes[idx+1]['Име на операция']).trim();
                           let nextOpKey = code + '_' + nextOpName;
                           let doneNext = completedOps[nextOpKey] || 0;
@@ -335,12 +382,11 @@
                           
                           sittingHere = doneHere - (doneNext + scrapNext);
                       } else {
-                          // Ако сме на последна операция (Завършен детайл): готови бройки минус нужните по план
                           let needed = totalNeeded[code] || 0;
-                          sittingHere = doneHere - needed;
+                          let shipped = shippedOps[code] || 0;
+                          sittingHere = doneHere - needed - shipped;
                       }
 
-                      // Показваме само редовете, в които реално стоят бройки
                       if (sittingHere > 0) {
                           globalRows.push({
                               'ID Детайл': code,
@@ -352,7 +398,6 @@
                   });
               });
 
-              // Сортираме по име на детайла и номер на операцията
               globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']) || a['Операция'].localeCompare(b['Операция']));
               filterTable();
 
@@ -383,7 +428,7 @@
             const thActions = document.createElement('th');
             thActions.innerText = 'Действия';
             thActions.style.textAlign = 'center';
-            thActions.style.width = '100px';
+            thActions.style.width = '140px'; // Разширяваме леко заради новия бутон
             headerRow.appendChild(thActions);
         }
         
@@ -398,12 +443,26 @@
        items.forEach((item) => {
           const row = document.createElement('tr');
           const trueIndex = globalRows.indexOf(item); 
+          
+          // ПРОМЯНА 1: Оцветяване на редовете според Групата
+          if (currentTab === 'plan') {
+              if (item._group === '11') {
+                  row.style.backgroundColor = '#f0f9ff';
+                  row.style.borderLeft = '5px solid #0ea5e9'; // Синя линия
+              } else if (item._group === '25') {
+                  row.style.backgroundColor = '#f0fdf4';
+                  row.style.borderLeft = '5px solid #22c55e'; // Зелена линия
+              } else {
+                  row.style.borderLeft = '5px solid transparent';
+              }
+          }
 
           config.fields.forEach(f => {
             if (f.hideOnAdd) return; 
             const td = document.createElement('td');
             let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             
+            // Дизайни за различните колони
             if (currentTab === 'sklad' && f.name === 'Остатък') {
               const minVal = parseFloat(item['Минимално количество']) || 0;
               if (parseFloat(val) <= minVal && minVal > 0) {
@@ -412,7 +471,6 @@
               }
             }
             
-            // ПРОМЕНЕНО: Визуализация за остатъка в цеха
             if (currentTab === 'sklad_gp' && f.name === 'Наличност в цеха' && parseFloat(val) > 0) {
                 td.innerHTML = `<b style="color: #2563eb; font-size: 1.1em;">${val} бр.</b>`;
                 row.appendChild(td); return;
@@ -422,6 +480,20 @@
               const cls = val === 'Брак' ? 'status-scrap' : 'status-ok';
               td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`;
               row.appendChild(td); return;
+            }
+            
+            // Дизайн за новите статуси на Плана
+            if (currentTab === 'plan' && f.name === 'Статус') {
+                 if (val === '📦 Опакован') {
+                     td.innerHTML = `<span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
+                 } else if (val === '🚚 Изпратен') {
+                     td.innerHTML = `<span style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 6px; font-weight: bold; text-decoration: line-through;">${val}</span>`;
+                 } else {
+                     let bg = val === 'Завършен' ? '#dcfce7' : '#e0e7ff';
+                     let c = val === 'Завършен' ? '#166534' : '#3730a3';
+                     td.innerHTML = `<span style="background: ${bg}; color: ${c}; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
+                 }
+                 row.appendChild(td); return;
             }
             
             if (currentTab === 'otcheti' && (f.name === 'Дата' || f.name === 'Време Старт')) {
@@ -444,8 +516,16 @@
           if (!config.readOnlyTab) {
               const tdActions = document.createElement('td');
               tdActions.style.textAlign = 'center';
-              tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})" title="Редактирай">✏️</button>
-                                     <button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})" title="Изтрий">🗑️</button>`;
+              
+              let actionsHtml = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})" title="Редактирай">✏️</button>
+                                 <button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})" title="Изтрий">🗑️</button>`;
+              
+              // ПРОМЯНА 2: Добавяне на бутона "ИЗПРАТИ" само за опакованите
+              if (currentTab === 'plan' && item['Статус'] === '📦 Опакован') {
+                  actionsHtml += `<button class="action-btn" onclick="shipPlan(${trueIndex})" title="Експедирай" style="background:#2563eb; color:white; font-size:0.8em; padding:6px 10px; margin-left:5px; border-radius:4px; font-weight:bold;">🚀 ИЗПРАТИ</button>`;
+              }
+              
+              tdActions.innerHTML = actionsHtml;
               row.appendChild(tdActions);
           }
           tbody.appendChild(row);
@@ -589,6 +669,48 @@
             }
           }
         });
+      }
+
+      // ПРОМЯНА 2: Логиката за изпращане на плана
+      async function shipPlan(index) {
+          const record = globalRows[index];
+          Swal.fire({
+              title: 'Експедиция на план',
+              html: `Ще изпратите <b>${record['Целево количество']} бр.</b> от <b>${record['ID Детайл']}</b>.<br>Тези бройки ще бъдат извадени от Склада!`,
+              icon: 'question',
+              showCancelButton: true,
+              confirmButtonText: '🚀 Да, Изпрати!',
+              cancelButtonText: 'Отказ',
+              confirmButtonColor: '#2563eb'
+          }).then(async (result) => {
+              if (result.isConfirmed) {
+                  Swal.fire({ title: 'Изписване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  try {
+                      // 1. Променяме статуса на плана
+                      const { error: e1 } = await client.from('plan')
+                          .update({ 'Статус': '🚚 Изпратен' })
+                          .eq('id', record.id);
+                      if (e1) throw e1;
+                      
+                      // 2. Създаваме запис за изписване в Отчетите
+                      const { error: e2 } = await client.from('otcheti').insert([{
+                          "ID Детайл": record['ID Детайл'],
+                          "Оператор": "СИСТЕМА (Експедиция)",
+                          "Количество": record['Целево количество'],
+                          "Операция": "ЕКСПЕДИЦИЯ",
+                          "Статус": "Изпратено",
+                          "Дата": new Date().toISOString(),
+                          "Време Старт": new Date().toISOString()
+                      }]);
+                      if (e2) throw e2;
+                      
+                      Swal.fire({ icon: 'success', title: 'Успешно изпратено!', timer: 1500, showConfirmButton: false });
+                      loadCurrentTableData();
+                  } catch (err) {
+                      Swal.fire('Грешка', err.message, 'error');
+                  }
+              }
+          });
       }
 
       window.onload = () => { buildNavbar(); loadCurrentTableData(); };
