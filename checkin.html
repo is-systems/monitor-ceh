@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чекиране - Производство</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            box-sizing: border-box; 
+            background-color: #f1f5f9; 
+        }
+        .card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); 
+            width: 100%; 
+            max-width: 420px; 
+            text-align: center; 
+            box-sizing: border-box; 
+        }
+        .status-banner { 
+            padding: 16px; 
+            border-radius: 12px; 
+            font-weight: 800; 
+            font-size: 1.2em; 
+            margin-bottom: 25px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+        }
+        .status-in { background-color: #dcfce7; color: #166534; border: 2px solid #bbf7d0; }
+        .status-out { background-color: #fee2e2; color: #991b1b; border: 2px solid #fca5a5; }
+        
+        .form-group { display: flex; flex-direction: column; text-align: left; margin-bottom: 25px; width: 100%; }
+        .form-group label { font-size: 0.8em; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input { padding: 14px 16px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1.05em; outline: none; transition: all 0.2s; color: #334155; }
+        .form-group input:focus { border-color: #4338ca; box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.1); }
+        
+        .btn { 
+            width: 100%; 
+            padding: 16px; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 1.1em; 
+            font-weight: 700; 
+            cursor: pointer; 
+            color: white; 
+            transition: all 0.2s; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .btn-in { background-color: #16a34a; }
+        .btn-in:hover { background-color: #15803d; }
+        .btn-out { background-color: #dc2626; }
+        .btn-out:hover { background-color: #b91c1c; }
+        
+        .clock { font-size: 3em; font-weight: 900; color: #1e293b; margin-bottom: 2px; }
+        .date { color: #64748b; font-size: 1em; font-weight: 600; margin-bottom: 30px; text-transform: capitalize; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="clock" id="clock">00:00</div>
+        <div class="date" id="date">--.--.----</div>
+        
+        <div id="statusBanner" class="status-banner">Зареждане...</div>
+
+        <form id="checkinForm" onsubmit="handleSubmit(event)">
+            <div class="form-group">
+                <label for="emailInput">Въведете вашия имейл</label>
+                <input type="email" id="emailInput" required placeholder="example@gmail.com" autocomplete="email">
+            </div>
+            <button type="submit" id="submitBtn" class="btn">Потвърди</button>
+        </form>
+    </div>
+
+    <script>
+        const client = supabase.createClient(
+          'https://zdythzcgcjxwbxufunuh.supabase.co', 
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
+        );
+
+        // Четем параметъра от URL адреса (?action=in или ?action=out)
+        const urlParams = new URLSearchParams(window.location.search);
+        const actionParam = urlParams.get('action'); 
+        
+        const actionText = actionParam === 'out' ? 'Излизане' : 'Влизане';
+        
+        const banner = document.getElementById('statusBanner');
+        const btn = document.getElementById('submitBtn');
+        const emailInput = document.getElementById('emailInput');
+
+        // Настройваме цветовете спрямо това кой код е сканиран
+        if (actionParam === 'out') {
+            banner.innerText = '🔴 ИЗЛИЗАНЕ ОТ СМЕНА';
+            banner.className = 'status-banner status-out';
+            btn.innerText = 'Потвърди ИЗЛИЗАНЕ';
+            btn.className = 'btn btn-out';
+        } else {
+            banner.innerText = '🟢 ВЛИЗАНЕ НА СМЕНА';
+            banner.className = 'status-banner status-in';
+            btn.innerText = 'Потвърди ВЛИЗАНЕ';
+            btn.className = 'btn btn-in';
+        }
+
+        // Автоматично попълваме имейла, ако телефонът го е запомнил от предишно чекиране
+        const savedEmail = localStorage.getItem('workerEmail');
+        if (savedEmail) {
+            emailInput.value = savedEmail;
+        }
+
+        // Динамичен часовник
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('date').innerText = now.toLocaleDateString('bg-BG', {weekday: 'long', day: '2-digit', month: '2-digit'});
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+            const email = emailInput.value.trim().toLowerCase();
+            if (!email) return;
+
+            Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            try {
+                // Директен запис в таблицата chekiraniya
+                const { error } = await client
+                    .from('chekiraniya')
+                    .insert([{
+                        "Имейл": email,
+                        "Действие": actionText
+                    }]);
+
+                if (error) throw error;
+
+                // Запомняме имейла в паметта на браузъра на този телефон
+                localStorage.setItem('workerEmail', email);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Успешно отчетено!',
+                    text: `${actionText} беше записано за ${email}`,
+                    timer: 2500,
+                    showConfirmButton: false
+                }).then(() => {
+                    // Красив завършек, за да знае човекът, че е готов
+                    document.body.innerHTML = `
+                        <div style="text-align:center; padding:30px; max-width:400px; background:white; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
+                            <h2 style="color: #16a34a; margin-bottom:10px;">✨ Благодарим ви!</h2>
+                            <p style="color: #475569; font-size:1.1em;">Вашият час е регистриран успешно.<br>Може да затворите този прозорец.</p>
+                        </div>
+                    `;
+                });
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire('❌ Грешка при връзката', 'Моля, проверете интернета си и опитайте отново.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
