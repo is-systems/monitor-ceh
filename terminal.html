@@ -268,7 +268,7 @@
                 client.from('marshruti').select('*').limit(10000),
                 client.from('otcheti').select('*').limit(10000), 
                 client.from('sklad').select('*').limit(10000),
-                client.from('Номенклатура').select('ID Детайл, Вътрешно име').limit(10000) 
+                client.from('Номенклатура').select('*').limit(10000) 
             ]);
 
             if (plansRes.error) throw plansRes.error;
