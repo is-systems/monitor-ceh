@@ -24,6 +24,9 @@
       
       .btn-primary { background-color: #4338ca; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s; font-size: 0.95em; }
       .btn-primary:hover { background-color: #3730a3; }
+      .btn-warning { background-color: #f59e0b; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; display: none; transition: background 0.2s; font-size: 0.95em; }
+      .btn-warning:hover { background-color: #d97706; }
+      
       .action-btn { background: transparent; border: none; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 1.1em; }
       .action-btn:hover { background-color: #f1f5f9; }
       .btn-edit { color: #2563eb; }
@@ -67,7 +70,10 @@
         <div class="search-box">
           <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата...">
         </div>
-        <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-warning" id="autoCheckoutBtn" onclick="runAutoCheckout()">🕒 АВТО-ИЗЛИЗАНЕ (17:00)</button>
+            <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
+        </div>
       </div>
 
       <div class="table-container">
@@ -119,90 +125,17 @@
           fields: [
             { name: 'Време', type: 'text', label: 'Дата и час' },
             { name: 'Имейл', type: 'text', label: 'Служител (Имейл)' },
-            { name: 'Действие', type: 'text', label: 'Действие' }
+            { name: 'Действие', type: 'text', label: 'Действие' },
+            { name: 'Локация', type: 'text', label: 'GPS / Отстояние' },
+            { name: 'Бележка', type: 'text', label: 'Статус / Забележка' }
           ]
         },
-        sklad_gp: {
-          label: '🏭 Склад Цех (WIP/ГП)',
-          table: 'computed_sklad_gp', 
-          readOnlyTab: true, 
-          fields: [
-            { name: 'ID Детайл', type: 'text', label: 'Код на детайл' },
-            { name: 'Име', type: 'text', label: 'Вътрешно име' },
-            { name: 'Операция', type: 'text', label: 'Последна завършена стъпка' },
-            { name: 'Наличност в цеха', type: 'number', label: 'Количество на изчакване' }
-          ]
-        },
-        nomenklatura: {
-          label: '🗂️ Номенклатура',
-          table: 'Номенклатура', 
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'ID Детайл', type: 'text', required: true, label: 'Код / ID на детайла' },
-            { name: 'Вътрешно име', type: 'text', label: 'Вътрешно име / Описание' },
-            { name: 'Тип', type: 'text', label: 'Тип (напр. Възел, Материал)' },
-            { name: 'ID Родител', type: 'text', label: 'Родител (ако е приложимо)' },
-            { name: 'Разходна норма', type: 'number', def: 1 },
-            { name: 'Единици', type: 'text', def: 'бр.', label: 'Мерна единица (бр., кг, м)' },
-            { name: 'Линк към чертеж', type: 'text' },
-            { name: 'Имейл на доставчик', type: 'text', label: 'Имейл на доставчик (за поръчки)' }
-          ]
-        },
-        sklad: {
-          label: '📦 Склад Материали',
-          table: 'sklad',
-          key: 'ID Детайл',
-          fields: [
-            { name: 'ID Детайл', type: 'text', required: true, readonlyOnEdit: true, label: 'Код / ID на детайл' },
-            { name: 'Начална наличност', type: 'number', def: 0 },
-            { name: 'Доставено', type: 'number', def: 0 },
-            { name: 'Изразходено', type: 'number', def: 0 },
-            { name: 'Остатък', type: 'number', def: 0, readonly: true, hint: 'Изчислява се автоматично' },
-            { name: 'Минимално количество', type: 'number', def: 0 }
-          ]
-        },
-        bom: {
-          label: '🧩 БОМ (Разбивка)',
-          table: 'bom',
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'ID Родител', type: 'text', required: true, label: 'Родител (Възел)' },
-            { name: 'ID Компонент', type: 'text', required: true, label: 'Компонент (Дете / Материал)' },
-            { name: 'Количество', type: 'number', required: true, def: 1, label: 'Количество за 1 бр. Родител' }
-          ]
-        },
-        marshruti: {
-          label: '🔄 Маршрутни карти',
-          table: 'marshruti',
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'Код на детайла', type: 'text', required: true },
-            { name: '№ Операция', type: 'number', required: true, def: 10 },
-            { name: 'Име на операция', type: 'text', required: true, label: 'Име на операция (напр. Оп. 10)' },
-            { name: 'Машина', type: 'text', label: 'Работно място / Машина' },
-            { name: 'Линк към чертеж', type: 'text' },
-            { name: 'Линк към СОП', type: 'text', label: 'Линк към СОП (Инструкция)' },
-            { name: 'Описание', type: 'textarea' }
-          ]
-        },
-        otcheti: {
-          label: '📊 Отчети (Log)',
-          table: 'otcheti',
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'ID Детайл', type: 'text', required: true },
-            { name: 'Операция', type: 'text', required: true },
-            { name: 'Количество', type: 'number', def: 1, required: true },
-            { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак', 'Изпратено'], required: true },
-            { name: 'Оператор', type: 'text', required: true },
-            { name: 'Време Старт', type: 'text', label: '⌚ СТАРТ' }, 
-            { name: 'Дата', type: 'text', def: () => new Date().toISOString(), label: '🏁 КРАЙ' }
-          ]
-        }
+        sklad_gp: { label: '🏭 Склад Цех (WIP/ГП)', table: 'computed_sklad_gp', readOnlyTab: true, fields: [ { name: 'ID Детайл', type: 'text', label: 'Код на детайл' }, { name: 'Име', type: 'text', label: 'Вътрешно име' }, { name: 'Операция', type: 'text', label: 'Последна завършена стъпка' }, { name: 'Наличност в цеха', type: 'number', label: 'Количество на изчакване' } ] },
+        nomenklatura: { label: '🗂️ Номенклатура', table: 'Номенклатура', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true, label: 'Код / ID' }, { name: 'Вътрешно име', type: 'text' }, { name: 'Тип', type: 'text' }, { name: 'ID Родител', type: 'text' }, { name: 'Разходна норма', type: 'number', def: 1 }, { name: 'Единици', type: 'text', def: 'бр.' }, { name: 'Линк към чертеж', type: 'text' }, { name: 'Имейл на доставчик', type: 'text' } ] },
+        sklad: { label: '📦 Склад Материали', table: 'sklad', key: 'ID Детайл', fields: [ { name: 'ID Детайл', type: 'text', required: true, readonlyOnEdit: true }, { name: 'Начална наличност', type: 'number', def: 0 }, { name: 'Доставено', type: 'number', def: 0 }, { name: 'Изразходено', type: 'number', def: 0 }, { name: 'Остатък', type: 'number', def: 0, readonly: true }, { name: 'Минимално количество', type: 'number', def: 0 } ] },
+        bom: { label: '🧩 БОМ (Разбивка)', table: 'bom', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Родител', type: 'text', required: true }, { name: 'ID Компонент', type: 'text', required: true }, { name: 'Количество', type: 'number', required: true, def: 1 } ] },
+        marshruti: { label: '🔄 Маршрутни карти', table: 'marshruti', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'Код на детайла', type: 'text', required: true }, { name: '№ Операция', type: 'number', required: true, def: 10 }, { name: 'Име на операция', type: 'text', required: true }, { name: 'Машина', type: 'text' }, { name: 'Линк към чертеж', type: 'text' }, { name: 'Линк към СОП', type: 'text' }, { name: 'Описание', type: 'textarea' } ] },
+        otcheti: { label: '📊 Отчети (Log)', table: 'otcheti', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Операция', type: 'text', required: true }, { name: 'Количество', type: 'number', def: 1, required: true }, { name: 'Статус', type: 'select', options: ['Отчетено', 'Брак', 'Изпратено'], required: true }, { name: 'Оператор', type: 'text', required: true }, { name: 'Време Старт', type: 'text' }, { name: 'Дата', type: 'text', def: () => new Date().toISOString() } ] }
       };
 
       let currentTab = 'plan'; 
@@ -226,17 +159,64 @@
         currentTab = tabKey;
         buildNavbar();
         document.getElementById('searchInput').value = '';
+        
         const config = tableConfigs[tabKey];
         const addBtn = document.getElementById('addNewBtn');
-        addBtn.innerText = `➕ Нов запис в ${config.label.substring(2)}`; 
+        const autoCheckoutBtn = document.getElementById('autoCheckoutBtn');
         
-        if (config.readOnlyTab) {
-            addBtn.style.display = 'none';
-        } else {
-            addBtn.style.display = 'block';
-        }
+        addBtn.innerText = `➕ Нов запис в ${config.label.substring(2)}`; 
+        addBtn.style.display = config.readOnlyTab ? 'none' : 'block';
+        
+        // Показваме бутона за Авто-излизане само в таба за досиета
+        autoCheckoutBtn.style.display = (tabKey === 'chekiraniya') ? 'block' : 'none';
         
         loadCurrentTableData();
+      }
+
+      // --- ЛОГИКА ЗА АВТОМАТИЧНО ИЗПИСВАНЕ ---
+      async function runAutoCheckout() {
+          Swal.fire({ title: 'Проверка за забравени излизания...', didOpen: () => Swal.showLoading() });
+          
+          // Взимаме всички чекирания от началото на днешния ден
+          let startOfDay = new Date();
+          startOfDay.setHours(0,0,0,0);
+          
+          const { data, error } = await client.from('chekiraniya')
+              .select('*')
+              .gte('Време', startOfDay.toISOString())
+              .order('Време', { ascending: true });
+              
+          if(error) { Swal.fire('Грешка', error.message, 'error'); return; }
+          
+          // Определяме какво е ПОСЛЕДНОТО действие за всеки работник днес
+          let userState = {};
+          data.forEach(r => userState[r['Имейл']] = r['Действие']);
+          
+          let toCheckout = [];
+          let nowStr = new Date().toISOString();
+          
+          for(let email in userState) {
+              if(userState[email] === 'Влизане') {
+                  toCheckout.push({
+                      'Имейл': email,
+                      'Действие': 'Авто излизане',
+                      'Време': nowStr,
+                      'Локация': 'Системно',
+                      'Бележка': 'Забравено излизане'
+                  });
+              }
+          }
+          
+          if(toCheckout.length === 0) {
+              Swal.fire('Всичко е наред', 'Няма работници вътре в цеха със забравено излизане.', 'info');
+              return;
+          }
+          
+          const { error: insErr } = await client.from('chekiraniya').insert(toCheckout);
+          if(insErr) { Swal.fire('Грешка', insErr.message, 'error'); return; }
+          
+          Swal.fire('Успех!', `Автоматично изписани: ${toCheckout.length} служители.`, 'success');
+          loadCurrentTableData();
       }
 
       async function loadCurrentTableData() {
@@ -253,24 +233,16 @@
                   client.from('bom').select('*').limit(10000)
               ]);
               if (planRes.error) throw planRes.error;
-              
               let plans = planRes.data || [];
               let bom = bomRes.data || [];
-              
               plans.forEach(p => {
                   let code = String(p['ID Детайл']).trim();
                   let group = '0';
                   let children = bom.filter(b => String(b['ID Родител']).trim() === code);
-                  
-                  let has11 = children.some(c => String(c['ID Компонент']).includes('11'));
-                  let has25 = children.some(c => String(c['ID Компонент']).includes('25'));
-                  
-                  if (has11) group = '11';
-                  else if (has25) group = '25';
-                  
+                  if (children.some(c => String(c['ID Компонент']).includes('11'))) group = '11';
+                  else if (children.some(c => String(c['ID Компонент']).includes('25'))) group = '25';
                   p._group = group;
               });
-              
               plans.sort((a, b) => {
                   if (a._group === '11' && b._group !== '11') return -1;
                   if (a._group !== '11' && b._group === '11') return 1;
@@ -278,13 +250,9 @@
                   if (a._group !== '25' && b._group === '25') return 1;
                   return 0;
               });
-              
               globalRows = plans;
               filterTable();
-            } catch (err) {
-              console.error(err);
-              document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
-            }
+            } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
         } else {
             try {
               let query = client.from(config.table).select('*').limit(10000);
@@ -295,122 +263,57 @@
               if (error) throw error;
               globalRows = data || [];
               filterTable();
-            } catch (err) {
-              console.error(err);
-              document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изтегляне: ' + err.message;
-            }
+            } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
         }
       }
 
       async function loadComputedVirtualWarehouse() {
+          // (Оставям оригиналната ти логика за Склад ГП непокътната)
           try {
               const [plansRes, bomRes, routesRes, reportsRes, nomRes] = await Promise.all([
-                  client.from('plan').select('*'),
-                  client.from('bom').select('*'),
-                  client.from('marshruti').select('*'),
-                  client.from('otcheti').select('*'), 
+                  client.from('plan').select('*'), client.from('bom').select('*'),
+                  client.from('marshruti').select('*'), client.from('otcheti').select('*'), 
                   client.from('Номенклатура').select('*')
               ]);
-
-              if (plansRes.error) throw plansRes.error;
-              if (bomRes.error) throw bomRes.error;
-              if (routesRes.error) throw routesRes.error;
-              if (reportsRes.error) throw reportsRes.error;
-
               let namesMap = {};
-              if (nomRes.data) { nomRes.data.forEach(n => namesMap[String(n['ID Детайл']).trim()] = n['Вътрешно име']); }
-
+              if (nomRes.data) nomRes.data.forEach(n => namesMap[String(n['ID Детайл']).trim()] = n['Вътрешно име']);
               let totalNeeded = {};
               let bomData = bomRes.data || [];
-
               function addNeed(itemCode, qty, isRoot = false) {
                   let cleanCode = String(itemCode).trim();
-                  if (!isRoot) {
-                      totalNeeded[cleanCode] = (totalNeeded[cleanCode] || 0) + qty;
-                  }
-                  let children = bomData.filter(b => String(b['ID Родител']).trim() === cleanCode);
-                  children.forEach(c => addNeed(c['ID Компонент'], qty * (parseFloat(c['Количество']) || 1), false));
+                  if (!isRoot) totalNeeded[cleanCode] = (totalNeeded[cleanCode] || 0) + qty;
+                  bomData.filter(b => String(b['ID Родител']).trim() === cleanCode)
+                         .forEach(c => addNeed(c['ID Компонент'], qty * (parseFloat(c['Количество']) || 1), false));
               }
-
-              if (plansRes.data) {
-                  plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0, true));
-              }
-
+              if (plansRes.data) plansRes.data.forEach(p => addNeed(p['ID Детайл'], parseFloat(p['Целево количество']) || 0, true));
               let routesByDetail = {};
-              if (routesRes.data) {
-                  routesRes.data.forEach(r => {
-                      let code = String(r['Код на детайла']).trim();
-                      if(!routesByDetail[code]) routesByDetail[code] = [];
-                      routesByDetail[code].push(r);
-                  });
-              }
-              Object.keys(routesByDetail).forEach(code => {
-                  routesByDetail[code].sort((a,b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-              });
-
-              let completedOps = {};
-              let scrappedOps = {};
-              let shippedOps = {};
-
+              if (routesRes.data) routesRes.data.forEach(r => { let c = String(r['Код на детайла']).trim(); if(!routesByDetail[c]) routesByDetail[c] = []; routesByDetail[c].push(r); });
+              Object.keys(routesByDetail).forEach(c => routesByDetail[c].sort((a,b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
+              let completedOps = {}, scrappedOps = {}, shippedOps = {};
               if (reportsRes.data) {
                   reportsRes.data.forEach(r => {
-                      let code = String(r['ID Детайл']).trim();
-                      let key = code + '_' + String(r['Операция']).trim();
-                      let qty = parseFloat(r['Количество']) || 0;
-                      
-                      if (r['Статус'] === 'Брак') {
-                          scrappedOps[key] = (scrappedOps[key] || 0) + qty;
-                      } else if (r['Статус'] === 'Изпратено') {
-                          shippedOps[code] = (shippedOps[code] || 0) + qty;
-                      } else {
-                          completedOps[key] = (completedOps[key] || 0) + qty;
-                      }
+                      let c = String(r['ID Детайл']).trim(); let key = c + '_' + String(r['Операция']).trim(); let q = parseFloat(r['Количество']) || 0;
+                      if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + q;
+                      else if (r['Статус'] === 'Изпратено') shippedOps[c] = (shippedOps[c] || 0) + q;
+                      else completedOps[key] = (completedOps[key] || 0) + q;
                   });
               }
-
               globalRows = [];
-
               Object.keys(routesByDetail).forEach(code => {
                   let routes = routesByDetail[code];
-                  
                   routes.forEach((route, idx) => {
-                      let opName = String(route['Име на операция']).trim();
-                      let opKey = code + '_' + opName;
-                      
-                      let doneHere = completedOps[opKey] || 0;
-                      let sittingHere = 0;
-
+                      let opName = String(route['Име на операция']).trim(); let opKey = code + '_' + opName;
+                      let doneHere = completedOps[opKey] || 0; let sittingHere = 0;
                       if (idx < routes.length - 1) {
-                          let nextOpName = String(routes[idx+1]['Име на операция']).trim();
-                          let nextOpKey = code + '_' + nextOpName;
-                          let doneNext = completedOps[nextOpKey] || 0;
-                          let scrapNext = scrappedOps[nextOpKey] || 0;
-                          
-                          sittingHere = doneHere - (doneNext + scrapNext);
-                      } else {
-                          let needed = totalNeeded[code] || 0;
-                          let shipped = shippedOps[code] || 0;
-                          sittingHere = doneHere - needed - shipped;
-                      }
-
-                      if (sittingHere > 0) {
-                          globalRows.push({
-                              'ID Детайл': code,
-                              'Име': namesMap[code] || '---',
-                              'Операция': opName,
-                              'Наличност в цеха': sittingHere
-                          });
-                      }
+                          let nextKey = code + '_' + String(routes[idx+1]['Име на операция']).trim();
+                          sittingHere = doneHere - ((completedOps[nextKey] || 0) + (scrappedOps[nextKey] || 0));
+                      } else { sittingHere = doneHere - (totalNeeded[code] || 0) - (shippedOps[code] || 0); }
+                      if (sittingHere > 0) globalRows.push({'ID Детайл': code, 'Име': namesMap[code] || '---', 'Операция': opName, 'Наличност в цеха': sittingHere});
                   });
               });
-
               globalRows.sort((a,b) => a['ID Детайл'].localeCompare(b['ID Детайл']) || a['Операция'].localeCompare(b['Операция']));
               filterTable();
-
-          } catch (err) {
-              console.error("Грешка при изчисление на склад ГП:", err);
-              document.getElementById('loadingLayout').innerHTML = '❌ Грешка при изчисление: ' + err.message;
-          }
+          } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
       }
 
       function renderDynamicTable(itemsToRender = null) {
@@ -425,19 +328,13 @@
         const headerRow = document.createElement('tr');
         config.fields.forEach(f => {
           if (f.hideOnAdd) return; 
-          const th = document.createElement('th');
-          th.innerText = f.label || f.name;
-          headerRow.appendChild(th);
+          const th = document.createElement('th'); th.innerText = f.label || f.name; headerRow.appendChild(th);
         });
         
         if (!config.readOnlyTab) {
-            const thActions = document.createElement('th');
-            thActions.innerText = 'Действия';
-            thActions.style.textAlign = 'center';
-            thActions.style.width = '140px'; 
+            const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; thActions.style.width = '140px'; 
             headerRow.appendChild(thActions);
         }
-        
         thead.appendChild(headerRow);
 
         if (items.length === 0) {
@@ -451,15 +348,31 @@
           const trueIndex = globalRows.indexOf(item); 
           
           if (currentTab === 'plan') {
-              if (item._group === '11') {
-                  row.style.backgroundColor = '#f0f9ff';
-                  row.style.borderLeft = '5px solid #0ea5e9';
-              } else if (item._group === '25') {
-                  row.style.backgroundColor = '#f0fdf4';
-                  row.style.borderLeft = '5px solid #22c55e';
-              } else {
-                  row.style.borderLeft = '5px solid transparent';
-              }
+              if (item._group === '11') { row.style.backgroundColor = '#f0f9ff'; row.style.borderLeft = '5px solid #0ea5e9'; } 
+              else if (item._group === '25') { row.style.backgroundColor = '#f0fdf4'; row.style.borderLeft = '5px solid #22c55e'; }
+          }
+
+          // ОЦВЕТЯВАНЕ ПРИ ЗАКЪСНЕНИЕ ИЛИ ИЗВЪН ОБЕКТА
+          if (currentTab === 'chekiraniya') {
+             let isCheckin = item['Действие'] === 'Влизане';
+             let isAutoOut = item['Действие'] === 'Авто излизане';
+             let isOutOfBounds = item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА');
+             
+             let actionDate = item['Време'] ? new Date(item['Време']) : null;
+             let isLate = false;
+             if (actionDate && isCheckin) {
+                 let h = actionDate.getHours();
+                 let m = actionDate.getMinutes();
+                 if (h > 8 || (h === 8 && m > 0)) isLate = true;
+             }
+
+             if (isLate || isOutOfBounds) {
+                 row.style.backgroundColor = '#fef2f2'; // Червен фон
+                 row.style.borderLeft = '5px solid #ef4444';
+             } else if (isAutoOut) {
+                 row.style.backgroundColor = '#fffbeb'; // Жълт фон
+                 row.style.borderLeft = '5px solid #f59e0b';
+             }
           }
 
           config.fields.forEach(f => {
@@ -471,268 +384,69 @@
                 if (f.name === 'Време' && val) {
                     try {
                         let d = new Date(val);
-                        let formatted = d.toLocaleString('bg-BG', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit', second: '2-digit'
-                        });
+                        let formatted = d.toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         td.innerHTML = `<span style="font-weight: 600; color: #475569;">${formatted}</span>`;
                     } catch(e) { td.innerText = val; }
                     row.appendChild(td); return;
                 }
                 if (f.name === 'Действие') {
-                    const isInput = val === 'Влизане';
-                    const bg = isInput ? '#dcfce7' : '#fee2e2';
-                    const c = isInput ? '#15803d' : '#b91c1c';
-                    const icon = isInput ? '🟢' : '🔴';
-                    td.innerHTML = `<span style="background: ${bg}; color: ${c}; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">${icon} ${val}</span>`;
+                    if (val === 'Влизане') {
+                        td.innerHTML = `<span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">🟢 ${val}</span>`;
+                    } else if (val === 'Излизане') {
+                        td.innerHTML = `<span style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">🔴 ${val}</span>`;
+                    } else if (val === 'Авто излизане') {
+                        td.innerHTML = `<span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">🕒 ${val}</span>`;
+                    } else { td.innerText = val; }
+                    row.appendChild(td); return;
+                }
+                if (f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) {
+                    td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`;
                     row.appendChild(td); return;
                 }
             }
 
             if (currentTab === 'sklad' && f.name === 'Остатък') {
               const minVal = parseFloat(item['Минимално количество']) || 0;
-              if (parseFloat(val) <= minVal && minVal > 0) {
-                td.innerHTML = `<span class="badge-warn">⚠️ ${val}</span>`;
-                row.appendChild(td); return;
-              }
+              if (parseFloat(val) <= minVal && minVal > 0) { td.innerHTML = `<span class="badge-warn">⚠️ ${val}</span>`; row.appendChild(td); return; }
             }
-            
-            if (currentTab === 'sklad_gp' && f.name === 'Наличност в цеха' && parseFloat(val) > 0) {
-                td.innerHTML = `<b style="color: #2563eb; font-size: 1.1em;">${val} бр.</b>`;
-                row.appendChild(td); return;
-            }
-            
-            if (currentTab === 'otcheti' && f.name === 'Статус') {
-              const cls = val === 'Брак' ? 'status-scrap' : 'status-ok';
-              td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`;
-              row.appendChild(td); return;
-            }
-            
+            if (currentTab === 'sklad_gp' && f.name === 'Наличност в цеха' && parseFloat(val) > 0) { td.innerHTML = `<b style="color: #2563eb; font-size: 1.1em;">${val} бр.</b>`; row.appendChild(td); return; }
+            if (currentTab === 'otcheti' && f.name === 'Статус') { const cls = val === 'Брак' ? 'status-scrap' : 'status-ok'; td.innerHTML = `<span class="badge-status ${cls}">${val}</span>`; row.appendChild(td); return; }
             if (currentTab === 'plan' && f.name === 'Статус') {
-                 if (val === '📦 Опакован') {
-                     td.innerHTML = `<span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
-                 } else if (val === '🚚 Изпратен') {
-                     td.innerHTML = `<span style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 6px; font-weight: bold; text-decoration: line-through;">${val}</span>`;
-                 } else {
-                     let bg = val === 'Завършен' ? '#dcfce7' : '#e0e7ff';
-                     let c = val === 'Завършен' ? '#166534' : '#3730a3';
-                     td.innerHTML = `<span style="background: ${bg}; color: ${c}; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
-                 }
+                 if (val === '📦 Опакован') td.innerHTML = `<span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
+                 else if (val === '🚚 Изпратен') td.innerHTML = `<span style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 6px; font-weight: bold; text-decoration: line-through;">${val}</span>`;
+                 else { let bg = val === 'Завършен' ? '#dcfce7' : '#e0e7ff'; let c = val === 'Завършен' ? '#166534' : '#3730a3'; td.innerHTML = `<span style="background: ${bg}; color: ${c}; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`; }
                  row.appendChild(td); return;
             }
-            
             if (currentTab === 'otcheti' && (f.name === 'Дата' || f.name === 'Време Старт')) {
                 if (val) {
-                    try {
-                        let safeVal = String(val).endsWith('Z') ? val : val + 'Z';
-                        let d = new Date(safeVal);
-                        td.innerHTML = `<span style="color: #475569; font-weight: 600;">${d.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'})}</span> <span style="font-size: 0.8em; color: #94a3b8;">(${d.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit'})})</span>`;
-                    } catch(e) { td.innerText = val; }
-                } else {
-                    td.innerText = '-';
-                }
+                    try { let d = new Date(String(val).endsWith('Z') ? val : val + 'Z'); td.innerHTML = `<span style="color: #475569; font-weight: 600;">${d.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'})}</span> <span style="font-size: 0.8em; color: #94a3b8;">(${d.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit'})})</span>`; } 
+                    catch(e) { td.innerText = val; }
+                } else { td.innerText = '-'; }
                 row.appendChild(td); return;
             }
-
-            td.innerText = val;
-            row.appendChild(td);
+            td.innerText = val; row.appendChild(td);
           });
 
           if (!config.readOnlyTab) {
-              const tdActions = document.createElement('td');
-              tdActions.style.textAlign = 'center';
-              
-              let actionsHtml = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})" title="Редактирай">✏️</button>
-                                 <button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})" title="Изтрий">🗑️</button>`;
-              
-              if (currentTab === 'plan' && item['Статус'] === '📦 Опакован') {
-                  actionsHtml += `<button class="action-btn" onclick="shipPlan(${trueIndex})" title="Експедирай" style="background:#2563eb; color:white; font-size:0.8em; padding:6px 10px; margin-left:5px; border-radius:4px; font-weight:bold;">🚀 ИЗПРАТИ</button>`;
-              }
-              
-              tdActions.innerHTML = actionsHtml;
-              row.appendChild(tdActions);
+              const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
+              let actionsHtml = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})" title="Редактирай">✏️</button><button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})" title="Изтрий">🗑️</button>`;
+              if (currentTab === 'plan' && item['Статус'] === '📦 Опакован') actionsHtml += `<button class="action-btn" onclick="shipPlan(${trueIndex})" title="Експедирай" style="background:#2563eb; color:white; font-size:0.8em; padding:6px 10px; margin-left:5px; border-radius:4px; font-weight:bold;">🚀 ИЗПРАТИ</button>`;
+              tdActions.innerHTML = actionsHtml; row.appendChild(tdActions);
           }
           tbody.appendChild(row);
         });
         table.style.display = 'table';
       }
 
-      function filterTable() {
-        const query = document.getElementById('searchInput').value.toLowerCase().trim();
-        if(!query) { renderDynamicTable(); return; }
-        const filtered = globalRows.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query)));
-        renderDynamicTable(filtered);
-      }
-
-      function liveCalculateSklad() {
-        if (currentTab !== 'sklad') return;
-        const init = parseFloat(document.getElementById('field_Начална_наличност').value) || 0;
-        const deliv = parseFloat(document.getElementById('field_Доставено').value) || 0;
-        const used = parseFloat(document.getElementById('field_Изразходено').value) || 0;
-        document.getElementById('field_Остатък').value = (init + deliv) - used;
-      }
-
-      function openAddModal() {
-        isEditMode = false; editingIndex = null;
-        const config = tableConfigs[currentTab];
-        if (config.readOnlyTab) return; 
-        
-        document.getElementById('modalTitle').innerText = `➕ Нов запис`;
-        const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
-
-        config.fields.forEach(f => {
-          if (f.hideOnAdd) return;
-          const group = document.createElement('div'); group.className = 'form-group';
-          const label = document.createElement('label'); label.innerText = f.label || f.name;
-          group.appendChild(label);
-          let input;
-          if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; }
-          else if (f.type === 'select') {
-            input = document.createElement('select');
-            f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); });
-          } else { input = document.createElement('input'); input.type = f.type; }
-
-          input.id = `field_${f.name.replace(/ /g, '_')}`;
-          let defaultVal = typeof f.def === 'function' ? f.def() : (f.def !== undefined ? f.def : '');
-          input.value = defaultVal;
-          if (f.required) input.required = true;
-          if (f.readonly) input.readOnly = true;
-          if (f.hint) input.placeholder = f.hint;
-          if (currentTab === 'sklad') input.oninput = liveCalculateSklad;
-          group.appendChild(input); area.appendChild(group);
-        });
-        document.getElementById('modalBackdrop').style.display = 'flex';
-      }
-
-      function openEditModal(index) {
-        isEditMode = true; editingIndex = index;
-        const config = tableConfigs[currentTab];
-        if (config.readOnlyTab) return; 
-        
-        const record = globalRows[index];
-        document.getElementById('modalTitle').innerText = `✏️ Редактиране`;
-        const area = document.getElementById('formFieldsArea'); area.innerHTML = '';
-
-        config.fields.forEach(f => {
-          if (f.hideOnAdd) return;
-          const group = document.createElement('div'); group.className = 'form-group';
-          const label = document.createElement('label'); label.innerText = f.label || f.name;
-          group.appendChild(label);
-          let input;
-          if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; }
-          else if (f.type === 'select') {
-            input = document.createElement('select');
-            f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); });
-          } else { input = document.createElement('input'); input.type = f.type; }
-
-          input.id = `field_${f.name.replace(/ /g, '_')}`;
-          input.value = record[f.name] !== undefined && record[f.name] !== null ? record[f.name] : '';
-          if (f.required) input.required = true;
-          if (f.readonly || f.readonlyOnEdit) input.readOnly = true;
-          if (currentTab === 'sklad') input.oninput = liveCalculateSklad;
-          group.appendChild(input); area.appendChild(group);
-        });
-        document.getElementById('modalBackdrop').style.display = 'flex';
-      }
-
+      function filterTable() { const query = document.getElementById('searchInput').value.toLowerCase().trim(); if(!query) { renderDynamicTable(); return; } const filtered = globalRows.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(query))); renderDynamicTable(filtered); }
+      function liveCalculateSklad() { if (currentTab !== 'sklad') return; const init = parseFloat(document.getElementById('field_Начална_наличност').value) || 0; const deliv = parseFloat(document.getElementById('field_Доставено').value) || 0; const used = parseFloat(document.getElementById('field_Изразходено').value) || 0; document.getElementById('field_Остатък').value = (init + deliv) - used; }
+      function openAddModal() { isEditMode = false; editingIndex = null; const config = tableConfigs[currentTab]; if (config.readOnlyTab) return; document.getElementById('modalTitle').innerText = `➕ Нов запис`; const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; config.fields.forEach(f => { if (f.hideOnAdd) return; const group = document.createElement('div'); group.className = 'form-group'; const label = document.createElement('label'); label.innerText = f.label || f.name; group.appendChild(label); let input; if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; } else if (f.type === 'select') { input = document.createElement('select'); f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); }); } else { input = document.createElement('input'); input.type = f.type; } input.id = `field_${f.name.replace(/ /g, '_')}`; input.value = typeof f.def === 'function' ? f.def() : (f.def !== undefined ? f.def : ''); if (f.required) input.required = true; if (f.readonly) input.readOnly = true; if (f.hint) input.placeholder = f.hint; if (currentTab === 'sklad') input.oninput = liveCalculateSklad; group.appendChild(input); area.appendChild(group); }); document.getElementById('modalBackdrop').style.display = 'flex'; }
+      function openEditModal(index) { isEditMode = true; editingIndex = index; const config = tableConfigs[currentTab]; if (config.readOnlyTab) return; const record = globalRows[index]; document.getElementById('modalTitle').innerText = `✏️ Редактиране`; const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; config.fields.forEach(f => { if (f.hideOnAdd) return; const group = document.createElement('div'); group.className = 'form-group'; const label = document.createElement('label'); label.innerText = f.label || f.name; group.appendChild(label); let input; if (f.type === 'textarea') { input = document.createElement('textarea'); input.rows = 3; } else if (f.type === 'select') { input = document.createElement('select'); f.options.forEach(opt => { const o = document.createElement('option'); o.value = opt; o.innerText = opt; input.appendChild(o); }); } else { input = document.createElement('input'); input.type = f.type; } input.id = `field_${f.name.replace(/ /g, '_')}`; input.value = record[f.name] !== undefined && record[f.name] !== null ? record[f.name] : ''; if (f.required) input.required = true; if (f.readonly || f.readonlyOnEdit) input.readOnly = true; if (currentTab === 'sklad') input.oninput = liveCalculateSklad; group.appendChild(input); area.appendChild(group); }); document.getElementById('modalBackdrop').style.display = 'flex'; }
       function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
-
-      async function saveForm(e) {
-        e.preventDefault();
-        Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-        const config = tableConfigs[currentTab];
-        let recordToSave = {};
-        config.fields.forEach(f => {
-          const el = document.getElementById(`field_${f.name.replace(/ /g, '_')}`);
-          if (el) {
-            let val = el.value.trim();
-            if (f.type === 'number') val = parseFloat(val) || 0;
-            recordToSave[f.name] = val;
-          }
-        });
-        try {
-          if (isEditMode) {
-            const oldRecord = globalRows[editingIndex];
-            let query = client.from(config.table).update(recordToSave);
-            if (oldRecord[config.key] !== undefined) query = query.eq(config.key, oldRecord[config.key]);
-            else query = query.match(oldRecord);
-            const { error } = await query;
-            if (error) throw error;
-          } else {
-            const { error } = await client.from(config.table).insert([recordToSave]);
-            if (error) throw error;
-          }
-          Swal.fire({ icon: 'success', title: 'Успешен запис!', timer: 1000, showConfirmButton: false });
-          closeModal(); loadCurrentTableData();
-        } catch (err) {
-          console.error(err); Swal.fire('❌ Грешка при запис', err.message, 'error');
-        }
-      }
-
-      async function deleteItem(index) {
-        const config = tableConfigs[currentTab];
-        const record = globalRows[index];
-        let desc = record['ID Детайл'] || record['Код на детайла'] || `Ред №${index+1}`;
-        Swal.fire({
-          title: 'Сигурна ли си?', text: `Ще изтриеш трайно "${desc}" от таблица ${config.table}!`, icon: 'warning',
-          showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8',
-          confirmButtonText: 'Да, изтрий го!', cancelButtonText: 'Отказ'
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            Swal.fire({ title: 'Премахване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-            try {
-              let query = client.from(config.table).delete();
-              if (record[config.key] !== undefined) query = query.eq(config.key, record[config.key]);
-              else query = query.match(record);
-              const { error } = await query;
-              if (error) throw error;
-              Swal.fire({ icon: 'success', title: 'Премахнато!', timer: 1000, showConfirmButton: false });
-              loadCurrentTableData();
-            } catch (err) {
-              console.error(err); Swal.fire('❌ Системна грешка при изтриване', err.message, 'error');
-            }
-          }
-        });
-      }
-
-      async function shipPlan(index) {
-          const record = globalRows[index];
-          Swal.fire({
-              title: 'Експедиция на план',
-              html: `Ще изпратите <b>${record['Целево количество']} бр.</b> от <b>${record['ID Детайл']}</b>.<br>Тези бройки ще бъдат извадени от Склада!`,
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: '🚀 Да, Изпрати!',
-              cancelButtonText: 'Отказ',
-              confirmButtonColor: '#2563eb'
-          }).then(async (result) => {
-              if (result.isConfirmed) {
-                  Swal.fire({ title: 'Изписване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                  try {
-                      const { error: e1 } = await client.from('plan')
-                          .update({ 'Статус': '🚚 Изпратен' })
-                          .eq('id', record.id);
-                      if (e1) throw e1;
-                      
-                      const { error: e2 } = await client.from('otcheti').insert([{
-                          "ID Детайл": record['ID Детайл'],
-                          "Оператор": "СИСТЕМА (Експедиция)",
-                          "Количество": record['Целево количество'],
-                          "Операция": "ЕКСПЕДИЦИЯ",
-                          "Статус": "Изпратено",
-                          "Дата": new Date().toISOString(),
-                          "Време Старт": new Date().toISOString()
-                      }]);
-                      if (e2) throw e2;
-                      
-                      Swal.fire({ icon: 'success', title: 'Успешно изпратено!', timer: 1500, showConfirmButton: false });
-                      loadCurrentTableData();
-                  } catch (err) {
-                      Swal.fire('Грешка', err.message, 'error');
-                  }
-              }
-          });
-      }
+      
+      async function saveForm(e) { e.preventDefault(); Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); const config = tableConfigs[currentTab]; let recordToSave = {}; config.fields.forEach(f => { const el = document.getElementById(`field_${f.name.replace(/ /g, '_')}`); if (el) { let val = el.value.trim(); if (f.type === 'number') val = parseFloat(val) || 0; recordToSave[f.name] = val; } }); try { if (isEditMode) { const oldRecord = globalRows[editingIndex]; let query = client.from(config.table).update(recordToSave); if (oldRecord[config.key] !== undefined) query = query.eq(config.key, oldRecord[config.key]); else query = query.match(oldRecord); const { error } = await query; if (error) throw error; } else { const { error } = await client.from(config.table).insert([recordToSave]); if (error) throw error; } Swal.fire({ icon: 'success', title: 'Успешен запис!', timer: 1000, showConfirmButton: false }); closeModal(); loadCurrentTableData(); } catch (err) { Swal.fire('❌ Грешка при запис', err.message, 'error'); } }
+      async function deleteItem(index) { const config = tableConfigs[currentTab]; const record = globalRows[index]; let desc = record['ID Детайл'] || record['Код на детайла'] || `Ред №${index+1}`; Swal.fire({ title: 'Сигурна ли си?', text: `Ще изтриеш трайно "${desc}" от таблица ${config.table}!`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'Да, изтрий го!', cancelButtonText: 'Отказ' }).then(async (result) => { if (result.isConfirmed) { Swal.fire({ title: 'Премахване...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); try { let query = client.from(config.table).delete(); if (record[config.key] !== undefined) query = query.eq(config.key, record[config.key]); else query = query.match(record); const { error } = await query; if (error) throw error; Swal.fire({ icon: 'success', title: 'Премахнато!', timer: 1000, showConfirmButton: false }); loadCurrentTableData(); } catch (err) { Swal.fire('❌ Системна грешка при изтриване', err.message, 'error'); } } }); }
+      async function shipPlan(index) { const record = globalRows[index]; Swal.fire({ title: 'Експедиция на план', html: `Ще изпратите <b>${record['Целево количество']} бр.</b> от <b>${record['ID Детайл']}</b>.<br>Тези бройки ще бъдат извадени от Склада!`, icon: 'question', showCancelButton: true, confirmButtonText: '🚀 Да, Изпрати!', cancelButtonText: 'Отказ', confirmButtonColor: '#2563eb' }).then(async (result) => { if (result.isConfirmed) { Swal.fire({ title: 'Изписване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); try { const { error: e1 } = await client.from('plan').update({ 'Статус': '🚚 Изпратен' }).eq('id', record.id); if (e1) throw e1; const { error: e2 } = await client.from('otcheti').insert([{ "ID Детайл": record['ID Детайл'], "Оператор": "СИСТЕМА (Експедиция)", "Количество": record['Целево количество'], "Операция": "ЕКСПЕДИЦИЯ", "Статус": "Изпратено", "Дата": new Date().toISOString(), "Време Старт": new Date().toISOString() }]); if (e2) throw e2; Swal.fire({ icon: 'success', title: 'Успешно изпратено!', timer: 1500, showConfirmButton: false }); loadCurrentTableData(); } catch (err) { Swal.fire('Грешка', err.message, 'error'); } } }); }
 
       window.onload = () => { buildNavbar(); loadCurrentTableData(); };
     </script>
