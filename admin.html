@@ -99,6 +99,29 @@
       );
 
       const tableConfigs = {
+        plan: {
+          label: '📅 Месечен План',
+          table: 'plan',
+          key: 'id',
+          fields: [
+            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
+            { name: 'ID Детайл', type: 'text', required: true, label: 'Крайно изделие / Детайл' },
+            { name: 'Целево количество', type: 'number', required: true, def: 0 },
+            { name: 'Месец', type: 'text', required: true, label: 'Месец (напр. Юни)' },
+            { name: 'Година', type: 'number', required: true, def: 2026 },
+            { name: 'Статус', type: 'select', options: ['Активен', 'Завършен', '📦 Опакован', '🚚 Изпратен'], required: true }
+          ]
+        },
+        chekiraniya: {
+          label: '📋 Досиета (Вход/Изход)',
+          table: 'chekiraniya',
+          readOnlyTab: true,
+          fields: [
+            { name: 'Време', type: 'text', label: 'Дата и час' },
+            { name: 'Имейл', type: 'text', label: 'Служител (Имейл)' },
+            { name: 'Действие', type: 'text', label: 'Действие' }
+          ]
+        },
         sklad_gp: {
           label: '🏭 Склад Цех (WIP/ГП)',
           table: 'computed_sklad_gp', 
@@ -137,20 +160,6 @@
             { name: 'Изразходено', type: 'number', def: 0 },
             { name: 'Остатък', type: 'number', def: 0, readonly: true, hint: 'Изчислява се автоматично' },
             { name: 'Минимално количество', type: 'number', def: 0 }
-          ]
-        },
-        plan: {
-          label: '📅 Месечен План',
-          table: 'plan',
-          key: 'id',
-          fields: [
-            { name: 'id', type: 'number', readonly: true, readonlyOnEdit: true, hideOnAdd: true },
-            { name: 'ID Детайл', type: 'text', required: true, label: 'Крайно изделие / Детайл' },
-            { name: 'Целево количество', type: 'number', required: true, def: 0 },
-            { name: 'Месец', type: 'text', required: true, label: 'Месец (напр. Юни)' },
-            { name: 'Година', type: 'number', required: true, def: 2026 },
-            // ПРОМЯНА: Добавени нови статуси за експедиция
-            { name: 'Статус', type: 'select', options: ['Активен', 'Завършен', '📦 Опакован', '🚚 Изпратен'], required: true }
           ]
         },
         bom: {
@@ -238,7 +247,6 @@
         if (currentTab === 'sklad_gp') {
             await loadComputedVirtualWarehouse();
         } else if (currentTab === 'plan') {
-            // ПРОМЯНА 1: Умно зареждане и сортиране на Плановете според БОМ-а
             try {
               const [planRes, bomRes] = await Promise.all([
                   client.from(config.table).select('*').limit(10000),
@@ -249,10 +257,9 @@
               let plans = planRes.data || [];
               let bom = bomRes.data || [];
               
-              // Търсим варианта в децата
               plans.forEach(p => {
                   let code = String(p['ID Детайл']).trim();
-                  let group = '0'; // по подразбиране
+                  let group = '0';
                   let children = bom.filter(b => String(b['ID Родител']).trim() === code);
                   
                   let has11 = children.some(c => String(c['ID Компонент']).includes('11'));
@@ -261,10 +268,9 @@
                   if (has11) group = '11';
                   else if (has25) group = '25';
                   
-                  p._group = group; // Скрит маркер за подреждане и оцветяване
+                  p._group = group;
               });
               
-              // Подреждаме: Вар 11 най-отгоре, после Вар 25, после всичко останало
               plans.sort((a, b) => {
                   if (a._group === '11' && b._group !== '11') return -1;
                   if (a._group !== '11' && b._group === '11') return 1;
@@ -283,6 +289,7 @@
             try {
               let query = client.from(config.table).select('*').limit(10000);
               if (currentTab === 'otcheti') query = query.order('Дата', { ascending: false });
+              if (currentTab === 'chekiraniya') query = query.order('Време', { ascending: false });
               
               const { data, error } = await query;
               if (error) throw error;
@@ -316,7 +323,6 @@
               let totalNeeded = {};
               let bomData = bomRes.data || [];
 
-              // ПРОМЯНА 3: Крайните продукти (които се продават) НЕ ги изваждаме от склада, докато не се изпратят
               function addNeed(itemCode, qty, isRoot = false) {
                   let cleanCode = String(itemCode).trim();
                   if (!isRoot) {
@@ -344,7 +350,7 @@
 
               let completedOps = {};
               let scrappedOps = {};
-              let shippedOps = {}; // Бройки, които вече са напуснали фабриката
+              let shippedOps = {};
 
               if (reportsRes.data) {
                   reportsRes.data.forEach(r => {
@@ -428,7 +434,7 @@
             const thActions = document.createElement('th');
             thActions.innerText = 'Действия';
             thActions.style.textAlign = 'center';
-            thActions.style.width = '140px'; // Разширяваме леко заради новия бутон
+            thActions.style.width = '140px'; 
             headerRow.appendChild(thActions);
         }
         
@@ -444,14 +450,13 @@
           const row = document.createElement('tr');
           const trueIndex = globalRows.indexOf(item); 
           
-          // ПРОМЯНА 1: Оцветяване на редовете според Групата
           if (currentTab === 'plan') {
               if (item._group === '11') {
                   row.style.backgroundColor = '#f0f9ff';
-                  row.style.borderLeft = '5px solid #0ea5e9'; // Синя линия
+                  row.style.borderLeft = '5px solid #0ea5e9';
               } else if (item._group === '25') {
                   row.style.backgroundColor = '#f0fdf4';
-                  row.style.borderLeft = '5px solid #22c55e'; // Зелена линия
+                  row.style.borderLeft = '5px solid #22c55e';
               } else {
                   row.style.borderLeft = '5px solid transparent';
               }
@@ -462,7 +467,28 @@
             const td = document.createElement('td');
             let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             
-            // Дизайни за различните колони
+            if (currentTab === 'chekiraniya') {
+                if (f.name === 'Време' && val) {
+                    try {
+                        let d = new Date(val);
+                        let formatted = d.toLocaleString('bg-BG', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        });
+                        td.innerHTML = `<span style="font-weight: 600; color: #475569;">${formatted}</span>`;
+                    } catch(e) { td.innerText = val; }
+                    row.appendChild(td); return;
+                }
+                if (f.name === 'Действие') {
+                    const isInput = val === 'Влизане';
+                    const bg = isInput ? '#dcfce7' : '#fee2e2';
+                    const c = isInput ? '#15803d' : '#b91c1c';
+                    const icon = isInput ? '🟢' : '🔴';
+                    td.innerHTML = `<span style="background: ${bg}; color: ${c}; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">${icon} ${val}</span>`;
+                    row.appendChild(td); return;
+                }
+            }
+
             if (currentTab === 'sklad' && f.name === 'Остатък') {
               const minVal = parseFloat(item['Минимално количество']) || 0;
               if (parseFloat(val) <= minVal && minVal > 0) {
@@ -482,7 +508,6 @@
               row.appendChild(td); return;
             }
             
-            // Дизайн за новите статуси на Плана
             if (currentTab === 'plan' && f.name === 'Статус') {
                  if (val === '📦 Опакован') {
                      td.innerHTML = `<span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-weight: bold;">${val}</span>`;
@@ -520,7 +545,6 @@
               let actionsHtml = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})" title="Редактирай">✏️</button>
                                  <button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})" title="Изтрий">🗑️</button>`;
               
-              // ПРОМЯНА 2: Добавяне на бутона "ИЗПРАТИ" само за опакованите
               if (currentTab === 'plan' && item['Статус'] === '📦 Опакован') {
                   actionsHtml += `<button class="action-btn" onclick="shipPlan(${trueIndex})" title="Експедирай" style="background:#2563eb; color:white; font-size:0.8em; padding:6px 10px; margin-left:5px; border-radius:4px; font-weight:bold;">🚀 ИЗПРАТИ</button>`;
               }
@@ -671,7 +695,6 @@
         });
       }
 
-      // ПРОМЯНА 2: Логиката за изпращане на плана
       async function shipPlan(index) {
           const record = globalRows[index];
           Swal.fire({
@@ -686,13 +709,11 @@
               if (result.isConfirmed) {
                   Swal.fire({ title: 'Изписване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                   try {
-                      // 1. Променяме статуса на плана
                       const { error: e1 } = await client.from('plan')
                           .update({ 'Статус': '🚚 Изпратен' })
                           .eq('id', record.id);
                       if (e1) throw e1;
                       
-                      // 2. Създаваме запис за изписване в Отчетите
                       const { error: e2 } = await client.from('otcheti').insert([{
                           "ID Детайл": record['ID Детайл'],
                           "Оператор": "СИСТЕМА (Експедиция)",
