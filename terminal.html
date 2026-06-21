@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MES Терминал</title>
+    <!-- Паспорт на приложението -->
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -11,91 +12,93 @@
       body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
       .container { padding: 15px; display: flex; flex-direction: column; align-items: center; }
       
-      .app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; }
-      .editable-header { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 10px; border-radius: 8px; transition: background 0.2s; border: 1px solid transparent; }
-      .editable-header:hover { background: #f8fafc; border-color: #e2e8f0; }
-      .editable-header:active { background: #f1f5f9; }
-      .edit-icon { font-size: 0.9em; opacity: 0.4; }
+      /* КОМПАКТЕН ХЕДЪР ЗА ТЕЛЕФОН */
+      .app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
+      .profile-area { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 8px; }
+      .profile-area:active { background: #f1f5f9; }
+      .operator-name { font-size: 0.8em; color: #64748b; font-weight: bold; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       
-      .machine-title { font-weight: 900; color: #1e3a8a; text-transform: uppercase; font-size: 0.9em; max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .operator-name { font-size: 0.85em; color: #64748b; font-weight: bold; }
+      .action-buttons { display: flex; gap: 6px; }
+      .btn-check { color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 900; font-size: 0.85em; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .btn-in { background-color: #16a34a; }
+      .btn-in:active { background-color: #15803d; transform: scale(0.95); }
+      .btn-out { background-color: #dc2626; }
+      .btn-out:active { background-color: #b91c1c; transform: scale(0.95); }
       
-    #tasksContainer { width: 100%; max-width: 550px; margin: 15px auto 40px auto; display: flex; flex-direction: column; gap: 20px; }
+      /* ИЗБОР НА МАШИНА ПОД ХЕДЪРА */
+      .machine-bar { width: 100%; background: #e2e8f0; padding: 8px 0; text-align: center; font-size: 0.85em; color: #475569; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+      .machine-title { color: #1e3a8a; font-weight: 900; text-decoration: underline; margin-left: 5px;}
+
+      /* ЕДНА КОЛОНА ЗА ЗАДАЧИТЕ */
+      #tasksContainer { width: 100%; max-width: 550px; margin: 15px auto 80px auto; display: flex; flex-direction: column; gap: 20px; }
       
-      /* НОВИЯТ ДИЗАЙН НА КАРТИТЕ */
-      .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
-      .card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-color: #cbd5e1; }
+      /* ДИЗАЙН НА КАРТИТЕ */
+      .card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; position: relative; }
       
       .task-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-      .plan-label { color: #64748b; font-weight: 800; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; }
-      .qty-badge { background-color: #ef4444; color: white; padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 1em; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
+      .plan-label { color: #64748b; font-weight: 800; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px; }
+      .qty-badge { background-color: #ef4444; color: white; padding: 4px 12px; border-radius: 20px; font-weight: 900; font-size: 0.95em; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
       
-      .detail-info { margin-bottom: 20px; }
-      .internal-name { font-size: 1.4em; font-weight: 900; color: #1e293b; margin-bottom: 4px; line-height: 1.2; }
-      .internal-name a { color: #1e3a8a; text-decoration: none; transition: color 0.2s; }
-      .internal-name a:hover { color: #2563eb; text-decoration: underline; }
-      .detail-code { font-size: 1em; font-weight: 700; color: #94a3b8; }
+      .detail-info { margin-bottom: 15px; }
+      .internal-name { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 4px; line-height: 1.2; }
+      .internal-name a { color: #1e3a8a; text-decoration: none; }
+      .detail-code { font-size: 0.9em; font-weight: 700; color: #94a3b8; }
       
-      .route-flow { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 700; font-size: 0.95em; }
-      .op-active { color: #2563eb; display: flex; align-items: center; gap: 4px; font-size: 1.1em; }
+      .route-flow { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 700; font-size: 0.9em; }
+      .op-active { color: #2563eb; display: flex; align-items: center; gap: 4px; font-size: 1.05em; }
       .op-pending { color: #94a3b8; }
-      .route-arrow { color: #cbd5e1; font-size: 0.9em; }
+      .route-arrow { color: #cbd5e1; font-size: 0.8em; }
       
       input[type="number"] { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; text-align: center; font-size: 1.3em; font-weight: bold; box-sizing: border-box; }
       input[type="number"]:focus { border-color: #3b82f6; outline: none; }
       
-      .btn, .btn-danger { color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em; transition: opacity 0.2s; }
+      .btn, .btn-danger { color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em; }
       .btn { background: #16a34a; flex: 1; }
-      .btn:hover { background: #15803d; }
       .btn-danger { background: #e74c3c; flex: 0.4; }
-      .btn-danger:hover { background: #c0392b; }
       
       /* ИСТОРИЯ */
       .local-history { display: none; position: fixed; bottom: 80px; right: 15px; background: rgba(255,255,255,0.98); border: 1px solid #cbd5e1; padding: 15px 12px 12px 12px; border-radius: 12px; width: 300px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-size: 13px; z-index: 9000; }
       .local-history h4 { margin: 0 0 10px 0; color: #475569; text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;}
       .history-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
       .history-item { padding: 8px 0; border-bottom: 1px dashed #e2e8f0; color: #334155; display: flex; flex-direction: column; }
-      .history-item:last-child { border-bottom: none; }
       .history-time { color: #64748b; font-weight: bold; font-size: 11px; margin-bottom: 2px;}
       
-      .history-toggle-btn { position: fixed; bottom: 15px; right: 15px; background: #1e293b; color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; z-index: 9001; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
-      .history-toggle-btn:active { background: #0f172a; transform: scale(0.95); }
-      .close-history-btn { position: absolute; top: 10px; right: 10px; background: transparent; border: none; font-size: 16px; cursor: pointer; color: #94a3b8; font-weight: bold; }
+      .history-toggle-btn { position: fixed; bottom: 15px; right: 15px; background: #1e293b; color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; z-index: 9001; display: flex; justify-content: center; align-items: center; }
     </style>
   </head>
   <body>
+    <!-- ХЕДЪР -->
     <div class="app-header">
-      <div class="editable-header" onclick="changeOperator()" title="Смени оператор">
+      <div class="profile-area" onclick="setupProfile()" title="Настройки на профила">
         <div>
           <div style="font-weight:900; color:#1e3a8a; font-size: 1.1em;">ИС-СИСТЕМС</div>
           <div class="operator-name" id="uiOperatorName">ОПЕРАТОР</div>
         </div>
-        <span class="edit-icon">✏️</span>
+        <span style="font-size: 1.2em;">⚙️</span>
       </div>
       
-      <div class="editable-header" onclick="changeMachine()" title="Смени машина">
-        <div style="text-align: right;">
-            <div style="font-size: 0.7em; color: #94a3b8; font-weight: bold; text-transform: uppercase;">Работно място</div>
-            <div class="machine-title" id="uiMachineName">ВСИЧКИ</div>
-        </div>
-        <span class="edit-icon">✏️</span>
+      <div class="action-buttons">
+        <button class="btn-check btn-in" onclick="processCheckIn('Влизане')">🟢 ВХОД</button>
+        <button class="btn-check btn-out" onclick="processCheckIn('Излизане')">🔴 ИЗХОД</button>
       </div>
+    </div>
+
+    <!-- ИЗБОР НА МАШИНА -->
+    <div class="machine-bar" onclick="changeMachine()">
+        Работно място: <span class="machine-title" id="uiMachineName">ВСИЧКИ</span> ✏️
     </div>
     
     <div class="container">
       <div id="tasksContainer">
-         <div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em; grid-column: 1/-1;">Търсене на задачи... 🔄</div>
+         <div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>
       </div>
     </div>
 
-    <button class="history-toggle-btn" onclick="toggleHistory()" title="Покажи история">🕒</button>
-
+    <button class="history-toggle-btn" onclick="toggleHistory()">🕒</button>
     <div class="local-history" id="historyPanel">
-      <button class="close-history-btn" onclick="toggleHistory()">✖</button>
-      <h4>🕒 История на този таблет</h4>
-      <ul id="historyList" class="history-list">
-        <li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>
-      </ul>
+      <button onclick="toggleHistory()" style="position: absolute; top: 10px; right: 10px; background: transparent; border: none; font-size: 16px; color: #94a3b8; font-weight: bold;">✖</button>
+      <h4>🕒 История на този телефон</h4>
+      <ul id="historyList" class="history-list"><li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li></ul>
     </div>
 
   <script>
@@ -104,63 +107,30 @@
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
       );
 
+      // Глобални променливи
       let currentOperator = "";
+      let currentEmail = "";
       let currentMachine = "";
       let globalTasks = []; 
       let localHistoryData = [];
       let globalBomData = [];
       let globalRoutesByDetail = {};
 
-      function updateHistoryUI() {
-        var list = document.getElementById('historyList');
-        if (localHistoryData.length === 0) {
-          list.innerHTML = '<li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>';
-          return;
-        }
-        var html = '';
-        localHistoryData.forEach(item => {
-           var color = item.type === 'БРАК' ? '#e74c3c' : '#16a34a';
-           html += `<li class="history-item">
-                      <span class="history-time">${item.time}</span>
-                      <span><span style="color:${color}; font-weight:bold;">${item.qty} бр.</span> ${item.name}</span>
-                    </li>`;
-        });
-        list.innerHTML = html;
-      }
+      // Координати на цеха за GPS проверката
+      const WORKSHOP_LAT = 41.8937;
+      const WORKSHOP_LNG = 23.4875;
 
-      function toggleHistory() {
-        var panel = document.getElementById('historyPanel');
-        panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
-      }
-
-      function addLogToHistory(type, qty, taskId) {
-         var now = new Date();
-         var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-         let taskData = globalTasks.find(t => t.id === taskId);
-         var name = taskData ? (taskData.internalName || taskData.name) : 'Детайл';
-         
-         localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name });
-         if (localHistoryData.length > 6) localHistoryData.pop(); 
-         updateHistoryUI();
-      }
-
+      // --- ИНИЦИАЛИЗАЦИЯ И ПРОФИЛ ---
       async function initTerminal() {
           currentOperator = localStorage.getItem('mes_operator');
+          currentEmail = localStorage.getItem('mes_email');
           let savedMachine = localStorage.getItem('mes_machine');
 
-          if (!currentOperator) {
-              const { value: opName } = await Swal.fire({
-                  title: 'Добър ден!',
-                  text: 'Моля, въведете своето име:',
-                  input: 'text',
-                  allowOutsideClick: false,
-                  confirmButtonText: 'Продължи',
-                  confirmButtonColor: '#2563eb'
-              });
-              currentOperator = (opName && opName.trim() !== "") ? opName.trim() : "Оператор";
-              localStorage.setItem('mes_operator', currentOperator);
+          if (!currentOperator || !currentEmail) {
+              await setupProfile();
+          } else {
+              document.getElementById('uiOperatorName').innerText = currentOperator;
           }
-          document.getElementById('uiOperatorName').innerText = currentOperator;
 
           if (savedMachine === null) {
               await changeMachine(true); 
@@ -171,54 +141,142 @@
           }
       }
 
-      async function changeOperator() {
-          const { value: opName } = await Swal.fire({
-              title: 'Смяна на оператор',
-              input: 'text',
-              inputValue: currentOperator,
-              showCancelButton: true,
-              confirmButtonText: 'Запази',
-              cancelButtonText: 'Отказ',
-              confirmButtonColor: '#2563eb'
+      async function setupProfile() {
+          const { value: formValues } = await Swal.fire({
+              title: 'Профил Работник',
+              html:
+                  '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-bottom:5px; color:#475569;">Име и Фамилия</label>' +
+                  '<input id="swal-name" class="swal2-input" style="margin-top:0;" value="' + (currentOperator || '') + '">' +
+                  '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-top:15px; margin-bottom:5px; color:#475569;">Личен Имейл</label>' +
+                  '<input id="swal-email" class="swal2-input" type="email" style="margin-top:0;" value="' + (currentEmail || '') + '">',
+              focusConfirm: false,
+              allowOutsideClick: !!currentOperator,
+              confirmButtonText: 'Запази профила',
+              confirmButtonColor: '#2563eb',
+              preConfirm: () => {
+                  return [
+                      document.getElementById('swal-name').value.trim(),
+                      document.getElementById('swal-email').value.trim()
+                  ]
+              }
           });
-          if (opName && opName.trim() !== "") {
-              currentOperator = opName.trim();
+
+          if (formValues && formValues[0] && formValues[1]) {
+              currentOperator = formValues[0];
+              currentEmail = formValues[1].toLowerCase();
               localStorage.setItem('mes_operator', currentOperator);
+              localStorage.setItem('mes_email', currentEmail);
               document.getElementById('uiOperatorName').innerText = currentOperator;
+              Swal.fire({icon: 'success', title: 'Профилът е запазен!', timer: 1500, showConfirmButton: false});
+          } else if (!currentOperator) {
+              Swal.fire('Внимание', 'Име и имейл са задължителни за работа със системата!', 'error').then(() => location.reload());
           }
       }
 
+      // --- ЛОГИКА ЗА ЧЕКИРАНЕ С GPS ---
+      function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+          const R = 6371e3; 
+          const p1 = lat1 * Math.PI/180; const p2 = lat2 * Math.PI/180;
+          const dp = (lat2-lat1) * Math.PI/180; const dl = (lon2-lon1) * Math.PI/180;
+          const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return Math.round(R * c);
+      }
+
+      function getUserLocation() {
+          return new Promise((resolve) => {
+              if (!navigator.geolocation) { resolve({ loc: "Не се поддържа", note: "⚠️ GPS НЕ СЕ ПОДДЪРЖА" }); return; }
+              navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                      const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+                      const dist = getDistanceInMeters(lat, lng, WORKSHOP_LAT, WORKSHOP_LNG);
+                      let note = dist > 200 ? `⚠️ ИЗВЪН ОБЕКТА (${dist}м)` : "";
+                      resolve({ loc: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, note: note });
+                  },
+                  (err) => { resolve({ loc: "GPS Отказан", note: "⚠️ ЛИПСВА ЛОКАЦИЯ" }); },
+                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+              );
+          });
+      }
+
+      async function processCheckIn(actionType) {
+          if (!currentEmail) { Swal.fire('Внимание', 'Моля, въведете вашия имейл в настройките на профила (⚙️).', 'warning'); return; }
+
+          try {
+              Swal.fire({ title: 'Проверка...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+              
+              // 1. Проверка за дублиране
+              const { data: lastRecord, error: fetchErr } = await client.from('chekiraniya').select('Действие').eq('Имейл', currentEmail).order('Време', { ascending: false }).limit(1);
+              if (fetchErr) throw fetchErr;
+
+              if (lastRecord && lastRecord.length > 0) {
+                  const lastAction = lastRecord[0]['Действие'];
+                  if (actionType === 'Влизане' && lastAction === 'Влизане') {
+                      Swal.fire('Внимание!', 'Вече сте чекирани за Влизане днес. Приятна работа!', 'info'); return;
+                  }
+                  if (actionType === 'Излизане' && (lastAction === 'Излизане' || lastAction === 'Авто излизане')) {
+                      Swal.fire('Внимание!', 'Вече сте се изписали от системата.', 'info'); return;
+                  }
+              }
+
+              // 2. Вземане на GPS
+              Swal.fire({ title: 'Проверка на локация...', text: 'Моля, разрешете достъп до GPS на телефона.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+              const geoInfo = await getUserLocation();
+
+              // 3. Запис в базата
+              Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+              const { error: insertErr } = await client.from('chekiraniya').insert([{
+                  "Имейл": currentEmail, "Действие": actionType, "Време": new Date().toISOString(), "Локация": geoInfo.loc, "Бележка": geoInfo.note
+              }]);
+              if (insertErr) throw insertErr;
+
+              let iconType = actionType === 'Влизане' ? 'success' : 'info';
+              Swal.fire({ icon: iconType, title: 'Успешно!', text: `${actionType} е регистрирано.`, timer: 2000, showConfirmButton: false });
+
+          } catch (err) {
+              console.error(err); Swal.fire('❌ Грешка при връзката', 'Моля, проверете интернета си.', 'error');
+          }
+      }
+
+      // --- ЛОГИКА ЗА ИСТОРИЯ ---
+      function updateHistoryUI() {
+        var list = document.getElementById('historyList');
+        if (localHistoryData.length === 0) { list.innerHTML = '<li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>'; return; }
+        var html = '';
+        localHistoryData.forEach(item => {
+           var color = item.type === 'БРАК' ? '#e74c3c' : '#16a34a';
+           html += `<li class="history-item"><span class="history-time">${item.time}</span><span><span style="color:${color}; font-weight:bold;">${item.qty} бр.</span> ${item.name}</span></li>`;
+        });
+        list.innerHTML = html;
+      }
+      function toggleHistory() { var panel = document.getElementById('historyPanel'); panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; }
+      function addLogToHistory(type, qty, taskId) {
+         var now = new Date(); var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+         let taskData = globalTasks.find(t => t.id === taskId); var name = taskData ? (taskData.internalName || taskData.name) : 'Детайл';
+         localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name }); if (localHistoryData.length > 6) localHistoryData.pop(); updateHistoryUI();
+      }
+
+      // --- ИЗБОР НА МАШИНА И ИЗТЕГЛЯНЕ НА ЗАДАЧИ ---
       async function changeMachine(isInitial = false) {
-          Swal.fire({ title: 'Зареждане на машини...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-          
+          Swal.fire({ title: 'Зареждане...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           try {
               const { data, error } = await client.from('marshruti').select('Машина').limit(10000);
               if (error) throw error;
               
               let uniqueMachines = [];
-              if (data) {
-                  data.forEach(r => {
-                      let m = r['Машина'];
-                      if (m && m.trim() !== "" && !uniqueMachines.includes(m.trim())) {
-                          uniqueMachines.push(m.trim());
-                      }
-                  });
-              }
+              if (data) data.forEach(r => { let m = r['Машина']; if (m && m.trim() !== "" && !uniqueMachines.includes(m.trim())) uniqueMachines.push(m.trim()); });
               uniqueMachines.sort(); 
 
               let checkboxHtml = '<div style="text-align:left; margin-top:15px; max-height: 300px; overflow-y: auto;">';
-              checkboxHtml += `
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button type="button" onclick="document.querySelectorAll('.machine-cb').forEach(cb => cb.checked = true)" style="flex:1; padding:10px; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; font-weight:bold; cursor:pointer;">☑️ Всички</button>
-                    <button type="button" onclick="document.querySelectorAll('.machine-cb').forEach(cb => cb.checked = false)" style="flex:1; padding:10px; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; border-radius:6px; font-weight:bold; cursor:pointer;">☐ Изчисти</button>
-                </div>
-              `;
+              checkboxHtml += `<div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" onclick="document.querySelectorAll('.machine-cb').forEach(cb => cb.checked = true)" style="flex:1; padding:10px; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; font-weight:bold;">☑️ Всички</button>
+                    <button type="button" onclick="document.querySelectorAll('.machine-cb').forEach(cb => cb.checked = false)" style="flex:1; padding:10px; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; border-radius:6px; font-weight:bold;">☐ Изчисти</button>
+                </div>`;
 
               let currentSelections = currentMachine ? currentMachine.split(',') : [];
               uniqueMachines.forEach(m => {
                   let isChecked = currentSelections.includes(m) ? 'checked' : '';
-                  checkboxHtml += `
-                    <label style="display:flex; align-items:center; margin-bottom:10px; cursor:pointer; padding:10px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;">
+                  checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:10px; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;">
                         <input type="checkbox" class="machine-cb" value="${m}" ${isChecked} style="transform: scale(1.5); margin-right:15px;">
                         <span style="font-weight:700;">${m}</span>
                     </label>`;
@@ -226,45 +284,24 @@
               checkboxHtml += '</div>';
 
               Swal.close();
-
-              const { isConfirmed } = await Swal.fire({
-                  title: 'Избери работни места',
-                  html: checkboxHtml,
-                  showCancelButton: !isInitial,
-                  allowOutsideClick: !isInitial,
-                  confirmButtonText: 'Потвърди избор',
-                  cancelButtonText: 'Отказ',
-                  confirmButtonColor: '#2563eb',
-                  preConfirm: () => {
-                      let selected = [];
-                      document.querySelectorAll('.machine-cb:checked').forEach(cb => selected.push(cb.value));
-                      return selected;
-                  }
-              });
+              const { isConfirmed } = await Swal.fire({ title: 'Работно място', html: checkboxHtml, showCancelButton: !isInitial, allowOutsideClick: !isInitial, confirmButtonText: 'Потвърди', confirmButtonColor: '#2563eb', preConfirm: () => { let selected = []; document.querySelectorAll('.machine-cb:checked').forEach(cb => selected.push(cb.value)); return selected; } });
 
               if (isConfirmed) {
-                  let finalSelection = [];
-                  document.querySelectorAll('.machine-cb:checked').forEach(cb => finalSelection.push(cb.value));
-                  
-                  currentMachine = finalSelection.join(',');
-                  localStorage.setItem('mes_machine', currentMachine);
+                  let finalSelection = []; document.querySelectorAll('.machine-cb:checked').forEach(cb => finalSelection.push(cb.value));
+                  currentMachine = finalSelection.join(','); localStorage.setItem('mes_machine', currentMachine);
                   document.getElementById('uiMachineName').innerText = (finalSelection.length > 0) ? finalSelection.join(', ') : "ВСИЧКИ";
                   loadTasks();
               }
-          } catch (err) {
-              console.error(err);
-              Swal.fire('Грешка', 'Не успях да заредя списъка.', 'error');
-          }
+          } catch (err) { Swal.fire('Грешка', err.message, 'error'); }
       }
 
       async function loadTasks() {
         var container = document.getElementById('tasksContainer');
-        container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em; grid-column: 1/-1;">Търсене на задачи... 🔄</div>';
+        container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>';
         
         try {
-            // ДОБАВЕНО: Изтегляме и Номенклатурата, за да намерим Вътрешното име!
             const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
-                client.from('plan').select('*').eq('Статус', 'Активен').limit(10000), // Вземаме само Активните
+                client.from('plan').select('*').eq('Статус', 'Активен').limit(10000),
                 client.from('bom').select('*').limit(10000),
                 client.from('marshruti').select('*').limit(10000),
                 client.from('otcheti').select('*').limit(10000), 
@@ -272,88 +309,41 @@
                 client.from('Номенклатура').select('*').limit(10000) 
             ]);
 
-            if (plansRes.error) throw plansRes.error;
-            if (bomRes.error) throw bomRes.error;
-            if (routesRes.error) throw routesRes.error;
-            if (reportsRes.error) throw reportsRes.error;
+            if (plansRes.error) throw plansRes.error; if (bomRes.error) throw bomRes.error;
+            if (routesRes.error) throw routesRes.error; if (reportsRes.error) throw reportsRes.error;
 
-           // Създаваме речник за вътрешните имена (без значение от главни/малки букви)
             let namesMap = {};
-            if (nomRes.data) {
-                nomRes.data.forEach(n => {
-                    let code = String(n['ID Детайл']).trim().toLowerCase();
-                    namesMap[code] = n['Вътрешно име'] || '';
-                });
-            }
+            if (nomRes.data) nomRes.data.forEach(n => { let code = String(n['ID Детайл']).trim().toLowerCase(); namesMap[code] = n['Вътрешно име'] || ''; });
 
-            globalBomData = bomRes.data || [];
-            globalRoutesByDetail = {};
-            
-            routesRes.data.forEach(r => {
-                let code = String(r['Код на детайла']).trim();
-                if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = [];
-                globalRoutesByDetail[code].push(r);
-            });
-            Object.keys(globalRoutesByDetail).forEach(code => {
-                globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-            });
+            globalBomData = bomRes.data || []; globalRoutesByDetail = {};
+            routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
+            Object.keys(globalRoutesByDetail).forEach(code => globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
 
-            let completedOps = {}; 
-            let scrappedOps = {}; 
-
+            let completedOps = {}; let scrappedOps = {}; 
             reportsRes.data.forEach(r => {
                 let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
                 let qty = parseFloat(r['Количество']) || 0;
-                if (r['Статус'] === 'Брак') {
-                    if(!scrappedOps[key]) scrappedOps[key] = 0;
-                    scrappedOps[key] += qty;
-                } else {
-                    if(!completedOps[key]) completedOps[key] = 0;
-                    completedOps[key] += qty;
-                }
+                if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key] || 0) + qty; } 
+                else { completedOps[key] = (completedOps[key] || 0) + qty; }
             });
 
             let skladData = skladRes.data || [];
-            let getSkladQty = (code) => {
-                let codeLower = code.toLowerCase();
-                let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === codeLower);
-                return item ? (parseFloat(item['Остатък']) || 0) : 0;
-            };
+            let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
             let planGroups = {}; 
-
             plansRes.data.forEach(plan => {
                 let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim();
-                let rootItem = String(plan['ID Детайл']).trim();
-                let targetQty = parseFloat(plan['Целево количество']) || 0;
-
+                let rootItem = String(plan['ID Детайл']).trim(); let targetQty = parseFloat(plan['Целево количество']) || 0;
                 if(!planGroups[planId]) planGroups[planId] = [];
-
-                planGroups[planId].push({
-                    детайл_код: rootItem,
-                    текущ_родител: '',
-                    общо_необходимо_количество: targetQty
-                });
+                planGroups[planId].push({ детайл_код: rootItem, текущ_родител: '', общо_необходимо_количество: targetQty });
 
                 function traverseAndAdd(parentName, parentBaseQty) {
-                    let parentScrapTotal = 0;
-                    for (let key in scrappedOps) {
-                        if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
-                    }
+                    let parentScrapTotal = 0; for (let key in scrappedOps) if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
                     let actualParentNeed = parentBaseQty + parentScrapTotal;
-
                     let children = globalBomData.filter(b => String(b['ID Родител']).trim() === parentName);
                     children.forEach(c => {
-                        let childName = String(c['ID Компонент']).trim();
-                        let multiplier = parseFloat(c['Количество']) || 1;
-                        let childNeededQty = actualParentNeed * multiplier;
-
-                        planGroups[planId].push({
-                            детайл_код: childName,
-                            текущ_родител: parentName,
-                            общо_необходимо_количество: childNeededQty
-                        });
-
+                        let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1; let childNeededQty = actualParentNeed * multiplier;
+                        planGroups[planId].push({ детайл_код: childName, текущ_родител: parentName, общо_необходимо_количество: childNeededQty });
                         traverseAndAdd(childName, childNeededQty);
                     });
                 }
@@ -367,96 +357,50 @@
                 let getChildren = (parentCode) => bomNodes.filter(n => String(n.текущ_родител).trim() === parentCode);
                 
                 bomNodes.forEach((node, nodeIndex) => {
-                    let code = String(node.детайл_код).trim();
-                    let planQty = parseFloat(node.общо_необходимо_количество) || 0;
-                    
-                    let routes = globalRoutesByDetail[code] || [];
-                    if(routes.length === 0) return; 
+                    let code = String(node.детайл_код).trim(); let planQty = parseFloat(node.общо_необходимо_количество) || 0;
+                    let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
                     
                     routes.forEach((route, idx) => {
-                        let opName = String(route['Име на операция']).trim();
-                        let opKey = code + '_' + opName;
-                        
-                        let doneQty = completedOps[opKey] || 0;
-                        let scrapQty = scrappedOps[opKey] || 0;
-                        let consumedHere = doneQty + scrapQty; 
-                        
+                        let opName = String(route['Име на операция']).trim(); let opKey = code + '_' + opName;
+                        let doneQty = completedOps[opKey] || 0; let scrapQty = scrappedOps[opKey] || 0; let consumedHere = doneQty + scrapQty; 
                         let scrapStrictlyDownstream = 0;
-                        for(let j = idx + 1; j < routes.length; j++) {
-                            let dKey = code + '_' + String(routes[j]['Име на операция']).trim();
-                            scrapStrictlyDownstream += (scrappedOps[dKey] || 0);
-                        }
-                        
+                        for(let j = idx + 1; j < routes.length; j++) { let dKey = code + '_' + String(routes[j]['Име на операция']).trim(); scrapStrictlyDownstream += (scrappedOps[dKey] || 0); }
                         let effectivePlanQty = planQty + scrapStrictlyDownstream;
 
                         if(doneQty >= effectivePlanQty) return; 
-                        
-                        let maxAllowed = 0;
-                        let hasLimit = true;
-                        let blockingReasons = []; 
+                        let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; 
 
                         if (idx > 0) {
-                            let prevRoute = routes[idx - 1];
-                            let prevOpName = String(prevRoute['Име на операция']).trim();
-                            let prevOpKey = code + '_' + prevOpName;
-                            let prevDoneQty = completedOps[prevOpKey] || 0;
-                            
-                            maxAllowed = prevDoneQty - consumedHere;
-                            
-                            if (maxAllowed <= 0) {
-                                blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
-                            }
+                            let prevRoute = routes[idx - 1]; let prevOpName = String(prevRoute['Име на операция']).trim(); let prevOpKey = code + '_' + prevOpName;
+                            let prevDoneQty = completedOps[prevOpKey] || 0; maxAllowed = prevDoneQty - consumedHere;
+                            if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
                         } else {
                             let children = getChildren(code);
-                            if (children.length === 0) {
-                                hasLimit = false;
-                                maxAllowed = Infinity;
-                            } else {
+                            if (children.length === 0) { hasLimit = false; maxAllowed = Infinity; } 
+                            else {
                                 let minSets = Infinity;
                                 children.forEach(child => {
-                                    let cCode = String(child.детайл_код).trim();
-                                    let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
-                                    let cRoutes = globalRoutesByDetail[cCode] || [];
-                                    let cDone = 0;
-                                    let isManufactured = (cRoutes.length > 0);
-                                    
-                                    if (isManufactured) {
-                                        let lastRoute = cRoutes[cRoutes.length - 1];
-                                        let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim();
-                                        cDone = completedOps[cOpKey] || 0;
-                                    } else {
-                                        cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0);
-                                    }
+                                    let cCode = String(child.детайл_код).trim(); let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
+                                    let cRoutes = globalRoutesByDetail[cCode] || []; let cDone = 0; let isManufactured = (cRoutes.length > 0);
+                                    if (isManufactured) { let lastRoute = cRoutes[cRoutes.length - 1]; let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim(); cDone = completedOps[cOpKey] || 0; } 
+                                    else { cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0); }
                                     
                                     if (cPlan > 0) {
-                                        let multiplier = cPlan / planQty;
-                                        let possibleSets = Math.floor(cDone / multiplier);
+                                        let multiplier = cPlan / planQty; let possibleSets = Math.floor(cDone / multiplier);
                                         if (possibleSets < minSets) minSets = possibleSets;
-                                        
-                                        if (possibleSets <= 0) {
-                                            let loc = isManufactured ? "Отчети" : "Склад";
-                                            blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`);
-                                        }
+                                        if (possibleSets <= 0) { let loc = isManufactured ? "Отчети" : "Склад"; blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`); }
                                     }
                                 });
-                                if (minSets === Infinity) minSets = 0;
-                                maxAllowed = minSets - consumedHere;
+                                if (minSets === Infinity) minSets = 0; maxAllowed = minSets - consumedHere;
                             }
                         }
                         
-                        if (maxAllowed < 0) maxAllowed = 0;
-                        let isBlocked = hasLimit && maxAllowed <= 0;
-                        
+                        if (maxAllowed < 0) maxAllowed = 0; let isBlocked = hasLimit && maxAllowed <= 0;
                         let machineName = route['Машина'] || '';
-
                         if (currentMachine && currentMachine.trim() !== "") {
                             let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim());
-                            let routeMachine = machineName.toLowerCase();
-                            
-                            let match = selectedMachines.some(m => routeMachine.includes(m));
-                            if (!match) {
-                                return; 
-                            }
+                            let match = selectedMachines.some(m => machineName.toLowerCase().includes(m));
+                            if (!match) return; 
                         }
 
                         let defaultInput = (effectivePlanQty - doneQty > 0) ? (effectivePlanQty - doneQty) : 0;
@@ -467,25 +411,12 @@
                         let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
                         globalTasks.push({
-                            id: safeId,
-                            plan_id: planId,
-                            name: code,
-                            internalName: namesMap[code.toLowerCase()] || '',
-                            op: opName,
-                            opNum: parseInt(route['№ Операция']) || 0,
+                            id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '',
+                            op: opName, opNum: parseInt(route['№ Операция']) || 0,
                             next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово",
-                            machine: machineName,
-                            drawing_link: route['Линк към чертеж'],
-                            sop_link: route['Линк към СОП'],
-                            desc: route['Описание'],
-                            type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ",
-                            defaultQty: defaultInput,
-                            maxAllowed: maxAllowed,
-                            hasLimit: hasLimit,
-                            isBlocked: isBlocked,
-                            blockingReasons: blockingReasons,
-                            totalNeed: effectivePlanQty,
-                            totalDone: doneQty
+                            machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'],
+                            type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit,
+                            isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty
                         });
                     });
                 });
@@ -494,99 +425,55 @@
             globalTasks.sort((a, b) => a.opNum - b.opNum);
             renderTasks(globalTasks);
 
-        } catch (err) {
-            console.error(err);
-            document.getElementById('tasksContainer').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#ef4444; font-size:1.2em; font-weight:bold;">❌ Критична грешка при зареждане:<br>' + err.message + '</div>';
-        }
+        } catch (err) { console.error(err); document.getElementById('tasksContainer').innerHTML = '<div style="text-align:center; padding: 40px; color:#ef4444; font-weight:bold;">❌ Грешка:<br>' + err.message + '</div>'; }
       }
 
       function renderTasks(tasks) {
         var container = document.getElementById('tasksContainer');
-        
-        if(tasks.length === 0) { 
-          container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; font-size:1.3em; color: #16a34a; font-weight: 900;">🎉 Всички задачи за избраните машини са изпълнени!</div>';
-          return;
-        }
+        if(tasks.length === 0) { container.innerHTML = '<div style="text-align:center; padding: 40px; font-size:1.3em; color: #16a34a; font-weight: 900;">🎉 Всички задачи са изпълнени!</div>'; return; }
         
         var html = '';
         tasks.forEach(function(t) {
-          // Дизайн на цвета на картата
           let borderStyle = t.type === 'ЗЕЛЕНА' ? 'border-left: 6px solid #22c55e;' : 'border-left: 6px solid #3b82f6;';
-          
           let displayName = t.internalName ? t.internalName : t.name;
           let displayCode = t.internalName ? `№ ${t.name}` : 'Липсва вътрешно име';
-          
           let linkHtml = displayName;
-          if (t.drawing_link && t.drawing_link.startsWith('http')) {
-              linkHtml = `<a href="${t.drawing_link}" target="_blank">${displayName} 🔗</a>`;
-          }
+          if (t.drawing_link && t.drawing_link.startsWith('http')) linkHtml = `<a href="${t.drawing_link}" target="_blank">${displayName} 🔗</a>`;
 
-          var sopHtml = (t.sop_link && t.sop_link.startsWith('http')) 
-              ? `<a href="${t.sop_link}" target="_blank" style="display:inline-block; margin-bottom:12px; background:#f59e0b; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px;">📑 Отвори СОП</a>` : '';
-              
-          var descHtml = t.desc 
-              ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
-
-          var bomBadgeHtml = '';
-          var actionButtonHtml = '';
-          var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
+          var sopHtml = (t.sop_link && t.sop_link.startsWith('http')) ? `<a href="${t.sop_link}" target="_blank" style="display:inline-block; margin-bottom:12px; background:#f59e0b; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px;">📑 Отвори СОП</a>` : '';
+          var descHtml = t.desc ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
+          var bomBadgeHtml = ''; var actionButtonHtml = ''; var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
 
           if (t.isBlocked) {
               let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
               bomBadgeHtml = `<div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #991b1b; font-weight: 700; text-align: center;">🚫 Липсва: ${reasonsText}</div>`;
-              actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:not-allowed;">🛑 БЛОКИРАНА ЗАДАЧА</button>`;
+              actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px;">🛑 БЛОКИРАНА ЗАДАЧА</button>`;
           } else if (t.hasLimit) {
               bomBadgeHtml = `<div style="background-color: #dcfce7; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #166534; font-weight: 800; text-align: center;">📦 Възможни: ${t.maxAllowed} бр.</div>`;
-              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
           } else {
               bomBadgeHtml = `<div style="background-color: #e0e7ff; border: 1px solid #c7d2fe; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #3730a3; font-weight: 800; text-align: center;">⚡ Първа стъпка (свободно производство)</div>`;
-              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
           }
 
           html += `
             <div class="card" id="card_${t.id}" style="${borderStyle}">
-              <div class="task-header">
-                  <span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span>
-                  <span class="qty-badge" title="Целево количество за плана">${t.totalNeed} бр.</span>
-              </div>
-              
-              <div class="detail-info">
-                  <div class="internal-name">${linkHtml}</div>
-                  <div class="detail-code">${displayCode}</div>
-              </div>
-              
-              ${sopHtml}
-              ${descHtml}
-
-              <div class="route-flow">
-                  <span class="op-active">▶ ${t.op}</span>
-                  <span class="route-arrow">➔</span>
-                  <span class="op-pending">${t.next_op}</span>
-              </div>
-
+              <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${t.totalNeed} бр.</span></div>
+              <div class="detail-info"><div class="internal-name">${linkHtml}</div><div class="detail-code">${displayCode}</div></div>
+              ${sopHtml} ${descHtml}
+              <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
               ${bomBadgeHtml}
-              
-              <div id="free_state_${t.id}">
-                ${actionButtonHtml}
-              </div>
-
+              <div id="free_state_${t.id}">${actionButtonHtml}</div>
               <div id="focus_state_${t.id}" style="display: none;">
                 <div style="background-color: #f8fafc; padding: 15px; border-radius: 12px; margin-top: 5px; border: 2px solid #bae6fd;">
                   <p style="color: #0369a1; font-weight: 900; text-align:center; margin-top:0; font-size: 1.1em;">🟢 В ПРОЦЕС НА РАБОТА</p>
-                  
-                  <div style="display:flex; justify-content:space-between; margin-bottom: 5px; font-size: 0.85em; font-weight:bold; color: #64748b;">
-                      <span>Готови до момента:</span>
-                      <span>${t.totalDone} бр.</span>
-                  </div>
-
+                  <div style="display:flex; justify-content:space-between; margin-bottom: 5px; font-size: 0.85em; font-weight:bold; color: #64748b;"><span>Готови до момента:</span><span>${t.totalDone} бр.</span></div>
                   <input type="number" id="qty_${t.id}" value="${t.defaultQty}" ${inputMaxHtml} inputmode="numeric" style="margin-bottom:15px;">
-                  
                   <div style="display: flex; gap: 10px;">
                     <button class="btn" id="btn_${t.id}" onclick="finishTask('${t.id}', this)">✅ ОТЧЕТИ</button>
                     <button class="btn-danger" id="btn_scrap_${t.id}" onclick="reportScrap('${t.id}', this)">БРАК</button>
                   </div>
-                  
-                  <button onclick="pauseTaskDOM('${t.id}')" style="background: white; color: #475569; border: 2px solid #cbd5e1; padding: 14px; border-radius: 8px; font-weight: 800; width: 100%; margin-top: 15px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">📋 ВРЪЩАНЕ НАЗАД</button>
+                  <button onclick="pauseTaskDOM('${t.id}')" style="background: white; color: #475569; border: 2px solid #cbd5e1; padding: 14px; border-radius: 8px; font-weight: 800; width: 100%; margin-top: 15px; cursor: pointer;">📋 ВРЪЩАНЕ НАЗАД</button>
                 </div>
               </div>
             </div>`;
@@ -600,59 +487,36 @@
         document.getElementById('free_state_' + taskId).style.display = 'none';
         document.getElementById('focus_state_' + taskId).style.display = 'block';
         window['startTime_' + taskId] = new Date().toISOString();
+        window.scrollTo(0,0);
       }
 
       function pauseTaskDOM(taskId) {
         if (navigator.vibrate) navigator.vibrate(50);
-        document.querySelectorAll('.card').forEach(c => c.style.display = 'flex'); // Flex заради новия дизайн
+        document.querySelectorAll('.card').forEach(c => c.style.display = 'flex'); 
         document.getElementById('free_state_' + taskId).style.display = 'block';
         document.getElementById('focus_state_' + taskId).style.display = 'none';
       }
 
       async function finishTask(taskId, btn) {
         var inputElem = document.getElementById('qty_' + taskId);
-        if (!inputElem) return; 
-        var val = parseFloat(inputElem.value);
+        if (!inputElem) return; var val = parseFloat(inputElem.value);
         if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи валидна бройка!', 'error'); return; }
 
         let taskData = globalTasks.find(t => t.id === taskId);
-        if (taskData.hasLimit && val > taskData.maxAllowed) {
-            Swal.fire('Невъзможно', `Разполагаш с материали само за ${taskData.maxAllowed} бр.!`, 'error');
-            return;
-        }
+        if (taskData.hasLimit && val > taskData.maxAllowed) { Swal.fire('Невъзможно', `Разполагаш с материали само за ${taskData.maxAllowed} бр.!`, 'error'); return; }
 
-        Swal.fire({ 
-          title: 'Сигурен ли си?', 
-          html: `Ще отчетеш <b style="color:#16a34a; font-size:1.2em;">${val} здрави бройки</b>.<br>Предаваш ли ги напред?`, 
-          icon: 'question', showCancelButton: true, confirmButtonColor: '#16a34a', cancelButtonColor: '#e74c3c', 
-          confirmButtonText: '🟢 ДА, ПРЕДАЙ', cancelButtonText: '🔴 ОПА, ГРЕШКА'
+        Swal.fire({ title: 'Сигурен ли си?', html: `Ще отчетеш <b style="color:#16a34a; font-size:1.2em;">${val} здрави бройки</b>.`, icon: 'question', showCancelButton: true, confirmButtonColor: '#16a34a', confirmButtonText: '🟢 ДА, ПРЕДАЙ', cancelButtonText: 'Отказ'
         }).then(async (result) => {
           if (result.isConfirmed) {
             btn.disabled = true; btn.innerHTML = "ЗАПИС...";
             Swal.fire({ title: 'Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-            
             try {
                 let startedAt = window['startTime_' + taskId] || new Date().toISOString();
-
-                const { error } = await client.from('otcheti').insert([{
-                    "ID Детайл": taskData.name, 
-                    "Оператор": currentOperator,
-                    "Количество": val,
-                    "Операция": taskData.op,
-                    "Статус": "Отчетено",
-                    "Дата": new Date().toISOString(),
-                    "Време Старт": startedAt
-                }]);
-
+                const { error } = await client.from('otcheti').insert([{ "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }]);
                 if(error) throw error;
-
                 addLogToHistory('ГОТОВО', val, taskId); 
                 Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
-            } catch(err) {
-                console.error(err);
-                Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
-                btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ";
-            }
+            } catch(err) { Swal.fire('❌ Грешка при запис', err.message, 'error'); btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ"; }
           }
         });
       }
@@ -663,115 +527,43 @@
         if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи валидна бройка!', 'error'); return; }
         
         let taskData = globalTasks.find(t => t.id === taskId);
-        if (taskData.hasLimit && val > taskData.maxAllowed) {
-            Swal.fire('Невъзможно', `Имаш материал само за ${taskData.maxAllowed} бр.!`, 'error');
-            return;
-        }
+        if (taskData.hasLimit && val > taskData.maxAllowed) { Swal.fire('Невъзможно', `Имаш материал само за ${taskData.maxAllowed} бр.!`, 'error'); return; }
 
         if (taskData.name.includes('#')) {
             let children = globalBomData.filter(b => String(b['ID Родител']).trim() === taskData.name);
-            
             if (children.length > 0) {
-                let checkboxHtml = '<div style="text-align:left; margin-top:15px; font-size:14px; max-height: 250px; overflow-y: auto;">';
-                checkboxHtml += '<p style="color:#e74c3c; font-weight:bold; margin-bottom:12px;">Кои компоненти вътре бяха счупени?<br><span style="font-size: 0.8em; color: #64748b;">(Отмаркирайте спасените детайли, за да не се произвеждат пак)</span></p>';
-                
-                children.forEach(c => {
-                    let cName = String(c['ID Компонент']).trim();
-                    checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:8px; cursor:pointer; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;">
-                                       <input type="checkbox" class="scrap-child-cb" value="${cName}" checked style="transform: scale(1.5); margin-right:15px; cursor:pointer;">
-                                       <span style="font-weight:700; font-size: 1.1em; color: #1e293b;">${cName}</span>
-                                     </label>`;
-                });
+                let checkboxHtml = '<div style="text-align:left; margin-top:15px; font-size:14px; max-height: 250px; overflow-y: auto;"><p style="color:#e74c3c; font-weight:bold; margin-bottom:12px;">Кои компоненти вътре бяха счупени?<br><span style="font-size: 0.8em; color: #64748b;">(Отмаркирайте спасените детайли)</span></p>';
+                children.forEach(c => { let cName = String(c['ID Компонент']).trim(); checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:8px; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;"><input type="checkbox" class="scrap-child-cb" value="${cName}" checked style="transform: scale(1.5); margin-right:15px;"><span style="font-weight:700; font-size: 1.1em; color: #1e293b;">${cName}</span></label>`; });
                 checkboxHtml += '</div>';
 
-                const { value: formValues, isConfirmed } = await Swal.fire({
-                    title: 'Бракуване на детайл',
-                    html: `Ще бракувате <b>${val} бр.</b><br>` + checkboxHtml,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#e74c3c',
-                    cancelButtonColor: '#94a3b8',
-                    confirmButtonText: 'Да, бракувай!',
-                    cancelButtonText: 'Отказ',
-                    preConfirm: () => {
-                        let checkboxes = document.querySelectorAll('.scrap-child-cb');
-                        let scrapped = [];
-                        checkboxes.forEach(cb => { if (cb.checked) scrapped.push(cb.value); });
-                        return scrapped;
-                    }
-                });
-
-                if (isConfirmed) {
-                    await executeScrapLogic(taskData, val, children, formValues);
-                }
+                const { value: formValues, isConfirmed } = await Swal.fire({ title: 'Бракуване', html: `Ще бракувате <b>${val} бр.</b><br>` + checkboxHtml, icon: 'warning', showCancelButton: true, confirmButtonColor: '#e74c3c', confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ', preConfirm: () => { let scrapped = []; document.querySelectorAll('.scrap-child-cb:checked').forEach(cb => scrapped.push(cb.value)); return scrapped; } });
+                if (isConfirmed) await executeScrapLogic(taskData, val, children, formValues);
                 return;
             }
         }
-
-        Swal.fire({ 
-          title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', 
-          showCancelButton: true, confirmButtonColor: '#e74c3c', cancelButtonColor: '#94a3b8', 
-          confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ' 
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-              await executeScrapLogic(taskData, val, [], []);
-          }
-        });
+        Swal.fire({ title: 'Сигурен ли си?', text: "⚠️ БРАКУВАШ " + val + " бр.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#e74c3c', confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ' }).then(async (result) => { if (result.isConfirmed) await executeScrapLogic(taskData, val, [], []); });
       }
 
       async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNames) {
           Swal.fire({ title: 'Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-
           try {
               let startedAt = window['startTime_' + taskData.id] || new Date().toISOString();
-
-              let inserts = [{
-                  "ID Детайл": taskData.name,
-                  "Оператор": currentOperator,
-                  "Количество": val,
-                  "Операция": taskData.op,
-                  "Статус": "Брак",
-                  "Дата": new Date().toISOString(),
-                  "Време Старт": startedAt
-              }];
+              let inserts = [{ "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Брак", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
 
               allChildren.forEach(child => {
                   let cName = String(child['ID Компонент']).trim();
-                  
                   if (!scrappedChildrenNames.includes(cName)) {
-                      let multiplier = parseFloat(child['Количество']) || 1;
-                      let savedQty = val * multiplier;
-
-                      let cRoutes = globalRoutesByDetail[cName] || [];
-                      let operationToLog = "Възстановен"; 
-
-                      if (cRoutes.length > 0) {
-                          let lastRoute = cRoutes[cRoutes.length - 1];
-                          operationToLog = String(lastRoute['Име на операция']).trim();
-                      }
-
-                      inserts.push({
-                          "ID Детайл": cName,
-                          "Оператор": "СИСТЕМА (Спасен)",
-                          "Количество": savedQty,
-                          "Операция": operationToLog,
-                          "Статус": "Отчетено",
-                          "Дата": new Date().toISOString(),
-                          "Време Старт": startedAt
-                      });
+                      let multiplier = parseFloat(child['Количество']) || 1; let savedQty = val * multiplier;
+                      let cRoutes = globalRoutesByDetail[cName] || []; let opToLog = "Възстановен"; 
+                      if (cRoutes.length > 0) opToLog = String(cRoutes[cRoutes.length - 1]['Име на операция']).trim();
+                      inserts.push({ "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
                   }
               });
 
               const { error } = await client.from('otcheti').insert(inserts);
               if (error) throw error;
-
-              addLogToHistory('БРАК', val, taskData.id); 
-              Swal.close(); 
-              loadTasks(); 
-          } catch(err) {
-              console.error(err);
-              Swal.fire('❌ Грешка при запис', err.message || err.toString(), 'error');
-          }
+              addLogToHistory('БРАК', val, taskData.id); Swal.close(); loadTasks(); 
+          } catch(err) { Swal.fire('❌ Грешка при запис', err.message, 'error'); }
       }
       
       window.onload = initTerminal;
