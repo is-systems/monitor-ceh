@@ -33,7 +33,6 @@
       .btn-edit { color: #2563eb; }
       .btn-delete { color: #ef4444; }
 
-      /* ЛЕЙАУТ ЗА ПЕРСОНАЛ (Сайдбар + Таблица) */
       .layout-wrapper { display: flex; gap: 20px; align-items: flex-start; }
       .sidebar { width: 280px; flex-shrink: 0; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; }
       .sidebar-header { background: #f8fafc; padding: 15px; font-weight: 800; color: #334155; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
@@ -50,11 +49,6 @@
       td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       tr:hover td { background-color: #f8fafc; }
       
-      .badge-warn { background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 6px; font-weight: 700; }
-      .badge-status { padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.85em; }
-      .status-ok { background-color: #dcfce7; color: #166534; }
-      .status-scrap { background-color: #fee2e2; color: #991b1b; }
-      
       .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
       .modal { background: white; padding: 30px; border-radius: 16px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
       .modal-header { font-size: 1.2em; font-weight: 800; margin-bottom: 20px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
@@ -69,7 +63,6 @@
 
       #loadingLayout { text-align: center; padding: 40px; color: #64748b; font-weight: 700; }
 
-      /* СТИЛОВЕ ЗА ДОСИЕТАТА В МОДАЛА */
       .folder-tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 0px; overflow-x: auto; }
       .f-tab { background: transparent; border: none; font-weight: 800; color: #64748b; cursor: pointer; padding: 10px 15px; font-size: 0.9em; border-bottom: 3px solid transparent; white-space: nowrap; }
       .f-tab:hover { color: #1e293b; }
@@ -223,7 +216,6 @@
         addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
         addBtn.style.display = config.readOnlyTab ? 'none' : 'block';
         
-        // Показваме специфични неща за таб Персонал
         if (tabKey === 'chekiraniya') {
             autoCheckoutBtn.style.display = 'block';
             sidebar.style.display = 'block';
@@ -236,7 +228,6 @@
         loadCurrentTableData();
       }
 
-      // --- САЙДБАР С ПАПКИ ---
       async function loadPersonnelSidebar() {
           const list = document.getElementById('sidebarList');
           const loading = document.getElementById('sidebarLoading');
@@ -248,7 +239,7 @@
               if (error) throw error;
               
               let uniqueEmails = [...new Set(data.map(item => item['Имейл'] ? item['Имейл'].toLowerCase().trim() : ''))].filter(e => e !== '');
-              uniqueEmails.sort((a, b) => a.localeCompare(b)); // Азбучен ред
+              uniqueEmails.sort((a, b) => a.localeCompare(b)); 
               
               loading.style.display = 'none';
               
@@ -270,12 +261,11 @@
           }
       }
 
-      // --- ОТВАРЯНЕ НА ДОСИЕ В МОДАЛ ---
       function openWorkerFolder(email) {
           currentFolderEmail = email;
           document.getElementById('currentWorkerName').innerText = email;
           document.getElementById('folderModalBackdrop').style.display = 'flex';
-          switchFolderTab('att'); // Зареждаме Присъствие по подразбиране
+          switchFolderTab('att'); 
       }
 
       function closeFolderModal() { document.getElementById('folderModalBackdrop').style.display = 'none'; }
@@ -294,7 +284,6 @@
           if (tabId === 'docs') loadWorkerDocs();
       }
 
-      // 1. ИЗВЛИЧАНЕ НА ПРИСЪСТВИЕ (С оцветяване)
       async function loadWorkerAttendance() {
           const tbody = document.getElementById('workerAttList');
           tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Зареждане...</td></tr>';
@@ -332,10 +321,16 @@
                   let noteHtml = item['Бележка'] || '';
                   if (noteHtml.includes('ИЗВЪН ОБЕКТА')) noteHtml = `⚠️ <b style="color:#dc2626;">${noteHtml}</b>`;
 
+                  let locHtml = item['Локация'] || '';
+                  if (locHtml.includes(',')) {
+                      let coords = locHtml.replace(/\s/g, '');
+                      locHtml = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
+                  }
+
                   html += `<tr style="${rowStyle}">
                             <td style="font-weight: 700;">${timeStr}</td>
                             <td>${actionHtml}</td>
-                            <td>${item['Локация'] || ''}</td>
+                            <td>${locHtml}</td>
                             <td>${noteHtml}</td>
                            </tr>`;
               });
@@ -343,7 +338,6 @@
           } catch(err) { tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Грешка: ${err.message}</td></tr>`; }
       }
 
-      // 2. ИЗВЛИЧАНЕ НА РАБОТА
       async function loadWorkerWork() {
           const tbody = document.getElementById('workerWorkList');
           tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Зареждане...</td></tr>';
@@ -365,7 +359,6 @@
           } catch(err) { tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Грешка: ${err.message}</td></tr>`; }
       }
 
-      // 3. ДОКУМЕНТИ (Supabase Storage)
       async function loadWorkerDocs() {
           const listDiv = document.getElementById('workerDocsList');
           listDiv.innerHTML = 'Зареждане на файлове...';
@@ -406,7 +399,6 @@
           } catch(err) { alert('Грешка: ' + err.message); }
       }
 
-      // --- СТАНДАРТНИ ТАБЛИЧНИ ФУНКЦИИ ---
       async function runAutoCheckout() {
           Swal.fire({ title: 'Проверка...', didOpen: () => Swal.showLoading() });
           let startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
@@ -432,10 +424,6 @@
         const config = tableConfigs[currentTab];
         document.getElementById('loadingLayout').style.display = 'block';
         document.getElementById('mainTable').style.display = 'none';
-        
-        if (currentTab === 'sklad_gp') { 
-            // (Логиката за Склад ГП си остава тук както преди, скрил съм я за краткост, но ако е нужна ще я върнем. Тъй като не си я ползвала активно в предишния код, ще заредя директно таблицата)
-        } 
         
         try {
             let query = client.from(config.table).select('*').limit(10000);
@@ -489,6 +477,11 @@
                 else if (val === 'Излизане') td.innerHTML = `<span style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.9em;">🔴 ${val}</span>`;
                 else if (val === 'Авто излизане') td.innerHTML = `<span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.9em;">🕒 ${val}</span>`;
                 else td.innerText = val; row.appendChild(td); return;
+            }
+            if (currentTab === 'chekiraniya' && f.name === 'Локация' && val && val.includes(',')) {
+                let coords = val.replace(/\s/g, '');
+                td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
+                row.appendChild(td); return;
             }
             if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
             
