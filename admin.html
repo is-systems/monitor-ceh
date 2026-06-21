@@ -25,8 +25,6 @@
       
       .btn-primary { background-color: #4338ca; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s; font-size: 0.95em; }
       .btn-primary:hover { background-color: #3730a3; }
-      .btn-warning { background-color: #f59e0b; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; display: none; transition: background 0.2s; font-size: 0.95em; }
-      .btn-warning:hover { background-color: #d97706; }
       
       .action-btn { background: transparent; border: none; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 1.1em; }
       .action-btn:hover { background-color: #f1f5f9; }
@@ -94,7 +92,6 @@
           <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата...">
         </div>
         <div style="display: flex; gap: 10px;">
-            <button class="btn-warning" id="autoCheckoutBtn" onclick="runAutoCheckout()">🕒 АВТО-ИЗЛИЗАНЕ (17:00)</button>
             <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
         </div>
       </div>
@@ -210,18 +207,15 @@
         
         const config = tableConfigs[tabKey];
         const addBtn = document.getElementById('addNewBtn');
-        const autoCheckoutBtn = document.getElementById('autoCheckoutBtn');
         const sidebar = document.getElementById('personnelSidebar');
         
         addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
         addBtn.style.display = config.readOnlyTab ? 'none' : 'block';
         
         if (tabKey === 'chekiraniya') {
-            autoCheckoutBtn.style.display = 'block';
             sidebar.style.display = 'block';
             loadPersonnelSidebar();
         } else {
-            autoCheckoutBtn.style.display = 'none';
             sidebar.style.display = 'none';
         }
         
@@ -399,25 +393,40 @@
           } catch(err) { alert('Грешка: ' + err.message); }
       }
 
-      async function runAutoCheckout() {
-          Swal.fire({ title: 'Проверка...', didOpen: () => Swal.showLoading() });
-          let startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
-          const { data, error } = await client.from('chekiraniya').select('*').gte('Време', startOfDay.toISOString()).order('Време', { ascending: true });
-          if(error) { Swal.fire('Грешка', error.message, 'error'); return; }
-          
-          let userState = {};
-          data.forEach(r => userState[r['Имейл']] = r['Действие']);
-          let toCheckout = []; let nowStr = new Date().toISOString();
-          for(let email in userState) {
-              if(userState[email] === 'Влизане') {
-                  toCheckout.push({ 'Имейл': email, 'Действие': 'Авто излизане', 'Време': nowStr, 'Локация': 'Системно', 'Бележка': 'Забравено излизане' });
+      // ТОВА Е НЕВИДИМИЯТ РОБОТ, КОЙТО ПОЧИСТВА СИСТЕМАТА АВТОМАТИЧНО
+      async function runInvisibleAutoCheckout() {
+          try {
+              const { data, error } = await client.from('chekiraniya').select('*').order('Време', { ascending: true });
+              if(error) return;
+
+              let userState = {}; let userLastTime = {};
+              data.forEach(r => { userState[r['Имейл']] = r['Действие']; userLastTime[r['Имейл']] = r['Време']; });
+
+              let toCheckout = []; let now = new Date();
+
+              for(let email in userState) {
+                  if(userState[email] === 'Влизане') {
+                      let loginTime = new Date(userLastTime[email]);
+                      let isPastDay = loginTime.toDateString() !== now.toDateString();
+                      let isLoginBefore17 = loginTime.getHours() < 17;
+                      let isPast17 = now.getHours() >= 17 && isLoginBefore17;
+
+                      if (isPastDay || isPast17) {
+                          let checkoutTime = new Date(loginTime);
+                          checkoutTime.setHours(17, 0, 0, 0); // Наглася точно на 17:00 ч.
+                          toCheckout.push({
+                              'Имейл': email, 'Действие': 'Авто излизане',
+                              'Време': checkoutTime.toISOString(), 'Локация': 'Системно', 'Бележка': 'Авто корекция (Липсва излизане)'
+                          });
+                      }
+                  }
               }
-          }
-          if(toCheckout.length === 0) { Swal.fire('Всичко е наред', 'Няма работници вътре със забравено излизане.', 'info'); return; }
-          const { error: insErr } = await client.from('chekiraniya').insert(toCheckout);
-          if(insErr) { Swal.fire('Грешка', insErr.message, 'error'); return; }
-          Swal.fire('Успех!', `Автоматично изписани: ${toCheckout.length}`, 'success');
-          loadCurrentTableData();
+
+              if(toCheckout.length > 0) {
+                  await client.from('chekiraniya').insert(toCheckout);
+                  loadCurrentTableData(); // Опреснява таблицата, за да видиш корекциите
+              }
+          } catch(e) { console.error("Auto checkout error", e); }
       }
 
       async function loadCurrentTableData() {
@@ -499,13 +508,14 @@
       }
 
       function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
-      function openAddModal() { /* Тук е оригиналната логика за добавяне */ }
-      function openEditModal(i) { /* Тук е оригиналната логика за редакция */ }
+      function openAddModal() { /* Логика за добавяне */ }
+      function openEditModal(i) { /* Логика за редакция */ }
       function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
-      async function saveForm(e) { /* Оригинална логика за запазване */ e.preventDefault(); }
-      async function deleteItem(i) { /* Оригинална логика за изтриване */ }
+      async function saveForm(e) { e.preventDefault(); }
+      async function deleteItem(i) { /* Логика за изтриване */ }
 
-      window.onload = () => { buildNavbar(); loadCurrentTableData(); };
+      // Тук стартираме невидимия робот при всяко отваряне
+      window.onload = () => { buildNavbar(); loadCurrentTableData(); runInvisibleAutoCheckout(); };
     </script>
   </body>
 </html>
