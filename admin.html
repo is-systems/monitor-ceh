@@ -539,8 +539,14 @@
                 td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
                 row.appendChild(td); return;
             }
-            if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
+           if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
             
+            // НОВО: Превръща дългите линкове в малки бутони
+            if (typeof val === 'string' && val.startsWith('http')) {
+                td.innerHTML = `<a href="${val}" target="_blank" style="background: #e0e7ff; color: #4338ca; padding: 5px 12px; border-radius: 6px; font-weight: 800; text-decoration: none; font-size: 0.85em; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: inline-block;">🔗 Отвори</a>`;
+                row.appendChild(td); return;
+            }
+
             td.innerText = val; row.appendChild(td);
           });
 
