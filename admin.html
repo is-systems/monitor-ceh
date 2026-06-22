@@ -7,6 +7,8 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
     <style>
       body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
       
@@ -17,7 +19,9 @@
       .tab-btn:hover { background-color: #f1f5f9; color: #0f172a; }
       .tab-btn.active { background-color: #e0e7ff; color: #4338ca; }
 
+      /* РАЗШИРЕН ЕКРАН НА 98% ОТ МОНИТОРА */
       .main-container { max-width: 98%; margin: 20px auto; padding: 0 15px; box-sizing: border-box; }
+      
       .controls-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap; }
       .search-box { flex: 1; max-width: 400px; min-width: 250px; }
       .search-box input { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95em; box-sizing: border-box; outline: none; }
@@ -44,7 +48,7 @@
       .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow-x: auto; }
       table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em; min-width: 800px; }
       th { background-color: #f8fafc; padding: 14px 16px; font-weight: 800; color: #475569; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.5px; }
-      td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       tr:hover td { background-color: #f8fafc; }
       
       .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
@@ -81,11 +85,10 @@
   </head>
   <body>
 
-    <!-- Скриваме всичко първоначално заради защитата -->
     <div id="appContent" style="display: none;">
         
         <div class="navbar">
-          <div class="brand"><img src="icon.png" style="height: 32px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"> ИС-СИСТЕМС</div>
+          <div class="brand"><img src="icon.png" style="height: 32px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" onerror="this.style.display='none'"> ИС-СИСТЕМС</div>
           <div class="nav-tabs" id="tabsContainer"></div>
         </div>
 
@@ -95,6 +98,8 @@
               <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата...">
             </div>
             <div style="display: flex; gap: 10px;">
+                <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;" onchange="processPDF(event)">
+                <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">📥 Зареди от PDF</button>
                 <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
             </div>
           </div>
@@ -168,7 +173,7 @@
           </div>
         </div>
         
-    </div> <!-- Край на appContent -->
+    </div>
 
     <script>
       // ==========================================
@@ -178,7 +183,6 @@
       // ==========================================
 
       window.onload = () => {
-          // Проверяваме дали вече сме въвели кода успешно
           if (sessionStorage.getItem('is_admin_logged') !== 'true') {
               Swal.fire({
                   title: '🔐 Системен достъп',
@@ -193,19 +197,17 @@
                   if (result.value === ADMIN_PIN) {
                       sessionStorage.setItem('is_admin_logged', 'true');
                       document.getElementById('appContent').style.display = 'block';
-                      initializeApp(); // Стартираме системата
+                      initializeApp(); 
                   } else {
                       Swal.fire('Грешен код!', 'Опитайте отново.', 'error').then(() => location.reload());
                   }
               });
           } else {
-              // Ако вече сме въвели кода по-рано, директно показваме всичко
               document.getElementById('appContent').style.display = 'block';
               initializeApp();
           }
       };
 
-      // --- ВРЪЗКА С БАЗАТА ДАННИ ---
       const client = supabase.createClient(
         'https://zdythzcgcjxwbxufunuh.supabase.co', 
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
@@ -228,7 +230,6 @@
       let editingIndex = null;
       let currentFolderEmail = '';
 
-      // ТОВА СЕ СТАРТИРА СЛЕД УСПЕШЕН PIN КОД
       function initializeApp() {
           buildNavbar(); 
           loadCurrentTableData(); 
@@ -254,11 +255,15 @@
         
         const config = tableConfigs[tabKey];
         const addBtn = document.getElementById('addNewBtn');
+        const pdfBtn = document.getElementById('pdfBtn');
         const sidebar = document.getElementById('personnelSidebar');
         
         addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
         addBtn.style.display = config.readOnlyTab ? 'none' : 'block';
         
+        // Показваме бутона за PDF само в Месечен План
+        pdfBtn.style.display = (tabKey === 'plan') ? 'block' : 'none';
+
         if (tabKey === 'chekiraniya') {
             sidebar.style.display = 'block';
             loadPersonnelSidebar();
@@ -268,6 +273,134 @@
         
         loadCurrentTableData();
       }
+
+      // ==========================================
+      // НОВО: ФУНКЦИЯ ЗА ЧЕТЕНЕ И ИМПОРТ НА PDF
+      // ==========================================
+      async function processPDF(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          event.target.value = ''; // Ресетваме полето
+
+          const { value: formValues } = await Swal.fire({
+              title: 'Детайли за плана',
+              html:
+                  '<label style="display:block; text-align:left; font-size:14px; margin-bottom:5px;">Месец на плана (напр. Юни):</label>' +
+                  '<input id="swal-month" class="swal2-input" value="Юни">' +
+                  '<label style="display:block; text-align:left; font-size:14px; margin-top:15px; margin-bottom:5px;">Година:</label>' +
+                  '<input id="swal-year" type="number" class="swal2-input" value="2026">',
+              focusConfirm: false,
+              showCancelButton: true,
+              confirmButtonText: 'Продължи',
+              cancelButtonText: 'Отказ',
+              preConfirm: () => {
+                  return [
+                      document.getElementById('swal-month').value.trim(),
+                      document.getElementById('swal-year').value.trim()
+                  ]
+              }
+          });
+
+          if (!formValues) return;
+          const targetMonth = formValues[0];
+          const targetYear = parseInt(formValues[1]);
+
+          Swal.fire({ title: 'Четене на PDF...', text: 'Сканирам документа за детайли и бройки...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+          try {
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+              let fullTextArray = [];
+
+              // Извличане на текста от всички страници
+              for (let i = 1; i <= pdf.numPages; i++) {
+                  const page = await pdf.getPage(i);
+                  const content = await page.getTextContent();
+                  content.items.forEach(item => {
+                      let text = item.str.trim();
+                      if(text) fullTextArray.push(...text.replace(/[,\n\r]/g, ' ').split(/\s+/));
+                  });
+              }
+
+              let extractedPlan = [];
+              // Този израз търси специфичните номера за AMCI фабриката
+              const partRegex = /^(211\d{5}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
+
+              for(let i = 0; i < fullTextArray.length; i++) {
+                  let word = fullTextArray[i];
+                  if (partRegex.test(word)) {
+                      let qty = 0;
+                      // Връщаме се до 4 стъпки назад по текста, за да открием цифрата (QTY)
+                      for(let j = 1; j <= 4; j++) {
+                          if(i - j >= 0 && /^\d+$/.test(fullTextArray[i - j])) {
+                              let tempQty = parseInt(fullTextArray[i - j], 10);
+                              if(tempQty > 0 && tempQty < 10000) { 
+                                  qty = tempQty; 
+                                  break; 
+                              }
+                          }
+                      }
+                      if (qty > 0) {
+                          extractedPlan.push({ 
+                              'ID Детайл': word.toUpperCase(), 
+                              'Целево количество': qty,
+                              'Месец': targetMonth,
+                              'Година': targetYear,
+                              'Статус': 'Активен'
+                          });
+                      }
+                  }
+              }
+
+              if (extractedPlan.length === 0) {
+                  Swal.fire('Внимание', 'Не успях да открия познати детайли в този PDF. Уверете се, че това е стандартна поръчка (PO).', 'warning');
+                  return;
+              }
+
+              // Събираме бройките, ако един и същ детайл присъства два пъти в листа
+              let groupedPlan = {};
+              extractedPlan.forEach(p => {
+                  if(groupedPlan[p['ID Детайл']]) {
+                      groupedPlan[p['ID Детайл']]['Целево количество'] += p['Целево количество'];
+                  } else {
+                      groupedPlan[p['ID Детайл']] = p;
+                  }
+              });
+              let finalInsertData = Object.values(groupedPlan);
+
+              // Показваме списък за потвърждение на потребителя
+              let summaryHtml = `<div style="max-height: 250px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 10px; border-radius: 8px;"><ul>`;
+              finalInsertData.forEach(p => summaryHtml += `<li style="margin-bottom: 5px;"><b style="color: #2563eb;">${p['Целево количество']} бр.</b> - ${p['ID Детайл']}</li>`);
+              summaryHtml += `</ul></div>`;
+
+              const confirmRes = await Swal.fire({
+                  title: `Открити са ${finalInsertData.length} задачи`,
+                  html: summaryHtml,
+                  icon: 'question',
+                  showCancelButton: true,
+                  confirmButtonColor: '#16a34a',
+                  cancelButtonColor: '#94a3b8',
+                  confirmButtonText: '✅ Добави в плана',
+                  cancelButtonText: 'Отказ'
+              });
+
+              if (confirmRes.isConfirmed) {
+                  Swal.fire({ title: 'Записване в базата...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  const { error } = await client.from('plan').insert(finalInsertData);
+                  if (error) throw error;
+                  
+                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше автоматично зареден.`, timer: 2000, showConfirmButton: false });
+                  loadCurrentTableData();
+              }
+
+          } catch (err) {
+              console.error(err);
+              Swal.fire('Грешка при обработка', err.message, 'error');
+          }
+      }
+      // ==========================================
+
 
       async function loadPersonnelSidebar() {
           const list = document.getElementById('sidebarList');
@@ -440,7 +573,6 @@
           } catch(err) { alert('Грешка: ' + err.message); }
       }
 
-      // ТОВА Е НЕВИДИМИЯТ РОБОТ ЗА АВТОМАТИЧНО ИЗПИСВАНЕ (РАБОТИ ТАЙНО ВЪВ ФОН)
       async function runInvisibleAutoCheckout() {
           try {
               const { data, error } = await client.from('chekiraniya').select('*').order('Време', { ascending: true });
@@ -539,9 +671,9 @@
                 td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
                 row.appendChild(td); return;
             }
-           if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
+            if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
             
-            // НОВО: Превръща дългите линкове в малки бутони
+            // ПРЕВРЪЩА ЛИНКОВЕТЕ В БУТОНИ ЗА ПРЕГЛЕДНОСТ
             if (typeof val === 'string' && val.startsWith('http')) {
                 td.innerHTML = `<a href="${val}" target="_blank" style="background: #e0e7ff; color: #4338ca; padding: 5px 12px; border-radius: 6px; font-weight: 800; text-decoration: none; font-size: 0.85em; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: inline-block;">🔗 Отвори</a>`;
                 row.appendChild(td); return;
@@ -561,10 +693,8 @@
       }
 
       function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
-      
-      // Скрити за прегледност (но работят перфектно от оригиналния код)
-      // --- ФУНКЦИИ ЗА ДОБАВЯНЕ, РЕДАКЦИЯ И ИЗТРИВАНЕ ---
-      
+
+      // --- ВЪРНАТИТЕ РАБОТЕЩИ ФУНКЦИИ ЗА ДОБАВЯНЕ И РЕДАКЦИЯ ---
       function buildForm(data = null) {
         const area = document.getElementById('formFieldsArea');
         area.innerHTML = '';
@@ -605,7 +735,6 @@
           input.id = 'inp_' + f.name;
           if (f.required) input.required = true;
           
-          // Заключваме полето, ако е само за четене
           if (f.readonly || (isEditMode && f.readonlyOnEdit)) {
               input.readOnly = true;
               input.style.backgroundColor = '#f1f5f9';
