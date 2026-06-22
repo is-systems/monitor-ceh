@@ -277,85 +277,137 @@
     // ==========================================
       // НОВО: ФУНКЦИЯ ЗА ЧЕТЕНЕ НА PDF С ПРОСТРАНСТВЕНО ЗРЕНИЕ (X координати)
       // ==========================================
-     async function processPDF(event) {
+      async function processPDF(event) {
           const file = event.target.files[0];
           if (!file) return;
-          event.target.value = '';
+
+          event.target.value = ''; // Ресетваме полето
 
           const { value: formValues } = await Swal.fire({
               title: 'Детайли за плана',
-              html: '<label>Месец:</label><input id="swal-month" class="swal2-input" value="Юни">' +
-                    '<label>Година:</label><input id="swal-year" type="number" class="swal2-input" value="2026">',
+              html:
+                  '<label style="display:block; text-align:left; font-size:14px; margin-bottom:5px;">Месец на плана (напр. Юни):</label>' +
+                  '<input id="swal-month" class="swal2-input" value="Юни">' +
+                  '<label style="display:block; text-align:left; font-size:14px; margin-top:15px; margin-bottom:5px;">Година:</label>' +
+                  '<input id="swal-year" type="number" class="swal2-input" value="2026">',
+              focusConfirm: false,
+              showCancelButton: true,
               confirmButtonText: 'Продължи',
-              preConfirm: () => [document.getElementById('swal-month').value.trim(), document.getElementById('swal-year').value.trim()]
+              cancelButtonText: 'Отказ',
+              preConfirm: () => {
+                  return [
+                      document.getElementById('swal-month').value.trim(),
+                      document.getElementById('swal-year').value.trim()
+                  ]
+              }
           });
 
           if (!formValues) return;
-          const [targetMonth, targetYear] = formValues;
+          const targetMonth = formValues[0];
+          const targetYear = parseInt(formValues[1]);
 
-          Swal.fire({ title: 'Подреждане...', text: 'Четя документа по ред...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          Swal.fire({ title: 'Интелигентно четене...', text: 'Сканирам колоните на документа...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
           try {
               const arrayBuffer = await file.arrayBuffer();
               const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-              let allItems = [];
+              
+              let extractedPlan = [];
+              const partRegex = /^(211\d{5,6}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
 
               for (let i = 1; i <= pdf.numPages; i++) {
                   const page = await pdf.getPage(i);
                   const content = await page.getTextContent();
-                  content.items.forEach(item => {
-                      if(item.str.trim()) {
-                          allItems.push({
-                              text: item.str.trim(),
-                              x: item.transform[4],
-                              y: item.transform[5]
-                          });
-                      }
+                  
+                  // Вземаме всички текстове заедно с техните координати (X и Y)
+                  let textItems = content.items
+                      .filter(item => item.str.trim() !== '')
+                      .map(item => ({
+                          text: item.str.trim(),
+                          x: item.transform[4], // Позиция по хоризонтала (отляво надясно)
+                          y: item.transform[5]  // Позиция по вертикала
+                      }));
+
+                  // Сортираме ги по редове (Y) и след това отляво надясно (X)
+                  textItems.sort((a, b) => {
+                      if (Math.abs(b.y - a.y) > 5) return b.y - a.y;
+                      return a.x - b.x;
                   });
-              }
 
-              // СОРТИРАНЕ: Първо по вертикала (Y) отгоре надолу, после по хоризонтала (X) отляво надясно
-              allItems.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+                  for (let j = 0; j < textItems.length; j++) {
+                      let item = textItems[j];
+                      
+                      if (partRegex.test(item.text)) {
+                          // МАГИЯТА: Ако детайлът се намира над X=250 (което е колоната Description), го игнорираме напълно!
+                          // Part Number винаги стои вляво (X обикновено е между 80 и 150).
+                          if (item.x > 250) {
+                              continue; 
+                          }
 
-              let extractedPlan = [];
-              const partRegex = /^(211\d{5,6}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
-
-              for (let j = 0; j < allItems.length; j++) {
-                  let item = allItems[j];
-                  if (partRegex.test(item.text) && item.x < 250) {
-                      // Търсим QTY в същия ред (близко Y) и отляво (X)
-                      let qtyItem = allItems.find(prev => 
-                          Math.abs(prev.y - item.y) < 5 && 
-                          prev.x < item.x && 
-                          /^\d+$/.test(prev.text)
-                      );
-
-                      if (qtyItem) {
-                          extractedPlan.push({ 
-                              'ID Детайл': item.text.toUpperCase(), 
-                              'Целево количество': parseInt(qtyItem.text, 10),
-                              'Месец': targetMonth,
-                              'Година': targetYear,
-                              'Статус': 'Активен'
-                          });
+                          // Търсим бройката (QTY) точно преди него
+                          if (j > 0 && /^\d+$/.test(textItems[j - 1].text)) {
+                              let qtyItem = textItems[j - 1];
+                              
+                              // Уверяваме се, че числото е физически ВЛЯВО от номера на детайла (в колона QTY)
+                              if (qtyItem.x < item.x) {
+                                  let qty = parseInt(qtyItem.text, 10);
+                                  if (qty > 0 && qty < 10000) {
+                                      extractedPlan.push({ 
+                                          'ID Детайл': item.text.toUpperCase(), 
+                                          'Целево количество': qty,
+                                          'Месец': targetMonth,
+                                          'Година': targetYear,
+                                          'Статус': 'Активен'
+                                      });
+                                  }
+                              }
+                          }
                       }
                   }
               }
 
-              // Тук планът вече е подреден по Y координата (отгоре надолу)
+              if (extractedPlan.length === 0) {
+                  Swal.fire('Внимание', 'Не успях да открия познати детайли в първите колони.', 'warning');
+                  return;
+              }
+
+              let groupedPlan = {};
+              extractedPlan.forEach(p => {
+                  if(groupedPlan[p['ID Детайл']]) {
+                      groupedPlan[p['ID Детайл']]['Целево количество'] += p['Целево количество'];
+                  } else {
+                      groupedPlan[p['ID Детайл']] = p;
+                  }
+              });
+              let finalInsertData = Object.values(groupedPlan);
+
+              let summaryHtml = `<div style="max-height: 250px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 10px; border-radius: 8px;"><ul>`;
+              finalInsertData.forEach(p => summaryHtml += `<li style="margin-bottom: 5px;"><b style="color: #2563eb;">${p['Целево количество']} бр.</b> - ${p['ID Детайл']}</li>`);
+              summaryHtml += `</ul></div>`;
+
               const confirmRes = await Swal.fire({
-                  title: `Заредени ${extractedPlan.length} задачи по ред`,
-                  html: `<div style="max-height: 250px; overflow-y: auto;">... списъкът е подреден ...</div>`,
-                  confirmButtonText: '✅ Добави в плана'
+                  title: `Открити са ${finalInsertData.length} задачи`,
+                  html: summaryHtml,
+                  icon: 'question',
+                  showCancelButton: true,
+                  confirmButtonColor: '#16a34a',
+                  cancelButtonColor: '#94a3b8',
+                  confirmButtonText: '✅ Добави в плана',
+                  cancelButtonText: 'Отказ'
               });
 
               if (confirmRes.isConfirmed) {
-                  const { error } = await client.from('plan').insert(extractedPlan);
+                  Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                  const { error } = await client.from('plan').insert(finalInsertData);
                   if (error) throw error;
-                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът е зареден по ред.`, timer: 2000, showConfirmButton: false });
+                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше зареден.`, timer: 2000, showConfirmButton: false });
                   loadCurrentTableData();
               }
-          } catch (err) { Swal.fire('Грешка', err.message, 'error'); }
+
+          } catch (err) {
+              console.error(err);
+              Swal.fire('Грешка при обработка', err.message, 'error');
+          }
       }
       // ==========================================
 
