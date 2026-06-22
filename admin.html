@@ -274,8 +274,8 @@
         loadCurrentTableData();
       }
 
-     // ==========================================
-      // НОВО: ФУНКЦИЯ ЗА ЧЕТЕНЕ И ИМПОРТ НА PDF (СТРОГ РЕЖИМ)
+    // ==========================================
+      // НОВО: ФУНКЦИЯ ЗА ЧЕТЕНЕ НА PDF С ПРОСТРАНСТВЕНО ЗРЕНИЕ (X координати)
       // ==========================================
       async function processPDF(event) {
           const file = event.target.files[0];
@@ -306,55 +306,68 @@
           const targetMonth = formValues[0];
           const targetYear = parseInt(formValues[1]);
 
-          Swal.fire({ title: 'Четене на PDF...', text: 'Сканирам документа (Строг режим)...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          Swal.fire({ title: 'Интелигентно четене...', text: 'Сканирам колоните на документа...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
           try {
               const arrayBuffer = await file.arrayBuffer();
               const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-              let rawTextArray = [];
+              
+              let extractedPlan = [];
+              const partRegex = /^(211\d{5}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
 
               for (let i = 1; i <= pdf.numPages; i++) {
                   const page = await pdf.getPage(i);
                   const content = await page.getTextContent();
-                  content.items.forEach(item => {
-                      if(item.str.trim()) rawTextArray.push(item.str);
-                  });
-              }
-
-              // Изчистваме празните места и разделяме всичко на отделни думи
-              let words = [];
-              rawTextArray.forEach(t => {
-                  words.push(...t.replace(/[,\n\r]/g, ' ').split(/\s+/).filter(w => w !== ''));
-              });
-
-              let extractedPlan = [];
-              const partRegex = /^(211\d{5}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
-
-              for(let i = 0; i < words.length; i++) {
-                  let word = words[i];
                   
-                  // Ако намерим детайл
-                  if (partRegex.test(word)) {
-                      // СТРОГО ПРАВИЛО: Проверяваме САМО думата точно преди него. 
-                      // Тя трябва да е чисто число (QTY). Ако не е - значи детайлът е част от описанието и го пропускаме!
-                      if (i > 0 && /^\d+$/.test(words[i - 1])) {
-                          let qty = parseInt(words[i - 1], 10);
-                          
-                          if (qty > 0 && qty < 10000) {
-                              extractedPlan.push({ 
-                                  'ID Детайл': word.toUpperCase(), 
-                                  'Целево количество': qty,
-                                  'Месец': targetMonth,
-                                  'Година': targetYear,
-                                  'Статус': 'Активен'
-                              });
+                  // Вземаме всички текстове заедно с техните координати (X и Y)
+                  let textItems = content.items
+                      .filter(item => item.str.trim() !== '')
+                      .map(item => ({
+                          text: item.str.trim(),
+                          x: item.transform[4], // Позиция по хоризонтала (отляво надясно)
+                          y: item.transform[5]  // Позиция по вертикала
+                      }));
+
+                  // Сортираме ги по редове (Y) и след това отляво надясно (X)
+                  textItems.sort((a, b) => {
+                      if (Math.abs(b.y - a.y) > 5) return b.y - a.y;
+                      return a.x - b.x;
+                  });
+
+                  for (let j = 0; j < textItems.length; j++) {
+                      let item = textItems[j];
+                      
+                      if (partRegex.test(item.text)) {
+                          // МАГИЯТА: Ако детайлът се намира над X=250 (което е колоната Description), го игнорираме напълно!
+                          // Part Number винаги стои вляво (X обикновено е между 80 и 150).
+                          if (item.x > 250) {
+                              continue; 
+                          }
+
+                          // Търсим бройката (QTY) точно преди него
+                          if (j > 0 && /^\d+$/.test(textItems[j - 1].text)) {
+                              let qtyItem = textItems[j - 1];
+                              
+                              // Уверяваме се, че числото е физически ВЛЯВО от номера на детайла (в колона QTY)
+                              if (qtyItem.x < item.x) {
+                                  let qty = parseInt(qtyItem.text, 10);
+                                  if (qty > 0 && qty < 10000) {
+                                      extractedPlan.push({ 
+                                          'ID Детайл': item.text.toUpperCase(), 
+                                          'Целево количество': qty,
+                                          'Месец': targetMonth,
+                                          'Година': targetYear,
+                                          'Статус': 'Активен'
+                                      });
+                                  }
+                              }
                           }
                       }
                   }
               }
 
               if (extractedPlan.length === 0) {
-                  Swal.fire('Внимание', 'Не успях да открия познати детайли. Уверете се, че форматът е правилен.', 'warning');
+                  Swal.fire('Внимание', 'Не успях да открия познати детайли в първите колони.', 'warning');
                   return;
               }
 
