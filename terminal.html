@@ -137,8 +137,9 @@
                   '<input id="swal-name" class="swal2-input" style="margin-top:0;" value="' + (currentOperator || '') + '">' +
                   '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-top:15px; margin-bottom:5px; color:#475569;">Личен Имейл</label>' +
                   '<input id="swal-email" class="swal2-input" type="email" style="margin-top:0;" value="' + (currentEmail || '') + '">' +
-                  '<div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center;">' +
-                  '<button onclick="window.location.href=\'admin.html\'" style="background: transparent; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔒 Админ Панел</button></div>',
+                  '<div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: center; gap: 10px;">' +
+                  '<button type="button" onclick="window.location.href=\'admin.html\'" style="background: transparent; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔒 Админ</button>' +
+                  '<button type="button" onclick="window.location.href=\'monitor.html\'" style="background: transparent; border: 1px solid #bae6fd; color: #0284c7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📺 Монитор</button></div>',
               focusConfirm: false,
               allowOutsideClick: !!currentOperator,
               confirmButtonText: 'Запази профила',
@@ -296,7 +297,6 @@
         container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>';
         
         try {
-            // ВДИГНАТ ЛИМИТ ЗА ВСИЧКИ ЗАЯВКИ
             const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
                 client.from('plan').select('*').eq('Статус', 'Активен').limit(100000),
                 client.from('bom').select('*').limit(100000),
@@ -431,11 +431,12 @@
         
         var html = '';
         tasks.forEach(function(t) {
-          let borderStyle = t.type === 'ЗЕЛЕНА' ? 'border-left: 6px solid #22c55e;' : 'border-left: 6px solid #3b82f6;';
+          // Всички карти вече са сини
+          let borderStyle = 'border-left: 6px solid #3b82f6;';
           
-          // НОВАТА ЛОГИКА ЗА ИМЕНАТА - КОДЪТ ОТГОРЕ, ВЪТРЕШНОТО ИМЕ ОТДОЛУ
           let partCode = t.name;
-          let internalNameText = t.internalName ? t.internalName : 'Липсва вътрешно име';
+          // Ако няма вътрешно име, остава празно и не се показва долният ред
+          let internalNameHtml = t.internalName ? `<div class="detail-code">${t.internalName}</div>` : '';
           
           let linkHtml = partCode;
           if (t.drawing_link && t.drawing_link.startsWith('http')) {
@@ -461,7 +462,7 @@
           html += `
             <div class="card" id="card_${t.id}" style="${borderStyle}">
               <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${t.totalNeed} бр.</span></div>
-              <div class="detail-info"><div class="internal-name">${linkHtml}</div><div class="detail-code">${internalNameText}</div></div>
+              <div class="detail-info"><div class="internal-name">${linkHtml}</div>${internalNameHtml}</div>
               ${sopHtml} ${descHtml}
               <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
               ${bomBadgeHtml}
