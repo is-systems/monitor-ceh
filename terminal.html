@@ -26,6 +26,11 @@
       .machine-bar { width: 100%; background: #e2e8f0; padding: 8px 0; text-align: center; font-size: 0.85em; color: #475569; font-weight: 700; text-transform: uppercase; cursor: pointer; }
       .machine-title { color: #1e3a8a; font-weight: 900; text-decoration: underline; margin-left: 5px;}
 
+      /* НОВ CSS ЗА ФИЛТЪРА НА ЗАДАЧИТЕ */
+      .task-filters { display: flex; width: 100%; background: white; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+      .t-filter-btn { flex: 1; padding: 12px 5px; text-align: center; font-size: 0.85em; font-weight: 900; color: #64748b; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
+      .t-filter-btn.active { color: #2563eb; border-bottom-color: #2563eb; background: #f8fafc; }
+
       #tasksContainer { width: 100%; max-width: 550px; margin: 15px auto 80px auto; display: flex; flex-direction: column; gap: 20px; }
       
       .card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; position: relative; }
@@ -78,6 +83,12 @@
     <div class="machine-bar" onclick="changeMachine()">
         Работно място: <span class="machine-title" id="uiMachineName">ВСИЧКИ</span> ✏️
     </div>
+
+    <div class="task-filters">
+        <button class="t-filter-btn active" id="filter_all" onclick="setTaskFilter('all')">Всички</button>
+        <button class="t-filter-btn" id="filter_ready" onclick="setTaskFilter('ready')">🟢 Мога</button>
+        <button class="t-filter-btn" id="filter_blocked" onclick="setTaskFilter('blocked')">🛑 Не мога</button>
+    </div>
     
     <div class="container">
       <div id="tasksContainer">
@@ -106,6 +117,10 @@
       let globalBomData = [];
       let globalRoutesByDetail = {};
 
+      // НОВИ ПРОМЕНЛИВИ ЗА СЪСТОЯНИЕТО
+      let currentTaskFilter = 'all';
+      let activeTaskId = null; // Пази дали операторът в момента работи по задача
+
       const WORKSHOP_LAT = 41.8937;
       const WORKSHOP_LNG = 23.4875;
 
@@ -125,8 +140,23 @@
           } else {
               currentMachine = savedMachine;
               document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ";
-              loadTasks();
+              loadTasks(); // Първоначално зареждане (с надпис)
           }
+
+          // АВТОМАТИЧНО ОБНОВЯВАНЕ (ТИХО)
+          setInterval(() => {
+              // Обновяваме САМО ако работникът не е цъкнал "ПОЕМИ ЗАДАЧА"
+              if (!activeTaskId) {
+                  loadTasks(true); // true означава тихо зареждане
+              }
+          }, 30000); // 30 секунди
+      }
+
+      function setTaskFilter(filterType) {
+          currentTaskFilter = filterType;
+          document.querySelectorAll('.t-filter-btn').forEach(btn => btn.classList.remove('active'));
+          document.getElementById('filter_' + filterType).classList.add('active');
+          renderTasks(globalTasks);
       }
 
       async function setupProfile() {
@@ -139,7 +169,7 @@
                   '<input id="swal-email" class="swal2-input" type="email" style="margin-top:0;" value="' + (currentEmail || '') + '">' +
                   '<div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: center; gap: 10px;">' +
                   '<button type="button" onclick="window.location.href=\'admin.html\'" style="background: transparent; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔒 Админ</button>' +
-                  '<button type="button" onclick="window.location.href=\'index.html\'" style="background: transparent; border: 1px solid #bae6fd; color: #0284c7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📺 Монитор</button></div>',
+                  '<button type="button" onclick="window.location.href=\'monitor.html\'" style="background: transparent; border: 1px solid #bae6fd; color: #0284c7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📺 Монитор</button></div>',
               focusConfirm: false,
               allowOutsideClick: !!currentOperator,
               confirmButtonText: 'Запази профила',
@@ -292,9 +322,12 @@
           } catch (err) { Swal.fire('Грешка', err.message, 'error'); }
       }
 
-      async function loadTasks() {
+      // Добавихме параметър isSilent
+      async function loadTasks(isSilent = false) {
         var container = document.getElementById('tasksContainer');
-        container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>';
+        if (!isSilent) {
+            container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>';
+        }
         
         try {
             const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
@@ -427,15 +460,25 @@
 
       function renderTasks(tasks) {
         var container = document.getElementById('tasksContainer');
-        if(tasks.length === 0) { container.innerHTML = '<div style="text-align:center; padding: 40px; font-size:1.3em; color: #16a34a; font-weight: 900;">🎉 Всички задачи са изпълнени!</div>'; return; }
+        
+        // ПРИЛАГАНЕ НА ФИЛТЪРА
+        let filteredTasks = tasks;
+        if (currentTaskFilter === 'ready') {
+            filteredTasks = tasks.filter(t => !t.isBlocked);
+        } else if (currentTaskFilter === 'blocked') {
+            filteredTasks = tasks.filter(t => t.isBlocked);
+        }
+
+        if(filteredTasks.length === 0) { 
+            let msg = currentTaskFilter === 'all' ? '🎉 Всички задачи са изпълнени!' : 'Няма задачи в тази категория.';
+            container.innerHTML = `<div style="text-align:center; padding: 40px; font-size:1.3em; color: #16a34a; font-weight: 900;">${msg}</div>`; 
+            return; 
+        }
         
         var html = '';
-        tasks.forEach(function(t) {
-          // Всички карти вече са сини
+        filteredTasks.forEach(function(t) {
           let borderStyle = 'border-left: 6px solid #3b82f6;';
-          
           let partCode = t.name;
-          // Ако няма вътрешно име, остава празно и не се показва долният ред
           let internalNameHtml = t.internalName ? `<div class="detail-code">${t.internalName}</div>` : '';
           
           let linkHtml = partCode;
@@ -486,6 +529,7 @@
 
       function claimCurrentTaskDOM(taskId) {
         if (navigator.vibrate) navigator.vibrate(50);
+        activeTaskId = taskId; // Спираме автоматичното обновяване
         document.querySelectorAll('.card').forEach(c => { if (c.id !== 'card_' + taskId) c.style.display = 'none'; });
         document.getElementById('free_state_' + taskId).style.display = 'none';
         document.getElementById('focus_state_' + taskId).style.display = 'block';
@@ -495,6 +539,7 @@
 
       function pauseTaskDOM(taskId) {
         if (navigator.vibrate) navigator.vibrate(50);
+        activeTaskId = null; // Пускаме автоматичното обновяване отново
         document.querySelectorAll('.card').forEach(c => c.style.display = 'flex'); 
         document.getElementById('free_state_' + taskId).style.display = 'block';
         document.getElementById('focus_state_' + taskId).style.display = 'none';
@@ -518,6 +563,7 @@
                 const { error } = await client.from('otcheti').insert([{ "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }]);
                 if(error) throw error;
                 addLogToHistory('ГОТОВО', val, taskId); 
+                activeTaskId = null; // Освобождаваме задачата
                 Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
             } catch(err) { Swal.fire('❌ Грешка при запис', err.message, 'error'); btn.disabled = false; btn.innerHTML = "✅ ОТЧЕТИ"; }
           }
@@ -565,7 +611,9 @@
 
               const { error } = await client.from('otcheti').insert(inserts);
               if (error) throw error;
-              addLogToHistory('БРАК', val, taskData.id); Swal.close(); loadTasks(); 
+              addLogToHistory('БРАК', val, taskData.id); Swal.close(); 
+              activeTaskId = null; // Освобождаваме задачата
+              loadTasks(); 
           } catch(err) { Swal.fire('❌ Грешка при запис', err.message, 'error'); }
       }
       
