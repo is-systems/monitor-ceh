@@ -125,7 +125,6 @@
       const WORKSHOP_LAT = 41.8937;
       const WORKSHOP_LNG = 23.4875;
 
-      // ЛОГИКА ЗА ИЗВЕСТИЯ
       function checkNotifStatus() {
           if ("Notification" in window && Notification.permission === "granted") {
               document.getElementById('notifBtn').innerText = "🔔";
@@ -152,7 +151,7 @@
           currentEmail = localStorage.getItem('mes_email');
           let savedMachine = localStorage.getItem('mes_machine');
 
-          checkNotifStatus(); // Проверява дали камбанката трябва да е жълта при стартиране
+          checkNotifStatus(); 
 
           if (!currentOperator || !currentEmail) {
               await setupProfile();
@@ -192,7 +191,7 @@
                   '<input id="swal-email" class="swal2-input" type="email" style="margin-top:0;" value="' + (currentEmail || '') + '">' +
                   '<div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: center; gap: 10px;">' +
                   '<button type="button" onclick="window.location.href=\'admin.html\'" style="background: transparent; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔒 Админ</button>' +
-                  '<button type="button" onclick="window.location.href=\'monitor.html\'" style="background: transparent; border: 1px solid #bae6fd; color: #0284c7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📺 Монитор</button></div>',
+                  '<button type="button" onclick="window.location.href=\'index.html\'" style="background: transparent; border: 1px solid #bae6fd; color: #0284c7; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📺 Монитор</button></div>',
               focusConfirm: false,
               allowOutsideClick: !!currentOperator,
               confirmButtonText: 'Запази профила',
@@ -282,7 +281,6 @@
               }]);
               if (insertErr) throw insertErr;
 
-              // АЛАРМА ПРИ ЗАКЪСНЕНИЕ
               if (actionType === 'Влизане') {
                   let now = new Date();
                   if (now.getHours() > 8 || (now.getHours() === 8 && now.getMinutes() > 0)) {
@@ -402,14 +400,21 @@
                 if(!planGroups[planId]) planGroups[planId] = [];
                 planGroups[planId].push({ детайл_код: rootItem, текущ_родител: '', общо_необходимо_количество: targetQty });
 
-                function traverseAndAdd(parentName, parentBaseQty) {
+                // ЗЩИТА ОТ БЕЗКРАЕН ЦИКЪЛ (CIRCULAR BOM REFERENCE)
+                function traverseAndAdd(parentName, parentBaseQty, visited = new Set()) {
+                    if (visited.has(parentName)) {
+                        console.warn("Безкраен цикъл блокиран за:", parentName);
+                        return;
+                    }
+                    visited.add(parentName);
+
                     let parentScrapTotal = 0; for (let key in scrappedOps) if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
                     let actualParentNeed = parentBaseQty + parentScrapTotal;
                     let children = globalBomData.filter(b => String(b['ID Родител']).trim() === parentName);
                     children.forEach(c => {
                         let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1; let childNeededQty = actualParentNeed * multiplier;
                         planGroups[planId].push({ детайл_код: childName, текущ_родител: parentName, общо_необходимо_количество: childNeededQty });
-                        traverseAndAdd(childName, childNeededQty);
+                        traverseAndAdd(childName, childNeededQty, new Set(visited));
                     });
                 }
                 traverseAndAdd(rootItem, targetQty);
