@@ -213,11 +213,12 @@
 
     async function loadData() {
         try {
+            // Взимаме и колоната "ID Детайл" от плана, за да знаем ТОЧНО какво е поръчано
             const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
                 client.from('монитор_мастър_данни').select('*').limit(100000),
                 client.from('marshruti').select('*').limit(100000),
                 client.from('otcheti').select('*').limit(100000),
-                client.from('plan').select('id, Месец, Година, Статус').limit(100000)
+                client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').limit(100000)
             ]);
 
             if (nodesResponse.error) throw nodesResponse.error;
@@ -228,7 +229,15 @@
             const plansData = plansResponse.data || [];
 
             let planMap = {};
-            plansData.forEach(p => { planMap[p.id] = p; });
+            let explicitPlanItems = new Set(); // ЖЕЛЯЗНОТО ПРАВИЛО: Пази само ръчно въведените в плана детайли
+
+            plansData.forEach(p => { 
+                planMap[p.id] = p; 
+                if (p['ID Детайл']) {
+                    let codeKey = String(p['ID Детайл']).trim().toUpperCase();
+                    explicitPlanItems.add(`${p.id}___${codeKey}`);
+                }
+            });
 
             let completedOps = {};
             reportsData.forEach(r => {
@@ -264,11 +273,11 @@
                 let codeStr = row.code ? String(row.code).trim() : "";
                 
                 let mergedId = pMonthStr + '___' + codeStr;
-                let currentLevel = parseInt(row.level) || 1; // Вземаме нивото от базата (1 = Директно от плана)
 
                 if (!mergedNodes[mergedId]) {
                     mergedNodes[mergedId] = {
                         id: mergedId,
+                        planId: row.plan_id, // Запазваме системния номер на плана
                         planMonth: pMonthStr,
                         code: codeStr,
                         planQty: 0, 
@@ -276,19 +285,13 @@
                         globalState: 'gray',
                         operations: [],
                         drawingUrl: row.drawing_url,
-                        partType: row.part_type ? String(row.part_type) : "",
-                        level: currentLevel // Запазваме нивото
+                        partType: row.part_type ? String(row.part_type) : ""
                     };
-                } else {
-                    // Ако детайлът се среща пак, пазим по-малкото ниво
-                    if (currentLevel < mergedNodes[mergedId].level) {
-                        mergedNodes[mergedId].level = currentLevel;
-                    }
                 }
 
                 mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
 
-                if (row.parent_code && row.level > 1) {
+                if (row.parent_code) {
                     let parentCodeStr = String(row.parent_code).trim();
                     let parentMergedId = pMonthStr + '___' + parentCodeStr;
                     
@@ -323,11 +326,13 @@
 
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
-                // ЖЕЛЯЗНО ПРАВИЛО: Само Ниво 1 (въведено директно в Месечен план) отива в Сглобяване!
-                let isDirectPlanItem = (n.level === 1);
+                // === ПРОВЕРКАТА ===
+                // Питаме системата: "Този детайл въведен ли е изрично в Месечния план?"
+                let searchKey = `${n.planId}___${n.code.toUpperCase()}`;
+                let isDirectlyInPlan = explicitPlanItems.has(searchKey);
 
-                if (isDirectPlanItem) {
-                    masterData.assembly.push(n);
+                if (isDirectlyInPlan) {
+                    masterData.assembly.push(n); // Отива директно горе!
                 } 
                 else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
                 else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) masterData.predni.push(n);
