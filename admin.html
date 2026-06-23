@@ -19,7 +19,7 @@
       .tab-btn:hover { background-color: #f1f5f9; color: #0f172a; }
       .tab-btn.active { background-color: #e0e7ff; color: #4338ca; }
 
-      /* РАЗШИРЕН ЕКРАН НА 98% ОТ МОНИТОРА */
+      /* МАКСИМАЛНО ШИРОК ЕКРАН ЗА УДОБСТВО */
       .main-container { max-width: 98%; margin: 20px auto; padding: 0 15px; box-sizing: border-box; }
       
       .controls-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap; }
@@ -214,7 +214,7 @@
       );
 
       const tableConfigs = {
-        plan: { label: '📅 Месечен План', table: 'plan', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Целево количество', type: 'number', required: true }, { name: 'Месец', type: 'text', required: true }, { name: 'Година', type: 'number', required: true }, { name: 'Статус', type: 'select', options: ['Активен', 'Завършен', '📦 Опакован', '🚚 Изпратен'], required: true } ] },
+        plan: { label: '📅 Месечен План', table: 'plan', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Целево количество', type: 'number', required: true }, { name: 'Месец', type: 'text', required: true }, { name: 'Година', type: 'number', required: true }, { name: 'Статус', type: 'select', options: ['Active', 'Completed', '📦 Packed', '🚚 Shipped'], required: true } ] },
         chekiraniya: { label: '👥 Персонал & Достъп', table: 'chekiraniya', readOnlyTab: true, fields: [ { name: 'Време', type: 'text' }, { name: 'Имейл', type: 'text' }, { name: 'Действие', type: 'text' }, { name: 'Локация', type: 'text' }, { name: 'Бележка', type: 'text' } ] },
         sklad_gp: { label: '🏭 Склад Цех', table: 'computed_sklad_gp', readOnlyTab: true, fields: [ { name: 'ID Детайл', type: 'text' }, { name: 'Име', type: 'text' }, { name: 'Операция', type: 'text' }, { name: 'Наличност в цеха', type: 'number' } ] },
         nomenklatura: { label: '🗂️ Номенклатура', table: 'Номенклатура', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Вътрешно име', type: 'text' }, { name: 'Тип', type: 'text' }, { name: 'ID Родител', type: 'text' }, { name: 'Разходна норма', type: 'number', def: 1 }, { name: 'Единици', type: 'text', def: 'бр.' }, { name: 'Линк към чертеж', type: 'text' } ] },
@@ -261,7 +261,6 @@
         addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
         addBtn.style.display = config.readOnlyTab ? 'none' : 'block';
         
-        // Показваме бутона за PDF само в Месечен План
         pdfBtn.style.display = (tabKey === 'plan') ? 'block' : 'none';
 
         if (tabKey === 'chekiraniya') {
@@ -274,44 +273,35 @@
         loadCurrentTableData();
       }
 
-    // ==========================================
-      // НОВО: ФУНКЦИЯ ЗА ЧЕТЕНЕ НА PDF С ПРОСТРАНСТВЕНО ЗРЕНИЕ (X координати)
-      // ==========================================
+      // =============================================================
+      // НОВО: СУПЕР СТРОГ И ПОДРЕДЕН PDF ИМПОРТ (ГЛЕДА САМО КОЛОНА 1 И 2)
+      // =============================================================
       async function processPDF(event) {
           const file = event.target.files[0];
           if (!file) return;
-
-          event.target.value = ''; // Ресетваме полето
+          event.target.value = ''; 
 
           const { value: formValues } = await Swal.fire({
               title: 'Детайли за плана',
-              html:
-                  '<label style="display:block; text-align:left; font-size:14px; margin-bottom:5px;">Месец на плана (напр. Юни):</label>' +
-                  '<input id="swal-month" class="swal2-input" value="Юни">' +
-                  '<label style="display:block; text-align:left; font-size:14px; margin-top:15px; margin-bottom:5px;">Година:</label>' +
-                  '<input id="swal-year" type="number" class="swal2-input" value="2026">',
+              html: '<label style="display:block; text-align:left; font-size:14px; margin-bottom:5px;">Месец на плана:</label>' +
+                    '<input id="swal-month" class="swal2-input" value="Юни">' +
+                    '<label style="display:block; text-align:left; font-size:14px; margin-top:15px; margin-bottom:5px;">Година:</label>' +
+                    '<input id="swal-year" type="number" class="swal2-input" value="2026">',
               focusConfirm: false,
               showCancelButton: true,
               confirmButtonText: 'Продължи',
               cancelButtonText: 'Отказ',
-              preConfirm: () => {
-                  return [
-                      document.getElementById('swal-month').value.trim(),
-                      document.getElementById('swal-year').value.trim()
-                  ]
-              }
+              preConfirm: () => [document.getElementById('swal-month').value.trim(), document.getElementById('swal-year').value.trim()]
           });
 
           if (!formValues) return;
-          const targetMonth = formValues[0];
-          const targetYear = parseInt(formValues[1]);
+          const [targetMonth, targetYear] = [formValues[0], parseInt(formValues[1])];
 
-          Swal.fire({ title: 'Интелигентно четене...', text: 'Сканирам колоните на документа...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          Swal.fire({ title: 'Прецизно сканиране...', text: 'Изолирам първите две колони на документа...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
           try {
               const arrayBuffer = await file.arrayBuffer();
               const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-              
               let extractedPlan = [];
               const partRegex = /^(211\d{5,6}[A-Z]?|575-\d{4,5}(?:-\d+)?#?|H25-[A-Z0-9-]+|DC25[A-Z0-9-]+)$/i;
 
@@ -319,37 +309,34 @@
                   const page = await pdf.getPage(i);
                   const content = await page.getTextContent();
                   
-                  // Вземаме всички текстове заедно с техните координати (X и Y)
-                  let textItems = content.items
+                  // Вземаме само текстове, които физически се намират в Колона 1 и 2 (X координата под 230)
+                  // Тотално игнорираме всичко останало на листа!
+                  let validItems = content.items
                       .filter(item => item.str.trim() !== '')
                       .map(item => ({
                           text: item.str.trim(),
-                          x: item.transform[4], // Позиция по хоризонтала (отляво надясно)
-                          y: item.transform[5]  // Позиция по вертикала
-                      }));
+                          x: item.transform[4], 
+                          y: item.transform[5]  
+                      }))
+                      .filter(item => item.x < 230); // ЖЕЛЯЗНА ГРАНИЦА: Спира колона "Description"
 
-                  // Сортираме ги по редове (Y) и след това отляво надясно (X)
-                  textItems.sort((a, b) => {
-                      if (Math.abs(b.y - a.y) > 5) return b.y - a.y;
+                  // Сортираме елементите стриктно по редове отгоре надолу (Y), а в реда - отляво надясно (X)
+                  validItems.sort((a, b) => {
+                      if (Math.abs(b.y - a.y) > 4) return b.y - a.y; 
                       return a.x - b.x;
                   });
 
-                  for (let j = 0; j < textItems.length; j++) {
-                      let item = textItems[j];
+                  // Сега, когато в паметта имаме само първите 2 колони, намирането на QTY и Part Number е безгрешно
+                  for (let j = 0; j < validItems.length; j++) {
+                      let item = validItems[j];
                       
                       if (partRegex.test(item.text)) {
-                          // МАГИЯТА: Ако детайлът се намира над X=250 (което е колоната Description), го игнорираме напълно!
-                          // Part Number винаги стои вляво (X обикновено е между 80 и 150).
-                          if (item.x > 250) {
-                              continue; 
-                          }
-
-                          // Търсим бройката (QTY) точно преди него
-                          if (j > 0 && /^\d+$/.test(textItems[j - 1].text)) {
-                              let qtyItem = textItems[j - 1];
+                          // Търсим бройката (чисто число), стояща непосредствено преди този детайл на същия ред
+                          if (j > 0 && /^\d+$/.test(validItems[j - 1].text)) {
+                              let qtyItem = validItems[j - 1];
                               
-                              // Уверяваме се, че числото е физически ВЛЯВО от номера на детайла (в колона QTY)
-                              if (qtyItem.x < item.x) {
+                              // Уверяваме се, че числото е на същия ред и е вляво от детайла
+                              if (Math.abs(qtyItem.y - item.y) < 5 && qtyItem.x < item.x) {
                                   let qty = parseInt(qtyItem.text, 10);
                                   if (qty > 0 && qty < 10000) {
                                       extractedPlan.push({ 
@@ -357,7 +344,7 @@
                                           'Целево количество': qty,
                                           'Месец': targetMonth,
                                           'Година': targetYear,
-                                          'Статус': 'Активен'
+                                          'Статус': 'Active'
                                       });
                                   }
                               }
@@ -367,175 +354,106 @@
               }
 
               if (extractedPlan.length === 0) {
-                  Swal.fire('Внимание', 'Не успях да открия познати детайли в първите колони.', 'warning');
+                  Swal.fire('Внимание', 'Не открих валидни данни в първите две колони.', 'warning');
                   return;
               }
 
-              let groupedPlan = {};
-              extractedPlan.forEach(p => {
-                  if(groupedPlan[p['ID Детайл']]) {
-                      groupedPlan[p['ID Детайл']]['Целево количество'] += p['Целево количество'];
-                  } else {
-                      groupedPlan[p['ID Детайл']] = p;
-                  }
-              });
-              let finalInsertData = Object.values(groupedPlan);
-
-              let summaryHtml = `<div style="max-height: 250px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 10px; border-radius: 8px;"><ul>`;
-              finalInsertData.forEach(p => summaryHtml += `<li style="margin-bottom: 5px;"><b style="color: #2563eb;">${p['Целево количество']} бр.</b> - ${p['ID Детайл']}</li>`);
-              summaryHtml += `</ul></div>`;
+              // За разлика от преди, НЕ ГРУПИРАМЕ по име, за да се запази точният ред на редовете от документа!
+              let summaryHtml = `<div style="max-height: 300px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; background:#f8fafc;"><ol style="margin:0; padding-left:20px;">`;
+              extractedPlan.forEach(p => summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0;"><b style="color: #16a34a; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#1e3a8a;">${p['ID Детайл']}</span></li>`);
+              summaryHtml += `</ol></div>`;
 
               const confirmRes = await Swal.fire({
-                  title: `Открити са ${finalInsertData.length} задачи`,
-                  html: summaryHtml,
+                  title: `Открити поръчки: ${extractedPlan.length} реда`,
+                  html: '<p style="font-size:13px; color:#64748b; margin-top:0;">Списъкът е подреден точно в същата последователност, както в PDF файла:</p>' + summaryHtml,
                   icon: 'question',
                   showCancelButton: true,
-                  confirmButtonColor: '#16a34a',
+                  confirmButtonColor: '#4338ca',
                   cancelButtonColor: '#94a3b8',
-                  confirmButtonText: '✅ Добави в плана',
+                  confirmButtonText: '🚀 Зареди в плана',
                   cancelButtonText: 'Отказ'
               });
 
               if (confirmRes.isConfirmed) {
                   Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                  const { error } = await client.from('plan').insert(finalInsertData);
+                  const { error } = await client.from('plan').insert(extractedPlan);
                   if (error) throw error;
-                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше зареден.`, timer: 2000, showConfirmButton: false });
+                  
+                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше добавен в оригиналния си вид.`, timer: 2000, showConfirmButton: false });
                   loadCurrentTableData();
               }
 
           } catch (err) {
               console.error(err);
-              Swal.fire('Грешка при обработка', err.message, 'error');
+              Swal.fire('Грешка при импорта', err.message, 'error');
           }
       }
-      // ==========================================
-
+      // =============================================================
 
       async function loadPersonnelSidebar() {
           const list = document.getElementById('sidebarList');
           const loading = document.getElementById('sidebarLoading');
-          list.innerHTML = '';
-          loading.style.display = 'block';
-
+          list.innerHTML = ''; loading.style.display = 'block';
           try {
               const { data, error } = await client.from('chekiraniya').select('Имейл');
               if (error) throw error;
-              
               let uniqueEmails = [...new Set(data.map(item => item['Имейл'] ? item['Имейл'].toLowerCase().trim() : ''))].filter(e => e !== '');
               uniqueEmails.sort((a, b) => a.localeCompare(b)); 
-              
               loading.style.display = 'none';
-              
-              if (uniqueEmails.length === 0) {
-                  list.innerHTML = '<li style="padding:15px; color:#94a3b8; font-size:0.85em; text-align:center;">Няма служители</li>';
-                  return;
-              }
-
+              if (uniqueEmails.length === 0) { list.innerHTML = '<li style="padding:15px; color:#94a3b8; text-align:center;">Няма служители</li>'; return; }
               uniqueEmails.forEach(email => {
-                  const li = document.createElement('li');
-                  li.className = 'sidebar-item';
-                  li.innerHTML = `📁 <span>${email}</span>`;
-                  li.onclick = () => openWorkerFolder(email);
-                  list.appendChild(li);
+                  const li = document.createElement('li'); li.className = 'sidebar-item';
+                  li.innerHTML = `📁 <span>${email}</span>`; li.onclick = () => openWorkerFolder(email); list.appendChild(li);
               });
-
-          } catch (err) {
-              loading.innerText = 'Грешка: ' + err.message;
-          }
+          } catch (err) { loading.innerText = 'Грешка: ' + err.message; }
       }
 
-      function openWorkerFolder(email) {
-          currentFolderEmail = email;
-          document.getElementById('currentWorkerName').innerText = email;
-          document.getElementById('folderModalBackdrop').style.display = 'flex';
-          switchFolderTab('att'); 
-      }
-
+      function openWorkerFolder(email) { currentFolderEmail = email; document.getElementById('currentWorkerName').innerText = email; document.getElementById('folderModalBackdrop').style.display = 'flex'; switchFolderTab('att'); }
       function closeFolderModal() { document.getElementById('folderModalBackdrop').style.display = 'none'; }
-      
       function switchFolderTab(tabId) {
-          ['att', 'work', 'docs'].forEach(id => {
-              document.getElementById('tab' + id.charAt(0).toUpperCase() + id.slice(1) + 'Btn').classList.remove('active');
-              document.getElementById('f-' + id).classList.remove('active');
-          });
-          
-          document.getElementById('tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1) + 'Btn').classList.add('active');
-          document.getElementById('f-' + tabId).classList.add('active');
-          
-          if (tabId === 'att') loadWorkerAttendance();
-          if (tabId === 'work') loadWorkerWork();
-          if (tabId === 'docs') loadWorkerDocs();
+          ['att', 'work', 'docs'].forEach(id => { document.getElementById('tab' + id.charAt(0).toUpperCase() + id.slice(1) + 'Btn').classList.remove('active'); document.getElementById('f-' + id).classList.remove('active'); });
+          document.getElementById('tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1) + 'Btn').classList.add('active'); document.getElementById('f-' + tabId).classList.add('active');
+          if (tabId === 'att') loadWorkerAttendance(); if (tabId === 'work') loadWorkerWork(); if (tabId === 'docs') loadWorkerDocs();
       }
 
       async function loadWorkerAttendance() {
-          const tbody = document.getElementById('workerAttList');
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Зареждане...</td></tr>';
-          
+          const tbody = document.getElementById('workerAttList'); tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Зареждане...</td></tr>';
           try {
-              const { data, error } = await client.from('chekiraniya').select('*').eq('Имейл', currentFolderEmail).order('Време', { ascending: false }).limit(100);
+              const { data, error } = await client.from('chekiraniya').select('*').eq('Имейл', currentFolderEmail).order('Вreme', { ascending: false }).limit(100);
               if (error) throw error;
-              
-              if (!data || data.length === 0) {
-                  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Няма записи за чекиране.</td></tr>';
-                  return;
-              }
-
+              if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Няма записи.</td></tr>'; return; }
               let html = '';
               data.forEach(item => {
                   let isLate = false;
-                  if (item['Действие'] === 'Влизане' && item['Време']) {
-                      let d = new Date(item['Време']);
-                      if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true;
-                  }
-                  
+                  if (item['Действие'] === 'Влизане' && item['Време']) { let d = new Date(item['Време']); if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true; }
                   let rowStyle = '';
-                  if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) { 
-                      rowStyle = 'background-color: #fef2f2; border-left: 4px solid #ef4444;'; 
-                  } else if (item['Действие'] === 'Авто излизане') { 
-                      rowStyle = 'background-color: #fffbeb; border-left: 4px solid #f59e0b;'; 
-                  }
-
+                  if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) rowStyle = 'background-color: #fef2f2; border-left: 4px solid #ef4444;';
+                  else if (item['Действие'] === 'Авто излизане') rowStyle = 'background-color: #fffbeb; border-left: 4px solid #f59e0b';
                   let timeStr = item['Време'] ? new Date(item['Време']).toLocaleString('bg-BG') : '';
                   let actionHtml = item['Действие'];
                   if (actionHtml === 'Влизане') actionHtml = `<span style="color:#15803d; font-weight:800;">🟢 Влизане</span>`;
                   if (actionHtml === 'Излизане') actionHtml = `<span style="color:#b91c1c; font-weight:800;">🔴 Излизане</span>`;
                   if (actionHtml === 'Авто излизане') actionHtml = `<span style="color:#b45309; font-weight:800;">🕒 Авто излизане</span>`;
-                  
-                  let noteHtml = item['Бележка'] || '';
-                  if (noteHtml.includes('ИЗВЪН ОБЕКТА')) noteHtml = `⚠️ <b style="color:#dc2626;">${noteHtml}</b>`;
-
+                  let noteHtml = item['Бележка'] || ''; if (noteHtml.includes('ИЗВЪН ОБЕКТА')) noteHtml = `⚠️ <b style="color:#dc2626;">${noteHtml}</b>`;
                   let locHtml = item['Локация'] || '';
-                  if (locHtml.includes(',')) {
-                      let coords = locHtml.replace(/\s/g, '');
-                      locHtml = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
-                  }
-
-                  html += `<tr style="${rowStyle}">
-                            <td style="font-weight: 700;">${timeStr}</td>
-                            <td>${actionHtml}</td>
-                            <td>${locHtml}</td>
-                            <td>${noteHtml}</td>
-                           </tr>`;
+                  if (locHtml.includes(',')) { let coords = locHtml.replace(/\s/g, ''); locHtml = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:none;">📍 Карта</a>`; }
+                  html += `<tr style="${rowStyle}"><td><b>${timeStr}</b></td><td>${actionHtml}</td><td>${locHtml}</td><td>${noteHtml}</td></tr>`;
               });
               tbody.innerHTML = html;
           } catch(err) { tbody.innerHTML = `<tr><td colspan="4" style="color:red;">Грешка: ${err.message}</td></tr>`; }
       }
 
       async function loadWorkerWork() {
-          const tbody = document.getElementById('workerWorkList');
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Зареждане...</td></tr>';
+          const tbody = document.getElementById('workerWorkList'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Зареждане...</td></tr>';
           try {
               const { data, error } = await client.from('otcheti').select('*').ilike('Оператор', `%${currentFolderEmail}%`).order('Дата', { ascending: false }).limit(50);
               if (error) throw error;
-              
-              if (!data || data.length === 0) {
-                  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Няма отчетена работа.</td></tr>';
-              } else {
+              if (!data || data.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Няма отчетена работа.</td></tr>';
+              else {
                   let html = '';
                   data.forEach(r => {
                       let d = new Date(r['Дата']).toLocaleDateString('bg-BG');
-                      let statusColor = r['Статус'] === 'Брак' ? 'color: #dc2626; font-weight:800;' : 'color: #16a34a; font-weight:800;';
+                      let statusColor = r['Статус'] === 'Брак' ? 'color:#dc2626; font-weight:800;' : 'color:#16a34a; font-weight:800;';
                       html += `<tr><td>${d}</td><td style="font-weight:800;">${r['ID Детайл']}</td><td>${r['Операция']}</td><td style="font-weight:800;">${r['Количество']}</td><td style="${statusColor}">${r['Статус']}</td></tr>`;
                   });
                   tbody.innerHTML = html;
@@ -544,103 +462,68 @@
       }
 
       async function loadWorkerDocs() {
-          const listDiv = document.getElementById('workerDocsList');
-          listDiv.innerHTML = 'Зареждане на файлове...';
+          const listDiv = document.getElementById('workerDocsList'); listDiv.innerHTML = 'Зареждане на файлове...';
           try {
               const { data, error } = await client.storage.from('dosieta').list(currentFolderEmail);
               if (error) throw error;
               if (!data || data.length === 0) { listDiv.innerHTML = '<div style="color:#94a3b8; text-align:center;">Няма качени документи.</div>'; return; }
-              
               let html = '';
               for (let file of data) {
                   if (file.name === '.emptyFolderPlaceholder') continue;
                   const { data: urlData } = await client.storage.from('dosieta').createSignedUrl(`${currentFolderEmail}/${file.name}`, 3600);
-                  html += `<div class="doc-item"><a href="${urlData.signedUrl}" target="_blank">📄 ${file.name}</a><button onclick="deleteWorkerDoc('${file.name}')" style="background:transparent; border:none; color:#ef4444; cursor:pointer;" title="Изтрий">🗑️</button></div>`;
+                  html += `<div class="doc-item"><a href="${urlData.signedUrl}" target="_blank">📄 ${file.name}</a><button onclick="deleteWorkerDoc('${file.name}')" style="background:transparent; border:none; color:#ef4444; cursor:pointer;">🗑️</button></div>`;
               }
               listDiv.innerHTML = html;
-          } catch(err) { listDiv.innerHTML = `<div style="color:red;">Грешка: Уверете се, че сте създали Storage bucket "dosieta"! (${err.message})</div>`; }
+          } catch(err) { listDiv.innerHTML = `<div style="color:red;">Липсва Storage bucket "dosieta" (${err.message})</div>`; }
       }
 
       async function uploadWorkerDoc() {
-          const fileInput = document.getElementById('docUploadInput');
-          const file = fileInput.files[0];
-          if (!file) { Swal.fire('Внимание', 'Моля, изберете файл първо.', 'warning'); return; }
+          const fileInput = document.getElementById('docUploadInput'); const file = fileInput.files[0];
+          if (!file) { Swal.fire('Внимание', 'Моля, изберете файл.', 'warning'); return; }
           Swal.fire({ title: 'Качване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           try {
               const { error } = await client.storage.from('dosieta').upload(`${currentFolderEmail}/${file.name}`, file, { upsert: true });
-              if (error) throw error;
-              Swal.fire({ icon: 'success', title: 'Качен!', timer: 1000, showConfirmButton: false });
+              if (error) throw error; Swal.fire({ icon: 'success', title: 'Качен!', timer: 1000, showConfirmButton: false });
               fileInput.value = ''; loadWorkerDocs();
           } catch(err) { Swal.fire('Грешка', err.message, 'error'); }
       }
 
-      async function deleteWorkerDoc(fileName) {
-          if (!confirm(`Изтриване на ${fileName}?`)) return;
-          try {
-              const { error } = await client.storage.from('dosieta').remove([`${currentFolderEmail}/${fileName}`]);
-              if (error) throw error;
-              loadWorkerDocs();
-          } catch(err) { alert('Грешка: ' + err.message); }
-      }
+      async function deleteWorkerDoc(fileName) { if (!confirm(`Изтриване на ${fileName}?`)) return; try { const { error } = await client.storage.from('dosieta').remove([`${currentFolderEmail}/${fileName}`]); if (error) throw error; loadWorkerDocs(); } catch(err) { alert('Грешка: ' + err.message); } }
 
       async function runInvisibleAutoCheckout() {
           try {
-              const { data, error } = await client.from('chekiraniya').select('*').order('Време', { ascending: true });
-              if(error) return;
-
-              let userState = {}; let userLastTime = {};
-              data.forEach(r => { userState[r['Имейл']] = r['Действие']; userLastTime[r['Имейл']] = r['Време']; });
-
+              const { data, error } = await client.from('chekiraniya').select('*').order('Време', { ascending: true }); if(error) return;
+              let userState = {}; let userLastTime = {}; data.forEach(r => { userState[r['Имейл']] = r['Действие']; userLastTime[r['Имейл']] = r['Време']; });
               let toCheckout = []; let now = new Date();
-
               for(let email in userState) {
                   if(userState[email] === 'Влизане') {
                       let loginTime = new Date(userLastTime[email]);
-                      let isPastDay = loginTime.toDateString() !== now.toDateString();
-                      let isLoginBefore17 = loginTime.getHours() < 17;
-                      let isPast17 = now.getHours() >= 17 && isLoginBefore17;
-
-                      if (isPastDay || isPast17) {
-                          let checkoutTime = new Date(loginTime);
-                          checkoutTime.setHours(17, 0, 0, 0); 
-                          toCheckout.push({
-                              'Имейл': email, 'Действие': 'Авто излизане',
-                              'Време': checkoutTime.toISOString(), 'Локация': 'Системно', 'Бележка': 'Авто корекция (Липсва излизане)'
-                          });
+                      if (loginTime.toDateString() !== now.toDateString() || (now.getHours() >= 17 && loginTime.getHours() < 17)) {
+                          let checkoutTime = new Date(loginTime); checkoutTime.setHours(17, 0, 0, 0);
+                          toCheckout.push({ 'Имейл': email, 'Действие': 'Авто излизане', 'Време': checkoutTime.toISOString(), 'Локация': 'Системно', 'Бележка': 'Авто корекция (Липсва излизане)' });
                       }
                   }
               }
-
-              if(toCheckout.length > 0) {
-                  await client.from('chekiraniya').insert(toCheckout);
-                  loadCurrentTableData(); 
-              }
+              if(toCheckout.length > 0) { await client.from('chekiraniya').insert(toCheckout); loadCurrentTableData(); }
           } catch(e) { console.error("Auto checkout error", e); }
       }
 
       async function loadCurrentTableData() {
         const config = tableConfigs[currentTab];
-        document.getElementById('loadingLayout').style.display = 'block';
-        document.getElementById('mainTable').style.display = 'none';
-        
+        document.getElementById('loadingLayout').style.display = 'block'; document.getElementById('mainTable').style.display = 'none';
         try {
             let query = client.from(config.table).select('*').limit(10000);
             if (currentTab === 'otcheti') query = query.order('Дата', { ascending: false });
             if (currentTab === 'chekiraniya') query = query.order('Време', { ascending: false });
-            const { data, error } = await query;
-            if (error) throw error;
-            globalRows = data || [];
-            filterTable();
+            const { data, error } = await query; if (error) throw error;
+            globalRows = data || []; filterTable();
         } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
       }
 
       function renderDynamicTable(itemsToRender = null) {
-        const items = itemsToRender || globalRows;
-        const config = tableConfigs[currentTab];
+        const items = itemsToRender || globalRows; const config = tableConfigs[currentTab];
         document.getElementById('loadingLayout').style.display = 'none';
-        const table = document.getElementById('mainTable');
-        const thead = document.getElementById('tableHead');
-        const tbody = document.getElementById('tableBody');
+        const table = document.getElementById('mainTable'); const thead = document.getElementById('tableHead'); const tbody = document.getElementById('tableBody');
         thead.innerHTML = ''; tbody.innerHTML = '';
 
         const headerRow = document.createElement('tr');
@@ -650,42 +533,34 @@
 
         if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab ? 0 : 1)}" style="text-align:center; padding:40px;">Няма записи.</td></tr>`; table.style.display = 'table'; return; }
 
-       items.forEach((item) => {
-          const row = document.createElement('tr');
-          const trueIndex = globalRows.indexOf(item); 
+        items.forEach((item) => {
+          const row = document.createElement('tr'); const trueIndex = globalRows.indexOf(item);
           
           if (currentTab === 'chekiraniya') {
-             let isLate = false;
-             if (item['Действие'] === 'Влизане' && item['Време']) {
-                 let d = new Date(item['Време']);
-                 if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true;
-             }
-             if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) { row.style.backgroundColor = '#fef2f2'; row.style.borderLeft = '5px solid #ef4444'; } 
+             let isLate = false; if (item['Действие'] === 'Влизане' && item['Време']) { let d = new Date(item['Време']); if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true; }
+             if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) { row.style.backgroundColor = '#fef2f2'; row.style.borderLeft = '5px solid #ef4444'; }
              else if (item['Действие'] === 'Авто излизане') { row.style.backgroundColor = '#fffbeb'; row.style.borderLeft = '5px solid #f59e0b'; }
           }
 
           config.fields.forEach(f => {
-            if (f.hideOnAdd) return; 
-            const td = document.createElement('td');
-            let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
+            if (f.hideOnAdd) return; const td = document.createElement('td'); let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             
-            if (currentTab === 'chekiraniya' && f.name === 'Време' && val) { try { td.innerHTML = `<span style="font-weight: 700;">${new Date(val).toLocaleString('bg-BG')}</span>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
+            if (currentTab === 'chekiraniya' && f.name === 'Време' && val) { try { td.innerHTML = `<b>${new Date(val).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
             if (currentTab === 'chekiraniya' && f.name === 'Действие') {
-                if (val === 'Влизане') td.innerHTML = `<span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.9em;">🟢 ${val}</span>`;
-                else if (val === 'Излизане') td.innerHTML = `<span style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.9em;">🔴 ${val}</span>`;
-                else if (val === 'Авто излизане') td.innerHTML = `<span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.9em;">🕒 ${val}</span>`;
+                if (val === 'Влизане') td.innerHTML = `<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🟢 ${val}</span>`;
+                else if (val === 'Излизане') td.innerHTML = `<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🔴 ${val}</span>`;
+                else if (val === 'Авто излизане') td.innerHTML = `<span style="background:#fef3c7; color:#b45309; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🕒 ${val}</span>`;
                 else td.innerText = val; row.appendChild(td); return;
             }
             if (currentTab === 'chekiraniya' && f.name === 'Локация' && val && val.includes(',')) {
-                let coords = val.replace(/\s/g, '');
-                td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color: #2563eb; font-weight: bold; text-decoration: none;" title="Виж на картата">📍 Карта</a>`;
+                let coords = val.replace(/\s/g, ''); td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:none;">📍 Карта</a>`;
                 row.appendChild(td); return;
             }
             if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
             
-            // ПРЕВРЪЩА ЛИНКОВЕТЕ В БУТОНИ ЗА ПРЕГЛЕДНОСТ
+            // КРАСИВИ БУТОНИ ЗА ЛИНКОВЕТЕ КЪМ ЧЕРТЕЖИ И СОП
             if (typeof val === 'string' && val.startsWith('http')) {
-                td.innerHTML = `<a href="${val}" target="_blank" style="background: #e0e7ff; color: #4338ca; padding: 5px 12px; border-radius: 6px; font-weight: 800; text-decoration: none; font-size: 0.85em; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: inline-block;">🔗 Отвори</a>`;
+                td.innerHTML = `<a href="${val}" target="_blank" style="background:#e0e7ff; color:#4338ca; padding:5px 12px; border-radius:6px; font-weight:800; text-decoration:none; font-size:0.85em; display:inline-block;">🔗 Отвори</a>`;
                 row.appendChild(td); return;
             }
 
@@ -703,148 +578,61 @@
       }
 
       function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
-
-      // --- ВЪРНАТИТЕ РАБОТЕЩИ ФУНКЦИИ ЗА ДОБАВЯНЕ И РЕДАКЦИЯ ---
+      
+      // --- ФУНКЦИИ ЗА РЪЧНО ДОБАВЯНЕ И РЕДАКЦИЯ ---
       function buildForm(data = null) {
-        const area = document.getElementById('formFieldsArea');
-        area.innerHTML = '';
-        const fields = tableConfigs[currentTab].fields;
-        
+        const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; const fields = tableConfigs[currentTab].fields;
         fields.forEach(f => {
-          if (f.hideOnAdd && !isEditMode) return; 
-          
-          const group = document.createElement('div');
-          group.className = 'form-group';
-          
-          const label = document.createElement('label');
-          label.innerText = f.label || f.name;
-          group.appendChild(label);
-          
+          if (f.hideOnAdd && !isEditMode) return; const group = document.createElement('div'); group.className = 'form-group';
+          const label = document.createElement('label'); label.innerText = f.label || f.name; group.appendChild(label);
           let input;
           if (f.type === 'select') {
             input = document.createElement('select');
-            f.options.forEach(opt => {
-              const option = document.createElement('option');
-              option.value = opt;
-              option.innerText = opt;
-              input.appendChild(option);
-            });
+            f.options.forEach(opt => { const option = document.createElement('option'); option.value = opt; option.innerText = opt; input.appendChild(option); });
             if (data && data[f.name]) input.value = data[f.name];
           } else {
-            input = document.createElement('input');
-            input.type = f.type === 'number' ? 'number' : 'text';
-            if (f.type === 'number') input.step = 'any';
-            
-            if (data && data[f.name] !== undefined && data[f.name] !== null) {
-              input.value = data[f.name];
-            } else if (f.def !== undefined) {
-               input.value = typeof f.def === 'function' ? f.def() : f.def;
-            }
+            input = document.createElement('input'); input.type = f.type === 'number' ? 'number' : 'text'; if (f.type === 'number') input.step = 'any';
+            if (data && data[f.name] !== undefined && data[f.name] !== null) input.value = data[f.name];
+            else if (f.def !== undefined) input.value = typeof f.def === 'function' ? f.def() : f.def;
           }
-          
-          input.id = 'inp_' + f.name;
-          if (f.required) input.required = true;
-          
-          if (f.readonly || (isEditMode && f.readonlyOnEdit)) {
-              input.readOnly = true;
-              input.style.backgroundColor = '#f1f5f9';
-              input.style.color = '#64748b';
-              input.style.cursor = 'not-allowed';
-              if (f.type === 'select') input.disabled = true; 
-          }
-          
-          group.appendChild(input);
-          area.appendChild(group);
+          input.id = 'inp_' + f.name; if (f.required) input.required = true;
+          if (f.readonly || (isEditMode && f.readonlyOnEdit)) { input.readOnly = true; input.style.backgroundColor = '#f1f5f9'; input.style.color = '#64748b'; input.style.cursor = 'not-allowed'; if (f.type === 'select') input.disabled = true; }
+          group.appendChild(input); area.appendChild(group);
         });
       }
 
-      function openAddModal() {
-        isEditMode = false;
-        editingIndex = null;
-        document.getElementById('modalTitle').innerHTML = '➕ Добавяне: ' + tableConfigs[currentTab].label.replace(/[^а-яА-Я ]/g, '').trim();
-        buildForm();
-        document.getElementById('modalBackdrop').style.display = 'flex';
-      }
-
-      function openEditModal(index) {
-        isEditMode = true;
-        editingIndex = index;
-        document.getElementById('modalTitle').innerHTML = '✏️ Редакция: ' + tableConfigs[currentTab].label.replace(/[^а-яА-Я ]/g, '').trim();
-        buildForm(globalRows[index]);
-        document.getElementById('modalBackdrop').style.display = 'flex';
-      }
-
-      function closeModal() {
-        document.getElementById('modalBackdrop').style.display = 'none';
-      }
+      function openAddModal() { isEditMode = false; editingIndex = null; document.getElementById('modalTitle').innerHTML = '➕ Добавяне: ' + tableConfigs[currentTab].label.replace(/[^а-яА-Я ]/g, '').trim(); buildForm(); document.getElementById('modalBackdrop').style.display = 'flex'; }
+      function openEditModal(index) { isEditMode = true; editingIndex = index; document.getElementById('modalTitle').innerHTML = '✏️ Редакция: ' + tableConfigs[currentTab].label.replace(/[^а-яА-Я ]/g, '').trim(); buildForm(globalRows[index]); document.getElementById('modalBackdrop').style.display = 'flex'; }
+      function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
 
       async function saveForm(e) {
-        e.preventDefault();
-        const config = tableConfigs[currentTab];
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.innerText = 'Записване...';
-        btn.disabled = true;
-        
+        e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true;
         let payload = {};
-        config.fields.forEach(f => {
-          const el = document.getElementById('inp_' + f.name);
-          if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) {
-              let val = el.value;
-              if (f.type === 'number') val = parseFloat(val) || 0;
-              payload[f.name] = val;
-          }
-        });
-        
+        config.fields.forEach(f => { const el = document.getElementById('inp_' + f.name); if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) { let val = el.value; if (f.type === 'number') val = parseFloat(val) || 0; payload[f.name] = val; } });
         try {
           if (isEditMode) {
-             const row = globalRows[editingIndex];
-             const keyVal = row[config.key];
-             const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal);
-             if (error) throw error;
+             const row = globalRows[editingIndex]; const keyVal = row[config.key];
+             const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal); if (error) throw error;
              Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false});
           } else {
-             const { error } = await client.from(config.table).insert([payload]);
-             if (error) throw error;
+             const { error } = await client.from(config.table).insert([payload]); if (error) throw error;
              Swal.fire({icon: 'success', title: 'Успешно добавено!', timer: 1000, showConfirmButton: false});
           }
-          closeModal();
-          loadCurrentTableData();
-        } catch (err) {
-           Swal.fire('Грешка', err.message, 'error');
-        } finally {
-           btn.innerText = 'Запази запис';
-           btn.disabled = false;
-        }
+          closeModal(); loadCurrentTableData();
+        } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
       }
 
       async function deleteItem(index) {
-        const config = tableConfigs[currentTab];
-        const row = globalRows[index];
-        const keyVal = row[config.key];
-        
-        const res = await Swal.fire({
-           title: 'Сигурни ли сте?',
-           text: "Този запис ще бъде изтрит безвъзвратно!",
-           icon: 'warning',
-           showCancelButton: true,
-           confirmButtonColor: '#ef4444',
-           confirmButtonText: 'Да, изтрий!',
-           cancelButtonText: 'Отказ'
-        });
-        
+        const config = tableConfigs[currentTab]; const row = globalRows[index]; const keyVal = row[config.key];
+        const res = await Swal.fire({ title: 'Сигурни ли сте?', text: "Записът ще бъде изтрит безвъзвратно!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, изтрий!', cancelButtonText: 'Отказ' });
         if (res.isConfirmed) {
            try {
              Swal.fire({title: 'Изтриване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-             const { error } = await client.from(config.table).delete().eq(config.key, keyVal);
-             if (error) throw error;
-             Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false});
-             loadCurrentTableData();
-           } catch(err) {
-             Swal.fire('Грешка', err.message, 'error');
-           }
+             const { error } = await client.from(config.table).delete().eq(config.key, keyVal); if (error) throw error;
+             Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); loadCurrentTableData();
+           } catch(err) { Swal.fire('Грешка', err.message, 'error'); }
         }
       }
-
     </script>
   </body>
 </html>
