@@ -213,7 +213,6 @@
 
     async function loadData() {
         try {
-            // УВЕЛИЧЕНИ ЛИМИТИ НА 100 000 ЗА ОГРОМНИ ПЛАНОВЕ
             const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
                 client.from('монитор_мастър_данни').select('*').limit(100000),
                 client.from('marshruti').select('*').limit(100000),
@@ -265,6 +264,7 @@
                 let codeStr = row.code ? String(row.code).trim() : "";
                 
                 let mergedId = pMonthStr + '___' + codeStr;
+                let currentLevel = parseInt(row.level) || 1; // Вземаме нивото от базата (1 = Директно от плана)
 
                 if (!mergedNodes[mergedId]) {
                     mergedNodes[mergedId] = {
@@ -277,7 +277,13 @@
                         operations: [],
                         drawingUrl: row.drawing_url,
                         partType: row.part_type ? String(row.part_type) : "",
+                        level: currentLevel // Запазваме нивото
                     };
+                } else {
+                    // Ако детайлът се среща пак, пазим по-малкото ниво
+                    if (currentLevel < mergedNodes[mergedId].level) {
+                        mergedNodes[mergedId].level = currentLevel;
+                    }
                 }
 
                 mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
@@ -317,11 +323,10 @@
 
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
-                // ВАЖНО: Разпознаваме независимите поръчки
-                let isRootNode = !connections.some(c => c.from === n.id);
+                // ЖЕЛЯЗНО ПРАВИЛО: Само Ниво 1 (въведено директно в Месечен план) отива в Сглобяване!
+                let isDirectPlanItem = (n.level === 1);
 
-                // ВСИЧКО, КОЕТО Е ПОРЪЧАНО ДИРЕКТНО (НЯМА РОДИТЕЛ), ОТИВА В КРАЙНИ ПРОДУКТИ
-                if (isRootNode) {
+                if (isDirectPlanItem) {
                     masterData.assembly.push(n);
                 } 
                 else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
