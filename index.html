@@ -213,30 +213,46 @@
 
     async function loadData() {
         try {
-            const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
-                client.from('монитор_мастър_данни').select('*').limit(100000),
-                client.from('marshruti').select('*').limit(100000),
-                client.from('otcheti').select('*').limit(100000),
-                client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').eq('Статус', 'Активен').limit(100000)
-            ]);
-
-            if (nodesResponse.error) throw nodesResponse.error;
-
-            const nodesData = nodesResponse.data || [];
-            const routesData = routesResponse.data || [];
-            const reportsData = reportsResponse.data || [];
+            // СТЪПКА 1: Теглим САМО Активните планове първо
+            const plansResponse = await client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').eq('Статус', 'Активен').limit(5000);
+            if (plansResponse.error) throw plansResponse.error;
             const plansData = plansResponse.data || [];
+
+            if (plansData.length === 0) {
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
 
             let planMap = {};
             let explicitPlanItems = new Set(); 
+            let activePlanIds = [];
 
             plansData.forEach(p => { 
                 planMap[p.id] = p; 
+                activePlanIds.push(p.id);
                 if (p['ID Детайл']) {
                     let codeKey = String(p['ID Детайл']).trim().toUpperCase();
                     explicitPlanItems.add(`${p.id}___${codeKey}`);
                 }
             });
+
+            // СТЪПКА 2: Теглим мастър данните САМО ЗА ТЕЗИ ПЛАНОВЕ (за да не претоварим моста)
+            const nodesResponse = await client.from('монитор_мастър_данни')
+                                            .select('*')
+                                            .in('plan_id', activePlanIds)
+                                            .limit(50000);
+            if (nodesResponse.error) throw nodesResponse.error;
+            const nodesData = nodesResponse.data || [];
+
+            // СТЪПКА 3: Теглим маршрутите последователно
+            const routesResponse = await client.from('marshruti').select('*').limit(50000);
+            if (routesResponse.error) throw routesResponse.error;
+            const routesData = routesResponse.data || [];
+
+            // СТЪПКА 4: Теглим отчетите последователно
+            const reportsResponse = await client.from('otcheti').select('*').limit(50000);
+            if (reportsResponse.error) throw reportsResponse.error;
+            const reportsData = reportsResponse.data || [];
 
             let completedOps = {};
             reportsData.forEach(r => {
@@ -257,12 +273,8 @@
                 routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
             });
 
-            let activeNodes = nodesData.filter(row => {
-                let p = planMap[row.plan_id];
-                if (p && p['Статус'] === '🚚 Изпратен') return false;
-                return true;
-            });
-
+            // Тъй като вече теглим само активни, всички са активни
+            let activeNodes = nodesData; 
             let mergedNodes = {};
             let connections = [];
 
