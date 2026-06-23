@@ -339,12 +339,12 @@
                               if (Math.abs(qtyItem.y - item.y) < 5 && qtyItem.x < item.x) {
                                   let qty = parseInt(qtyItem.text, 10);
                                   if (qty > 0 && qty < 10000) {
-                                      extractedPlan.push({ 
+                                     extractedPlan.push({ 
                                           'ID Детайл': item.text.toUpperCase(), 
                                           'Целево количество': qty,
                                           'Месец': targetMonth,
                                           'Година': targetYear,
-                                          'Статус': 'Active'
+                                          'Статус': 'Активен'
                                       });
                                   }
                               }
