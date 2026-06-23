@@ -214,10 +214,11 @@
     async function loadData() {
         try {
             const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
+                const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
                 client.from('монитор_мастър_данни').select('*').limit(100000),
                 client.from('marshruti').select('*').limit(100000),
                 client.from('otcheti').select('*').limit(100000),
-                client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').limit(100000)
+                client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').eq('Статус', 'Активен').limit(100000)
             ]);
 
             if (nodesResponse.error) throw nodesResponse.error;
