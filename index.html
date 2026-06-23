@@ -73,7 +73,7 @@
     .vsm-header { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; border: none; padding-bottom: 2px; margin-bottom: 0px;}
     
     .vsm-title { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
-    .title-green { color: #22c55e !important; }     
+    .title-green { color: #22c55e !important; }      
     .title-blue { color: #60a5fa !important; }      
     .title-yellow { color: #facc15 !important; text-shadow: 0 0 10px rgba(250,204,21,0.3); } 
     .title-gray { color: #cbd5e1 !important; }      
@@ -131,7 +131,7 @@
       
       <div class="right-zone">
         <div class="window" style="height: 100%;">
-          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">СГЛОБЯВАНЕ (РЕЗОЛВЕРИ)</div>
+          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">КРАЙНИ ПРОДУКТИ (СГЛОБЯВАНЕ)</div>
           <div class="window-body" id="w-assembly"></div>
         </div>
       </div>
@@ -213,11 +213,12 @@
 
     async function loadData() {
         try {
+            // УВЕЛИЧЕНИ ЛИМИТИ НА 100 000 ЗА ОГРОМНИ ПЛАНОВЕ
             const [nodesResponse, routesResponse, reportsResponse, plansResponse] = await Promise.all([
-                client.from('монитор_мастър_данни').select('*').limit(10000),
-                client.from('marshruti').select('*').limit(10000),
-                client.from('otcheti').select('*').limit(10000),
-                client.from('plan').select('id, Месец, Година, Статус').limit(1000)
+                client.from('монитор_мастър_данни').select('*').limit(100000),
+                client.from('marshruti').select('*').limit(100000),
+                client.from('otcheti').select('*').limit(100000),
+                client.from('plan').select('id, Месец, Година, Статус').limit(100000)
             ]);
 
             if (nodesResponse.error) throw nodesResponse.error;
@@ -249,7 +250,6 @@
                 routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
             });
 
-            // Премахваме плановете, които са вече изпратени
             let activeNodes = nodesData.filter(row => {
                 let p = planMap[row.plan_id];
                 if (p && p['Статус'] === '🚚 Изпратен') return false;
@@ -317,17 +317,11 @@
 
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
-                // ПО-УМНА ПРОВЕРКА ЗА РЕЗОЛВЕРИ: Търсим в името ИЛИ в операциите
-                let isResolverByName = typeStr.includes("резолвер");
-                let hasAssemblyOp = n.operations.some(o => {
-                    let op = o.name.toLowerCase();
-                    return op.includes("сглобяване") || op.includes("зареждане") || op.includes("измерване");
-                });
-
-                // Проверяваме дали детайлът е "корен" (няма стрелки, които да излизат от него към друг детайл)
+                // ВАЖНО: Разпознаваме независимите поръчки
                 let isRootNode = !connections.some(c => c.from === n.id);
 
-                if (isRootNode && (isResolverByName || hasAssemblyOp)) {
+                // ВСИЧКО, КОЕТО Е ПОРЪЧАНО ДИРЕКТНО (НЯМА РОДИТЕЛ), ОТИВА В КРАЙНИ ПРОДУКТИ
+                if (isRootNode) {
                     masterData.assembly.push(n);
                 } 
                 else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
@@ -495,12 +489,8 @@
               levels[lvl].forEach(node => {
                 let dId = getDomId(node.id);
 
-                // ТОЧНА ПРОВЕРКА ЗА ЧЕРВЕНА ТОЧКА:
-                // 1. Детайлът няма никой над него (не е child)
-                // 2. Намира се САМО в прозореца за Сглобяване (Резолвери)
                 const isRoot = !parentMap[node.id]; 
-                const isAssemblyWindow = (containerId === 'w-assembly');
-                const rootMarker = (isRoot && isAssemblyWindow) ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
+                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
                 
                 const warehouseQty = node.warehouseQty || 0; 
                 const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
@@ -583,7 +573,8 @@
                     opsHTML = `<div class="vsm-ops">${html}</div>`;
                 }
                 
-                if (children.length > 0 && allChildrenDone && isAssemblyWindow && titleClass !== 'title-green') {
+                // Проверката за жълт цвят вече важи за всички крайни продукти
+                if (children.length > 0 && allChildrenDone && isRoot && titleClass !== 'title-green') {
                     titleClass = 'title-yellow'; 
                 }
 
