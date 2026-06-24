@@ -114,7 +114,7 @@
 <body>
 
   <div id="loading">
-    <div>Сглобяване на VSM потока от Supabase... ⚙️</div>
+    <div>Сглобяване на VSM потока... ⚙️</div>
     <div id="error-box"></div>
   </div>
   
@@ -131,7 +131,7 @@
       
       <div class="right-zone">
         <div class="window" style="height: 100%;">
-          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">КРАЙНИ ПРОДУКТИ (СГЛОБЯВАНЕ)</div>
+          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">РЕЗОЛВЕРИ</div>
           <div class="window-body" id="w-assembly"></div>
         </div>
       </div>
@@ -213,7 +213,6 @@
 
     async function loadData() {
         try {
-            // ТЕГЛИМ ВСИЧКИ ДАННИ ОТ БАЗАТА ДИРЕКТНО (ВМЕСТО ЧРЕЗ ИЗГЛЕДА)
             const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
                 client.from('plan').select('*').eq('Статус', 'Активен').limit(5000),
                 client.from('bom').select('*').limit(50000),
@@ -231,7 +230,6 @@
                 return;
             }
 
-            // ПОДГОТВЯМЕ РЕЧНИЦИТЕ
             let nomMap = {};
             if (nomRes.data) {
                 nomRes.data.forEach(n => {
@@ -282,9 +280,6 @@
             let explicitPlanItems = new Set(); 
             let activeNodes = [];
 
-            // =====================================================================
-            // УМЕН ПРЕВОДАЧ ЗА МЕСЕЧНИЯ ПЛАН (ПРЕВЕЖДА ЧИСЛО В ИМЕ)
-            // =====================================================================
             plansData.forEach(p => { 
                 planMap[p.id] = p; 
                 
@@ -293,12 +288,10 @@
                 let displayName = originalPlanCode;
                 let targetQty = parseFloat(p['Целево количество']) || 0;
 
-                // Проверяваме дали това цифрово име го има като "Вътрешно име" в Номенклатура
                 if (nomRes.data) {
                     let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === originalPlanCode);
                     if (translated && translated['ID Детайл']) {
                         actualBomName = String(translated['ID Детайл']).trim();
-                        // Ако го намерим, за екрана слепваме цифрата и текста!
                         displayName = `${originalPlanCode} - ${actualBomName}`; 
                     }
                 }
@@ -310,15 +303,13 @@
                     let nomEntry = nomMap[currentCodeLower] || {};
                     let children = bomChildrenMap[currentCodeLower] || [];
                     
-                    // АНТИ-СПАМ ФИЛТЪР ЗА СУРОВИНИ:
-                    // Пропускаме детайли, които нямат маршрути (операции) И нямат БОМ деца (напр. кабели, тиксо)
                     let isRawMaterial = (children.length === 0) && (!routesByDetail[currentCode]);
                     if (isRawMaterial && !isRootLevel) return;
 
                     activeNodes.push({
                         plan_id: p.id,
                         code: currentCode,
-                        display_name: isRootLevel ? displayName : currentCode, // Показва дългото име само на началния детайл
+                        display_name: isRootLevel ? displayName : currentCode, 
                         plan_qty: requiredQty,
                         parent_code: parentName,
                         ready_qty: skladMap[currentCodeLower] || 0,
@@ -336,7 +327,6 @@
                 traverseAndAdd('', actualBomName, targetQty, true);
             });
 
-            // ГРУПИРАНЕ И СЪЗДАВАНЕ НА ВРЪЗКИ
             let mergedNodes = {};
             let connections = [];
 
@@ -353,7 +343,7 @@
                         planId: row.plan_id, 
                         planMonth: pMonthStr,
                         code: codeStr,
-                        displayName: row.display_name, // ТУК ИЗПОЛЗВАМЕ ИМЕТО ЗА ЕКРАНА
+                        displayName: row.display_name, 
                         planQty: 0, 
                         warehouseQty: row.ready_qty || 0,
                         globalState: 'gray',
@@ -406,10 +396,8 @@
                 let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
                 let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
-                if (isDirectlyInPlan || isHashVariantOfPlan) {
-                    masterData.assembly.push(n);
-                } 
-                else if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
+                // ТУК Е ГЛАВНАТА ПРОМЯНА! Първо проверяваме категорията, ако не е известна (Резолвер), отива в Assembly
+                if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
                 else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) masterData.predni.push(n);
                 else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) masterData.zadni.push(n);
                 else if (typeStr.includes("мпр")) masterData.mpr.push(n);
@@ -418,11 +406,15 @@
                 else if (typeStr.includes("ротор") && typeStr.includes("11")) masterData.var11.push(n);
                 else if (typeStr.includes("ротор") && typeStr.includes("25")) masterData.var25.push(n);
                 else if (typeStr.includes("лагер")) masterData.bearings.push(n);
+                else if (typeStr.includes("щифт")) masterData.small_pins.push(n);
+                else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
+                else if (typeStr.includes("макар")) masterData.small_spools.push(n);
+                // Ако е директно в плана, но не е нито едно от горните, значи е Резолвер!
+                else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
+                    masterData.assembly.push(n);
+                } 
                 else {
-                    if (typeStr.includes("щифт")) masterData.small_pins.push(n);
-                    else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
-                    else if (typeStr.includes("макар")) masterData.small_spools.push(n);
-                    else masterData.small_others.push(n);
+                    masterData.small_others.push(n);
                 }
             });
 
@@ -576,7 +568,7 @@
                 let dId = getDomId(node.id);
 
                 const isRoot = !parentMap[node.id]; 
-                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
+                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
                 
                 const warehouseQty = node.warehouseQty || 0; 
                 const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
