@@ -7,13 +7,16 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- ИНТЕГРАЦИЯ НА ONESIGNAL -->
+    <!-- ИНТЕГРАЦИЯ НА ONESIGNAL С ПОДДРЪЖКА ЗА ПОДПАПКА -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(async function(OneSignal) {
         await OneSignal.init({
           appId: "2507a9cb-0d28-4952-9b7b-42e800a61613",
+          // Указваме точния път, тъй като сме в подпапка на GitHub Pages!
+          serviceWorkerParam: { scope: "/monitor-ceh/" },
+          serviceWorkerPath: "/monitor-ceh/OneSignalSDKWorker.js"
         });
       });
     </script>
@@ -157,11 +160,9 @@
           currentEmail = localStorage.getItem('mes_email');
           let savedMachine = localStorage.getItem('mes_machine');
 
-          // Свързваме потребителя с OneSignal, за да получава лични известия
           if (currentEmail) {
               OneSignalDeferred.push(function(OneSignal) {
                   OneSignal.login(currentEmail);
-                  OneSignal.Slidedown.promptPush(); // Тих опит за искане на разрешение
               });
           }
 
@@ -189,10 +190,17 @@
           renderTasks(globalTasks);
       }
 
+      function triggerPushPrompt() {
+          OneSignalDeferred.push(function(OneSignal) {
+              OneSignal.Slidedown.promptPush();
+          });
+      }
+
       async function setupProfile() {
           const { value: formValues } = await Swal.fire({
               title: 'Профил Работник',
               html:
+                  '<div style="background: #e0e7ff; padding: 10px; border-radius: 8px; margin-bottom: 15px;"><button type="button" onclick="triggerPushPrompt()" style="background: #4338ca; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width:100%; box-shadow: 0 2px 4px rgba(67,56,202,0.3);">🔔 Разреши Известия</button><p style="font-size: 11px; color: #475569; margin: 5px 0 0 0; text-align: center;">Ако не получавате известия, натиснете бутона.</p></div>' +
                   '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-bottom:5px; color:#475569;">Име и Фамилия</label>' +
                   '<input id="swal-name" class="swal2-input" style="margin-top:0;" value="' + (currentOperator || '') + '">' +
                   '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-top:15px; margin-bottom:5px; color:#475569;">Личен Имейл</label>' +
@@ -216,10 +224,8 @@
               localStorage.setItem('mes_email', currentEmail);
               document.getElementById('uiOperatorName').innerText = currentOperator;
               
-              // Обновяваме OneSignal с новия имейл
               OneSignalDeferred.push(function(OneSignal) {
                   OneSignal.login(currentEmail);
-                  OneSignal.Slidedown.promptPush();
               });
 
               Swal.fire({icon: 'success', title: 'Профилът е запазен!', timer: 1500, showConfirmButton: false});
@@ -278,7 +284,6 @@
               const { error: insertErr } = await client.from('chekiraniya').insert([{ "Имейл": currentEmail, "Действие": actionType, "Време": new Date().toISOString(), "Локация": geoInfo.loc, "Бележка": geoInfo.note }]);
               if (insertErr) throw insertErr;
 
-              // АЛАРМА И ГОВОРЕНЕ ПРИ ЗАКЪСНЕНИЕ (След 07:59 ч.)
               if (actionType === 'Влизане') {
                   let now = new Date();
                   if (now.getHours() >= 8) {
