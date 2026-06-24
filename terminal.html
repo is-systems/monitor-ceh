@@ -243,12 +243,7 @@
             if (plansRes.error) throw plansRes.error; if (bomRes.error) throw bomRes.error;
             if (routesRes.error) throw routesRes.error; if (reportsRes.error) throw reportsRes.error;
 
-            // namesMap взема истинското ID за заглавие и Вътрешното име (числото) за подзаглавие
-            let namesMap = {}; 
-            if (nomRes.data) nomRes.data.forEach(n => { 
-                let code = String(n['ID Детайл']).trim().toLowerCase(); 
-                namesMap[code] = n['Вътрешно име'] || ''; 
-            });
+            let namesMap = {}; if (nomRes.data) nomRes.data.forEach(n => { let code = String(n['ID Детайл']).trim().toLowerCase(); namesMap[code] = n['Вътрешно име'] || ''; });
 
             globalBomData = bomRes.data || []; globalRoutesByDetail = {};
             routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
@@ -267,21 +262,15 @@
             plansRes.data.forEach(plan => {
                 let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim(); 
                 let rootItem = String(plan['ID Детайл']).trim(); 
-                let targetQty = parseFloat(plan['Целево количество']) || 0;
-
-                // =========================================================================
-                // ПРЕВОДАЧ НА КОДОВЕ: Ако кодът от плана е "Вътрешно име" (число) 
-                // в Номенклатурата, вземи истинския "ID Детайл" (текст), за да намерим маршрута!
-                // =========================================================================
+                
                 if (nomRes.data) {
                     let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === rootItem);
-                    if (translated && translated['ID Детайл']) {
-                        rootItem = String(translated['ID Детайл']).trim();
-                    }
+                    if (translated && translated['ID Детайл']) rootItem = String(translated['ID Детайл']).trim();
                 }
 
+                let targetQty = parseFloat(plan['Целево количество']) || 0;
                 if(!planGroups[planId]) planGroups[planId] = [];
-                planGroups[planId].push({ детайл_код: rootItem, текущ_родител: '', общо_необходимо_количество: targetQty });
+                planGroups[planId].push({ детайл_код: rootItem, общо_необходимо_количество: targetQty });
 
                 function traverseAndAdd(parentName, parentBaseQty) {
                     let parentScrapTotal = 0; for (let key in scrappedOps) if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
@@ -289,7 +278,7 @@
                     let children = globalBomData.filter(b => String(b['ID Родител']).trim() === parentName);
                     children.forEach(c => {
                         let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1; let childNeededQty = actualParentNeed * multiplier;
-                        planGroups[planId].push({ детайл_код: childName, текущ_родител: parentName, общо_необходимо_количество: childNeededQty });
+                        planGroups[planId].push({ детайл_код: childName, общо_необходимо_количество: childNeededQty });
                         traverseAndAdd(childName, childNeededQty);
                     });
                 }
@@ -298,10 +287,16 @@
 
             globalTasks = [];
             for(let planId in planGroups) {
-                let bomNodes = planGroups[planId]; let getChildren = (parentCode) => bomNodes.filter(n => String(n.текущ_родител).trim() === parentCode);
+                // СУМИРАМЕ БРОЙКИТЕ (ЗА ДА НЯМА ПОВТАРЯЩИ СЕ КАРТИ)
+                let aggregatedBom = {};
+                planGroups[planId].forEach(node => {
+                    let code = node.детайл_код;
+                    if(!aggregatedBom[code]) aggregatedBom[code] = 0;
+                    aggregatedBom[code] += node.общо_необходимо_количество;
+                });
                 
-                bomNodes.forEach((node, nodeIndex) => {
-                    let code = String(node.детайл_код).trim(); let planQty = parseFloat(node.общо_необходимо_количество) || 0;
+                Object.keys(aggregatedBom).forEach((code, nodeIndex) => {
+                    let planQty = aggregatedBom[code];
                     let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
                     
                     routes.forEach((route, idx) => {
@@ -319,19 +314,28 @@
                             let prevDoneQty = completedOps[prevOpKey] || 0; maxAllowed = prevDoneQty - consumedHere;
                             if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
                         } else {
-                            let children = getChildren(code);
+                            let children = globalBomData.filter(b => String(b['ID Родител']).trim() === code);
                             if (children.length === 0) { hasLimit = false; maxAllowed = Infinity; } 
                             else {
                                 let minSets = Infinity;
                                 children.forEach(child => {
-                                    let cCode = String(child.детайл_код).trim(); let cPlan = parseFloat(child.общо_необходимо_количество) || 0;
-                                    let cRoutes = globalRoutesByDetail[cCode] || []; let cDone = 0; let isManufactured = (cRoutes.length > 0);
-                                    if (isManufactured) { let lastRoute = cRoutes[cRoutes.length - 1]; let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim(); cDone = completedOps[cOpKey] || 0; } 
-                                    else { cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0); }
-                                    if (cPlan > 0) {
-                                        let multiplier = cPlan / planQty; let possibleSets = Math.floor(cDone / multiplier);
-                                        if (possibleSets < minSets) minSets = possibleSets;
-                                        if (possibleSets <= 0) { let loc = isManufactured ? "Отчети" : "Склад"; blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`); }
+                                    let cCode = String(child['ID Компонент']).trim(); 
+                                    let multiplier = parseFloat(child['Количество']) || 1;
+                                    let cRoutes = globalRoutesByDetail[cCode] || []; 
+                                    let cDone = 0; let isManufactured = (cRoutes.length > 0);
+                                    if (isManufactured) { 
+                                        let lastRoute = cRoutes[cRoutes.length - 1]; 
+                                        let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim(); 
+                                        cDone = completedOps[cOpKey] || 0; 
+                                    } 
+                                    else { 
+                                        cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0); 
+                                    }
+                                    let possibleSets = Math.floor(cDone / multiplier);
+                                    if (possibleSets < minSets) minSets = possibleSets;
+                                    if (possibleSets <= 0) { 
+                                        let loc = isManufactured ? "Отчети" : "Склад"; 
+                                        blockingReasons.push(`${cCode} (${cDone} бр. в ${loc})`); 
                                     }
                                 });
                                 if (minSets === Infinity) minSets = 0; maxAllowed = minSets - consumedHere;
@@ -340,6 +344,9 @@
                         
                         if (maxAllowed < 0) maxAllowed = 0; let isBlocked = hasLimit && maxAllowed <= 0; let machineName = route['Машина'] || '';
                         if (currentMachine && currentMachine.trim() !== "") { let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim()); let match = selectedMachines.some(m => machineName.toLowerCase().includes(m)); if (!match) return; }
+
+                        // ПРЕМАХВАМЕ ПОВТАРЯЩИТЕ СЕ ПРИЧИНИ В ЧЕРВЕНОТО ПОЛЕ
+                        blockingReasons = [...new Set(blockingReasons)];
 
                         let defaultInput = (effectivePlanQty - doneQty > 0) ? (effectivePlanQty - doneQty) : 0;
                         if (hasLimit && defaultInput > maxAllowed) defaultInput = maxAllowed;
