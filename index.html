@@ -232,6 +232,9 @@
                 return;
             }
 
+            // Точка 3: Сортиране на плановете
+            plansData.sort((a, b) => a.id - b.id);
+
             let nomMap = {};
             if (nomRes.data) {
                 nomRes.data.forEach(n => {
@@ -246,13 +249,23 @@
                 });
             }
 
+            // Точка 1: Улавяне на статус "Започната"
             let completedOps = {};
+            let opStatusMap = {}; 
+            
             if (reportsRes.data) {
-                reportsRes.data.forEach(r => {
+                // Сортираме по време, за да запазим последния статус
+                let sortedReports = reportsRes.data.sort((a, b) => new Date(a['Време Старт'] || a['Дата']) - new Date(b['Време Старт'] || b['Дата']));
+                sortedReports.forEach(r => {
                     let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
                     let qty = parseFloat(r['Количество']) || 0;
+                    
                     if (r['Статус'] === 'Отчетено') {
                         completedOps[key] = (completedOps[key] || 0) + qty;
+                        opStatusMap[key] = 'Отчетено';
+                    } else if (r['Статус'] !== 'Брак') {
+                        // Записва "Започната", "Прекъсната" и т.н.
+                        opStatusMap[key] = r['Статус']; 
                     }
                 });
             }
@@ -271,7 +284,9 @@
 
             let bomChildrenMap = {};
             if (bomRes.data) {
-                bomRes.data.forEach(b => {
+                // Точка 3: Сортиране на децата по азбучен ред
+                let bomDataSorted = bomRes.data.sort((a, b) => String(a['ID Компонент']).localeCompare(String(b['ID Компонент'])));
+                bomDataSorted.forEach(b => {
                     let p = String(b['ID Родител']).trim().toLowerCase();
                     if(!bomChildrenMap[p]) bomChildrenMap[p] = [];
                     bomChildrenMap[p].push(b);
@@ -323,6 +338,7 @@
                         part_type: nomEntry['Тип'] || ''
                     });
 
+                    // Точка 3: Децата вече са сортирани в bomChildrenMap
                     children.forEach(c => {
                         let childName = String(c['ID Компонент']).trim();
                         let multiplier = parseFloat(c['Количество']) || 1;
@@ -384,13 +400,23 @@
                     partRoutes.forEach(route => {
                         let opName = String(route['Име на операция']).trim();
                         let opKey = n.code + '_' + opName;
+                        
                         let doneQty = completedOps[opKey] || 0;
-                        n.operations.push({ name: opName, completed: doneQty });
+                        let latestStatus = opStatusMap[opKey];
+                        
+                        // Точка 1: Определяне на точния статус за синьото
+                        let opState = 'gray';
+                        if (doneQty >= n.planQty) opState = 'green';
+                        else if (doneQty > 0) opState = 'blue'; // Има бройки (active)
+                        else if (latestStatus === 'Започната') opState = 'blue_0'; // Поета, но 0 бройки (active_0)
+                        
+                        n.operations.push({ name: opName, completed: doneQty, state: opState });
                     });
                 } else {
                     n.operations.push({ 
                         name: n.warehouseQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
-                        completed: n.warehouseQty || 0 
+                        completed: n.warehouseQty || 0,
+                        state: n.warehouseQty >= n.planQty ? 'green' : 'gray'
                     });
                 }
 
@@ -582,26 +608,38 @@
                 let titleClass = 'title-gray';
 
                 let children = childMap[node.id] || [];
-                let allChildrenDone = true;
-                let anyChildHasPieces = false;
                 
+                // Точка 2: Оценяваме ПОСЛЕДНАТА операция на децата
+                let allChildrenDone = true;
+                let anyChildLastOpHasPieces = false;
+                let anyChildLastOpStarted = false;
+
                 if (children.length > 0) {
                     allChildrenDone = children.every(cId => {
                         let chNode = allNodesMap[cId];
                         if(!chNode || !chNode.operations) return false;
-                        return chNode.operations.length === 0 || chNode.operations.every(o => o.completed >= chNode.planQty);
+                        if(chNode.operations.length === 0) return true; 
+                        return chNode.operations.every(o => o.state === 'green');
                     });
 
-                    anyChildHasPieces = children.some(cId => {
+                    anyChildLastOpHasPieces = children.some(cId => {
                         let chNode = allNodesMap[cId];
-                        if(!chNode || !chNode.operations) return false;
-                        return chNode.operations.some(o => o.completed > 0);
+                        if(!chNode || !chNode.operations || chNode.operations.length === 0) return false;
+                        let lastOp = chNode.operations[chNode.operations.length - 1]; // Гледаме само последната!
+                        return lastOp.completed > 0 || lastOp.state === 'green';
+                    });
+
+                    anyChildLastOpStarted = children.some(cId => {
+                        let chNode = allNodesMap[cId];
+                        if(!chNode || !chNode.operations || chNode.operations.length === 0) return false;
+                        let lastOp = chNode.operations[chNode.operations.length - 1]; // Гледаме само последната!
+                        return lastOp.state === 'blue' || lastOp.state === 'blue_0' || lastOp.completed > 0 || lastOp.state === 'green';
                     });
                 }
 
                 if (node.operations && node.operations.length > 0) {
                     let len = node.operations.length;
-                    let allOpsDone = node.operations.every(o => o.completed >= node.planQty);
+                    let allOpsDone = node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
                     const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFuture = (op) => `<span class="op-text op-future"><span class="arr">➔</span> ${op.name} | 0/${node.planQty}</span>`;
@@ -629,24 +667,29 @@
                         for (let i = 0; i < len; i++) {
                             let op = node.operations[i];
                             let state = '';
-                            if (op.completed >= node.planQty) {
+                            
+                            if (op.state === 'green' || op.completed >= node.planQty) {
                                 state = 'past';
-                            } else if (op.completed > 0) {
-                                state = 'active';
+                            } else if (op.state === 'blue' || op.completed > 0) {
+                                state = 'active'; // Има бройки (Синьо)
+                                hasActive = true;
+                            } else if (op.state === 'blue_0') {
+                                state = 'active_0'; // Поета е, но няма бройки (Синьо)
                                 hasActive = true;
                             } else {
                                 if (i === 0) {
                                     if (children.length === 0) {
-                                        state = 'waiting'; 
+                                        state = 'waiting'; // Листо -> Готово за старт
                                     } else {
                                         if (allChildrenDone) state = 'waiting';
-                                        else if (anyChildHasPieces) state = 'waiting'; 
+                                        else if (anyChildLastOpHasPieces) state = 'waiting'; // Децата имат готови бройки от последната си операция
+                                        else if (anyChildLastOpStarted) state = 'future'; // Децата са ПОЕЛИ последната си операция
                                         else state = 'hidden'; 
                                     }
                                 } else {
                                     let prev = stateMachine[i - 1];
                                     if (prev === 'past' || prev === 'active') state = 'waiting';
-                                    else if (prev === 'waiting') state = 'future';
+                                    else if (prev === 'active_0') state = 'future';
                                     else state = 'hidden';
                                 }
                             }
@@ -672,7 +715,7 @@
                                 } else {
                                     visibleOpsHtml += formatPast(op); 
                                 }
-                            } else if (state === 'active') {
+                            } else if (state === 'active' || state === 'active_0') {
                                 if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
                                 visibleOpsHtml += formatActive(op);
                             } else if (state === 'waiting') {
@@ -695,6 +738,7 @@
                         
                         opsHTMLContent += visibleOpsHtml;
 
+                        // Ако няма нищо за рисуване (всичко е скрито), div-ът остава празен и скрива само операциите!
                         if (opsHTMLContent.trim() !== '') {
                             opsHTML = `<div class="vsm-ops">${opsHTMLContent}</div>`;
                         }
