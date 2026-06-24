@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
+  <base target="_top">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Жив Монитор на Производството</title>
   <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;600;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ТЪМНА ПРОМИШЛЕНА ТЕМА */
     :root {
@@ -58,7 +56,7 @@
     .lane-title { font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; display: inline-block; letter-spacing: 1px;}
 
     .plan-group { border-left: 3px solid #475569; padding-left: 12px; margin-bottom: 8px; display: flex; flex-direction: column; }
-    .plan-label { font-size: 13px; font-weight: 800; color: #f8fafc; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;}
+    .plan-label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 8px; }
     .family-row { display: flex; flex-direction: row; gap: 30px; padding: 5px 0; border-bottom: none; align-items: center; }
     .family-row:last-child { border-bottom: none; padding-bottom: 0; }
     .bom-column { display: flex; flex-direction: column; gap: 14px; justify-content: center; position: relative; z-index: 2;}
@@ -68,12 +66,12 @@
     .vsm-tooltip { display: none; position: absolute; left: 50%; bottom: 125%; transform: translateX(-50%); background: #020617; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px; font-weight: 800; z-index: 110; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid #ef4444; }
     .vsm-tooltip::before { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #020617 transparent transparent transparent; }
 
-    /* ВИЗУАЛИЗАЦИЯ НА ДЕТАЙЛИТЕ */
+    /* GPS ВИЗУАЛИЗАЦИЯ */
     .vsm-node { display: flex; flex-direction: column; gap: 2px; padding: 0; width: max-content; background: transparent; border: none; }
     .vsm-header { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; border: none; padding-bottom: 2px; margin-bottom: 0px;}
     
     .vsm-title { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; }
-    .title-green { color: #22c55e !important; }      
+    .title-green { color: #22c55e !important; }     
     .title-blue { color: #60a5fa !important; }      
     .title-yellow { color: #facc15 !important; text-shadow: 0 0 10px rgba(250,204,21,0.3); } 
     .title-gray { color: #cbd5e1 !important; }      
@@ -81,37 +79,27 @@
     .vsm-qty { font-size: 14px; font-weight: 800; color: #64748b; }
 
     /* ОПЕРАЦИИ */
-    .vsm-ops { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+    .vsm-ops { display: flex; align-items: baseline; gap: 6px; flex-wrap: nowrap; }
     .op-text { white-space: nowrap; font-family: 'Sofia Sans', sans-serif; }
     
-    /* Завършена операция (малка и зелена) */
-    .op-past { font-size: 13px; font-weight: 600; color: #22c55e; opacity: 0.9; }
+    .op-past { font-size: 13px; font-weight: 600; color: #22c55e; opacity: 0.8; }
     
-    /* Текуща операция (голяма) */
-    .op-focus { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
-    .op-focus.active { color: #60a5fa; text-shadow: 0 0 8px rgba(59,130,246,0.4); } /* Започната (Синя) */
-    .op-focus.waiting { color: #94a3b8; } /* Още не е започната, но е готова за старт (Сива) */
+    .op-focus { font-size: 17px; font-weight: 900; letter-spacing: 0.5px; }
+    .op-focus.active { color: #60a5fa; text-shadow: 0 0 10px rgba(59,130,246,0.3); } 
+    .op-focus.waiting { color: #94a3b8; } 
     
-    /* Следваща операция (малка и сива) */
     .op-future { font-size: 13px; font-weight: 600; color: #64748b; opacity: 0.7; }
-
-    /* Всички операции са приключили (голямо зелено) */
-    .op-finished-all { font-size: 18px; font-weight: 900; color: #22c55e; text-shadow: 0 0 8px rgba(34,197,94,0.4); }
     
-    /* БУТОНИ ЗА РАЗГЪВАНЕ (ТРИ ТОЧКИ) */
-    .harmony-toggle { 
-        color: #64748b; font-weight: 900; font-size: 16px; cursor: pointer; 
-        user-select: none; transition: all 0.2s; padding: 0 6px; 
-        background: rgba(255,255,255,0.05); border-radius: 4px; display: inline-block;
-    }
-    .harmony-toggle:hover { color: #60a5fa; background: rgba(255,255,255,0.1); }
+    /* ХОРИЗОНТАЛНА ХАРМОНИКА */
+    .harmony-toggle { color: #475569; font-weight: 900; font-size: 14px; cursor: pointer; user-select: none; margin-right: 2px; transition: color 0.2s; }
+    .harmony-toggle:hover { color: #60a5fa; }
     .hidden-history { display: none !important; }
 
     .arr { color: #475569; font-weight: bold; font-size: 12px; margin: 0 2px;}
     .machine-view .hide-on-machine { display: none !important; }
   </style>
 </head>
-<body>
+<body class="<?= isMachineView ? 'machine-view' : '' ?>">
 
   <div id="loading">
     <div>Сглобяване на VSM потока... ⚙️</div>
@@ -131,7 +119,7 @@
       
       <div class="right-zone">
         <div class="window" style="height: 100%;">
-          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">РЕЗОЛВЕРИ</div>
+          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">СГЛОБЯВАНЕ (РЕЗОЛВЕРИ)</div>
           <div class="window-body" id="w-assembly"></div>
         </div>
       </div>
@@ -153,8 +141,7 @@
           <div class="window-body columns-mode">
             <div class="col-lane"><span class="lane-title">ЩИФТОВЕ</span><div id="w-small-pins"></div></div>
             <div class="col-lane"><span class="lane-title">ШПИЛКИ</span><div id="w-small-studs"></div></div>
-            <div class="col-lane"><span class="lane-title">ПАКЕТИ</span><div id="w-small-rotors"></div></div>
-            <div class="col-lane"><span class="lane-title">МАКАРИЧКИ</span><div id="w-small-spools"></div></div>
+            <div class="col-lane"><span class="lane-title">РОТОРНИ ПАКЕТИ</span><div id="w-small-rotors"></div></div>
             <div class="col-lane"><span class="lane-title">ДРУГИ</span><div id="w-small-others"></div></div>
           </div>
         </div>
@@ -168,264 +155,19 @@
   </div>
 
   <script>
-    if(new URLSearchParams(window.location.search).get('view') === 'machine') {
-        document.body.classList.add('machine-view');
-    }
-
-    const client = supabase.createClient(
-        'https://zdythzcgcjxwbxufunuh.supabase.co', 
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE'
-    );
-    
     let globalConnections = [];
-    let domIdMap = {};
-    let domIdCounter = 0;
-    
-    function getDomId(realId) {
-        if (!domIdMap[realId]) {
-            domIdCounter++;
-            domIdMap[realId] = 'node_' + domIdCounter;
-        }
-        return domIdMap[realId];
-    }
-    
     window.onload = function() {
       loadData();
-      setInterval(loadData, 30000); 
+      setInterval(loadData, 60000);
     };
 
-    function toggleHarmony(idStr) {
-        const histEl = document.getElementById('hist_' + idStr);
-        const btnEl = document.getElementById('btn_' + idStr);
-        if (histEl && btnEl) {
-            if (histEl.classList.contains('hidden-history')) {
-                histEl.classList.remove('hidden-history');
-                btnEl.style.color = '#60a5fa'; 
-                btnEl.style.background = 'rgba(59,130,246,0.15)';
-            } else {
-                histEl.classList.add('hidden-history');
-                btnEl.style.color = '';
-                btnEl.style.background = '';
-            }
-            setTimeout(() => drawArrows(), 50);
-        }
-    }
-
-    async function loadData() {
-        try {
-            const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
-                client.from('plan').select('*').eq('Статус', 'Активен').limit(5000),
-                client.from('bom').select('*').limit(50000),
-                client.from('marshruti').select('*').limit(50000),
-                client.from('otcheti').select('*').limit(50000),
-                client.from('sklad').select('*').limit(50000),
-                client.from('Номенклатура').select('*').limit(50000)
-            ]);
-
-            if (plansRes.error) throw plansRes.error;
-            const plansData = plansRes.data || [];
-
-            if (plansData.length === 0) {
-                document.getElementById('loading').style.display = 'none';
-                return;
-            }
-
-            let nomMap = {};
-            if (nomRes.data) {
-                nomRes.data.forEach(n => {
-                    if (n['ID Детайл']) nomMap[String(n['ID Детайл']).trim().toLowerCase()] = n;
-                });
-            }
-
-            let skladMap = {};
-            if (skladRes.data) {
-                skladRes.data.forEach(s => {
-                    if (s['ID Детайл']) skladMap[String(s['ID Детайл']).trim().toLowerCase()] = parseFloat(s['Остатък']) || 0;
-                });
-            }
-
-            let completedOps = {};
-            if (reportsRes.data) {
-                reportsRes.data.forEach(r => {
-                    let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
-                    let qty = parseFloat(r['Количество']) || 0;
-                    if (r['Статус'] === 'Отчетено') {
-                        completedOps[key] = (completedOps[key] || 0) + qty;
-                    }
-                });
-            }
-
-            let routesByDetail = {};
-            if (routesRes.data) {
-                routesRes.data.forEach(r => {
-                    let code = String(r['Код на детайла']).trim();
-                    if(!routesByDetail[code]) routesByDetail[code] = [];
-                    routesByDetail[code].push(r);
-                });
-                Object.keys(routesByDetail).forEach(code => {
-                    routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
-                });
-            }
-
-            let bomChildrenMap = {};
-            if (bomRes.data) {
-                bomRes.data.forEach(b => {
-                    let p = String(b['ID Родител']).trim().toLowerCase();
-                    if(!bomChildrenMap[p]) bomChildrenMap[p] = [];
-                    bomChildrenMap[p].push(b);
-                });
-            }
-
-            let planMap = {};
-            let explicitPlanItems = new Set(); 
-            let activeNodes = [];
-
-            plansData.forEach(p => { 
-                planMap[p.id] = p; 
-                
-                let originalPlanCode = String(p['ID Детайл']).trim();
-                let actualBomName = originalPlanCode;
-                let displayName = originalPlanCode;
-                let targetQty = parseFloat(p['Целево количество']) || 0;
-
-                if (nomRes.data) {
-                    let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === originalPlanCode);
-                    if (translated && translated['ID Детайл']) {
-                        actualBomName = String(translated['ID Детайл']).trim();
-                        if (originalPlanCode.toUpperCase() === actualBomName.toUpperCase()) {
-                            displayName = actualBomName;
-                        } else {
-                            displayName = `${originalPlanCode} - ${actualBomName}`; 
-                        }
-                    }
-                }
-
-                explicitPlanItems.add(`${p.id}___${actualBomName.toUpperCase()}`);
-
-                function traverseAndAdd(parentName, currentCode, requiredQty, isRootLevel) {
-                    let currentCodeLower = currentCode.toLowerCase();
-                    let nomEntry = nomMap[currentCodeLower] || {};
-                    let children = bomChildrenMap[currentCodeLower] || [];
-                    
-                    let isRawMaterial = (children.length === 0) && (!routesByDetail[currentCode]);
-                    if (isRawMaterial && !isRootLevel) return;
-
-                    activeNodes.push({
-                        plan_id: p.id,
-                        code: currentCode,
-                        display_name: isRootLevel ? displayName : currentCode, 
-                        plan_qty: requiredQty,
-                        parent_code: parentName,
-                        ready_qty: skladMap[currentCodeLower] || 0,
-                        drawing_url: nomEntry['Линк към чертеж'] || '',
-                        part_type: nomEntry['Тип'] || ''
-                    });
-
-                    children.forEach(c => {
-                        let childName = String(c['ID Компонент']).trim();
-                        let multiplier = parseFloat(c['Количество']) || 1;
-                        traverseAndAdd(currentCode, childName, requiredQty * multiplier, false);
-                    });
-                }
-
-                traverseAndAdd('', actualBomName, targetQty, true);
-            });
-
-            let mergedNodes = {};
-            let connections = [];
-
-            activeNodes.forEach(row => {
-                let pData = planMap[row.plan_id];
-                let pMonthStr = pData ? `${pData['Месец']} ${pData['Година']}` : `ПЛАН ${row.plan_id}`;
-                let codeStr = row.code ? String(row.code).trim() : "";
-                
-                let mergedId = pMonthStr + '___' + codeStr;
-
-                if (!mergedNodes[mergedId]) {
-                    mergedNodes[mergedId] = {
-                        id: mergedId,
-                        planId: row.plan_id, 
-                        planMonth: pMonthStr,
-                        code: codeStr,
-                        displayName: row.display_name, 
-                        planQty: 0, 
-                        warehouseQty: row.ready_qty || 0,
-                        globalState: 'gray',
-                        operations: [],
-                        drawingUrl: row.drawing_url,
-                        partType: row.part_type ? String(row.part_type) : ""
-                    };
-                }
-
-                mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
-
-                if (row.parent_code) {
-                    let parentCodeStr = String(row.parent_code).trim();
-                    let parentMergedId = pMonthStr + '___' + parentCodeStr;
-                    
-                    if (!connections.find(c => c.from === mergedId && c.to === parentMergedId)) {
-                        connections.push({ from: mergedId, to: parentMergedId });
-                    }
-                }
-            });
-
-            let masterData = {
-                tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
-                var11: [], var25: [], bearings: [],
-                small_pins: [], small_studs: [], small_rotors: [], small_spools: [], small_others: []
-            };
-
-            Object.values(mergedNodes).forEach(n => {
-                let partRoutes = routesByDetail[n.code] || [];
-
-                if (partRoutes.length > 0) {
-                    partRoutes.forEach(route => {
-                        let opName = String(route['Име на операция']).trim();
-                        let opKey = n.code + '_' + opName;
-                        let doneQty = completedOps[opKey] || 0;
-                        n.operations.push({ name: opName, completed: doneQty });
-                    });
-                } else {
-                    n.operations.push({ 
-                        name: n.warehouseQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
-                        completed: n.warehouseQty || 0 
-                    });
-                }
-
-                let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
-                
-                let searchKey = `${n.planId}___${n.code.toUpperCase()}`;
-                
-                let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
-                let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
-                let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
-
-                if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
-                else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) masterData.predni.push(n);
-                else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) masterData.zadni.push(n);
-                else if (typeStr.includes("мпр")) masterData.mpr.push(n);
-                else if (typeStr.includes("пакет")) masterData.small_rotors.push(n);
-                else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) masterData.statori.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("11")) masterData.var11.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("25")) masterData.var25.push(n);
-                else if (typeStr.includes("лагер")) masterData.bearings.push(n);
-                else if (typeStr.includes("щифт")) masterData.small_pins.push(n);
-                else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
-                else if (typeStr.includes("макар")) masterData.small_spools.push(n);
-                else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
-                    masterData.assembly.push(n);
-                } 
-                else {
-                    masterData.small_others.push(n);
-                }
-            });
-
-            drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
-
-        } catch (err) {
-            document.getElementById('error-box').innerText = "Грешка: " + err.message;
-            document.getElementById('loading').style.display = 'none';
-        }
+    function loadData() {
+      google.script.run
+        .withSuccessHandler(drawDashboard)
+        .withFailureHandler(function(err) { 
+          document.getElementById('error-box').innerText = "Грешка при обновяване: " + err.message; 
+        })
+        .getMonitorDataMaster();
     }
 
     function toggleTooltip(event, nodeId) {
@@ -435,6 +177,22 @@
         const isHidden = el.style.display === 'none' || el.style.display === '';
         document.querySelectorAll('.vsm-tooltip').forEach(t => t.style.display = 'none');
         el.style.display = isHidden ? 'block' : 'none';
+      }
+    }
+
+    function toggleHarmony(nodeId) {
+      const histEl = document.getElementById('hist_' + nodeId);
+      const toggleEl = document.getElementById('toggle_' + nodeId);
+      if (histEl && toggleEl) {
+        const isHidden = histEl.classList.contains('hidden-history');
+        if (isHidden) {
+          histEl.classList.remove('hidden-history');
+          toggleEl.innerText = '▶ ';
+        } else {
+          histEl.classList.add('hidden-history');
+          toggleEl.innerText = '◀ ';
+        }
+        setTimeout(() => drawArrows(), 50);
       }
     }
 
@@ -449,9 +207,6 @@
 
       document.getElementById('loading').style.display = 'none';
       globalConnections = data.connections || [];
-      
-      domIdMap = {};
-      domIdCounter = 0;
 
       const allNodesMap = {};
       if (data.nodes) {
@@ -478,13 +233,13 @@
 
         const plans = {};
         nodeArray.forEach(n => {
-          if (!plans[n.planMonth]) plans[n.planMonth] = [];
-          plans[n.planMonth].push(n);
+          if (!plans[n.planId]) plans[n.planId] = [];
+          plans[n.planId].push(n);
         });
         
         let finalHTML = '';
 
-        for (const [planMonth, nodes] of Object.entries(plans)) {
+        for (const [planId, nodes] of Object.entries(plans)) {
           const nodeIds = new Set(nodes.map(n => n.id));
           const adj = {};
           nodes.forEach(n => adj[n.id] = []);
@@ -518,7 +273,7 @@
             }
           });
           
-          let planHTML = `<div class="plan-group"><div class="plan-label">ПЛАН: ${planMonth}</div>`;
+          let planHTML = `<div class="plan-group"><div class="plan-label">План: ${planId}</div>`;
 
           families.forEach(famNodes => {
             const childrenMap = {};
@@ -567,77 +322,88 @@
               let colHTML = `<div class="bom-column">`;
               
               levels[lvl].forEach(node => {
-                let dId = getDomId(node.id);
-
                 const isRoot = !parentMap[node.id]; 
-                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
-                
+                const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Продукт">🔸</span>' : '';
+                const packageIcon = node.isPackaged ? '📦 ' : '';
                 const warehouseQty = node.warehouseQty || 0; 
+                
                 const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
                   ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
+                  
+                let warningHTML = '';
+                if (node.materialWarning) {
+                    warningHTML = `<span class="tooltip-container hide-on-machine"><span class="material-warning-trigger" onclick="toggleTooltip(event, '${node.id}')">⚠️</span><div id="tooltip_${node.id}" class="vsm-tooltip">✗ ${node.materialWarning}</div></span>`;
+                }
 
-                let opsHTML = '';
-                let titleClass = 'title-gray';
-
+                // --- НОВАТА PULL ЛОГИКА НА ОПЕРАЦИИТЕ ---
                 let children = childMap[node.id] || [];
                 let allChildrenDone = true;
-                
+                let anyChildHasPieces = false;
+                let anyChildStarted = false;
+
                 if (children.length > 0) {
                     allChildrenDone = children.every(cId => {
                         let chNode = allNodesMap[cId];
-                        if(!chNode || !chNode.operations) return false;
-                        return chNode.operations.findIndex(o => o.completed < chNode.planQty) === -1;
+                        return chNode ? chNode.globalState === 'green' : false;
+                    });
+
+                    anyChildHasPieces = children.some(cId => {
+                        let chNode = allNodesMap[cId];
+                        if (!chNode || !chNode.operations) return false;
+                        if (chNode.operations.length === 0) return chNode.globalState === 'green';
+                        return chNode.operations.some(o => o.completed > 0 || o.state === 'green');
+                    });
+
+                    anyChildStarted = children.some(cId => {
+                        let chNode = allNodesMap[cId];
+                        if (!chNode || !chNode.operations) return false;
+                        if (chNode.operations.length === 0) return chNode.globalState === 'green';
+                        return chNode.operations.some(o => o.completed > 0 || o.state === 'blue' || o.state === 'green');
                     });
                 }
 
+                let titleClass = 'title-gray';
+                let opsHTML = '';
+
                 if (node.operations && node.operations.length > 0) {
                     let len = node.operations.length;
-                    let allOpsDone = node.operations.every(o => o.completed >= node.planQty);
-
-                    const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
-                    const formatFuture = (op) => `<span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
-                    const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
-                    const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
-                    const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
+                    let allOpsDone = node.globalState === 'green' || node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
                     if (allOpsDone) {
+                        // СЦЕНАРИЙ 4: Изцяло готово -> Светва зелено и всички операции изчезват!
                         titleClass = 'title-green';
-                        let pastHiddenArr = [];
-                        for(let i=0; i < len - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
-                        
-                        let html = '';
-                        if(pastHiddenArr.length > 0) {
-                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
-                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
-                        }
-                        html += formatFinishedAll(node.operations[len - 1]);
-                        opsHTML = `<div class="vsm-ops">${html}</div>`;
-                        
+                        opsHTML = ''; 
                     } else {
-                        // НОВАТА ИЗДЪРПВАЩА (PULL) ЛОГИКА - СЦЕНАРИИТЕ ОТ ЧАТА
                         let stateMachine = [];
                         let hasActive = false;
-                        
+
+                        // Определяме статуса на всяка операция
                         for (let i = 0; i < len; i++) {
                             let op = node.operations[i];
                             let state = '';
-                            if (op.completed >= node.planQty) {
-                                state = 'past'; // Напълно готова
+                            
+                            if (op.state === 'green' || op.completed >= node.planQty) {
+                                state = 'past'; // Минало (завършено)
                             } else if (op.completed > 0) {
-                                state = 'active'; // Започната (синьо)
+                                state = 'active'; // Голямо синьо (Поета с готови бройки)
+                                hasActive = true;
+                            } else if (op.state === 'blue') {
+                                state = 'active_0'; // Голямо синьо (Поета, но още 0 бройки)
                                 hasActive = true;
                             } else {
                                 if (i === 0) {
-                                    // Първа операция - ако децата не са готови, чака бъдещето (малко сиво). Иначе е готова за поемане (голямо сиво).
-                                    state = (children.length > 0 && !allChildrenDone) ? 'future' : 'waiting';
+                                    if (children.length === 0) {
+                                        state = 'waiting'; // Листо (Готово за старт)
+                                    } else {
+                                        if (anyChildHasPieces) state = 'waiting'; // Голямо сиво (Детето има бройки)
+                                        else if (anyChildStarted) state = 'future'; // Малко сиво (Детето е започнато)
+                                        else state = 'hidden'; // Скрито
+                                    }
                                 } else {
                                     let prev = stateMachine[i - 1];
-                                    // Ако предходната е готова ИЛИ започната, текущата може да се поеме (Голямо сиво)
-                                    if (prev === 'past' || prev === 'active') state = 'waiting';
-                                    // Близко бъдеще - само първата след Голямото сиво (Малко сиво)
-                                    else if (prev === 'waiting') state = 'future';
-                                    // Всички останали напред са скрити
-                                    else state = 'hidden';
+                                    if (prev === 'past' || prev === 'active') state = 'waiting'; // Предната има бройки -> Голямо сиво
+                                    else if (prev === 'active_0') state = 'future'; // Предната е поета (без бройки) -> Малко сиво
+                                    else state = 'hidden'; // Скрито
                                 }
                             }
                             stateMachine.push(state);
@@ -646,12 +412,12 @@
                         if (hasActive) titleClass = 'title-blue';
 
                         let pastHiddenArr = [];
-                        let futureHiddenArr = [];
                         let visibleOpsHtml = '';
                         
                         let pastCount = stateMachine.filter(s => s === 'past').length;
                         let currentPastIndex = 0;
 
+                        // Рисуваме операциите на базата на статусите
                         for (let i = 0; i < len; i++) {
                             let op = node.operations[i];
                             let state = stateMachine[i];
@@ -659,55 +425,49 @@
                             if (state === 'past') {
                                 currentPastIndex++;
                                 if (currentPastIndex < pastCount) {
-                                    pastHiddenArr.push(formatPast(op)); // Всички стари операции се крият
+                                    pastHiddenArr.push(`<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`);
                                 } else {
-                                    visibleOpsHtml += formatPast(op); // Показваме само последната готова
+                                    visibleOpsHtml += `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
                                 }
-                            } else if (state === 'active') {
+                            } else if (state === 'active' || state === 'active_0') {
                                 if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
-                                visibleOpsHtml += formatActive(op);
+                                visibleOpsHtml += `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
                             } else if (state === 'waiting') {
                                 if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
-                                visibleOpsHtml += formatWaiting(op);
+                                visibleOpsHtml += `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
                             } else if (state === 'future') {
                                 if (visibleOpsHtml === '') {
-                                    // Специален случай (Сценарий 1 с недовършени деца): Показваме стрелка в самото начало
                                     visibleOpsHtml += `<span class="op-text op-future"><span class="arr">➔</span> ${op.name} | 0/${node.planQty}</span>`;
                                 } else {
-                                    visibleOpsHtml += ' <span class="arr">➔</span> ' + formatFuture(op);
+                                    visibleOpsHtml += ` <span class="arr">➔</span> <span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
                                 }
-                            } else if (state === 'hidden') {
-                                futureHiddenArr.push(formatFuture(op)); // Останалите в бъдещето се крият
                             }
                         }
 
                         let opsHTMLContent = '';
-                        if(pastHiddenArr.length > 0) {
-                            opsHTMLContent += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
-                            opsHTMLContent += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
+                        if (pastHiddenArr.length > 0) {
+                            opsHTMLContent += `<span class="harmony-toggle" id="toggle_${node.id}" onclick="toggleHarmony('${node.id}')">◀ </span>`;
+                            opsHTMLContent += `<span id="hist_${node.id}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
                         
                         opsHTMLContent += visibleOpsHtml;
 
-                        if(futureHiddenArr.length > 0) {
-                            opsHTMLContent += `<span id="hist_future_${dId}" class="hidden-history"> <span class="arr">➔</span> ${futureHiddenArr.join(' <span class="arr">➔</span> ')}</span>`;
-                            opsHTMLContent += ` <span class="harmony-toggle" onclick="toggleHarmony('future_${dId}')" id="btn_future_${dId}">⋯</span>`;
+                        if (opsHTMLContent.trim() !== '') {
+                            opsHTML = `<div class="vsm-ops">${opsHTMLContent}</div>`;
                         }
-
-                        opsHTML = `<div class="vsm-ops">${opsHTMLContent}</div>`;
                     }
                 }
                 
-                // Ако детайлът няма операции (или е суровина) и всички деца са готови -> става жълт
                 if (children.length > 0 && allChildrenDone && isRoot && titleClass !== 'title-green') {
                     titleClass = 'title-yellow'; 
                 }
 
                 colHTML += `
-                  <div class="vsm-node" id="card_${dId}">
+                  <div class="vsm-node" id="card_${node.id}">
                     <div class="vsm-header">
-                      <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
+                      <span class="vsm-title ${titleClass}">${rootMarker}${packageIcon}${node.code}${drawingLinkHTML}</span>
                       <span class="vsm-qty">| ${warehouseQty}/${node.planQty}</span>
+                      ${warningHTML}
                     </div>
                     ${opsHTML !== '' ? opsHTML : ''}
                   </div>
@@ -737,7 +497,6 @@
       renderFamilyBOMBucket(data.nodes.small_pins || [], 'w-small-pins');
       renderFamilyBOMBucket(data.nodes.small_studs || [], 'w-small-studs');
       renderFamilyBOMBucket(data.nodes.small_rotors || [], 'w-small-rotors');
-      renderFamilyBOMBucket(data.nodes.small_spools || [], 'w-small-spools'); 
       renderFamilyBOMBucket(data.nodes.small_others || [], 'w-small-others');
       
       renderFamilyBOMBucket(data.nodes.statori || [], 'w-statori');
@@ -758,41 +517,46 @@
     function drawArrows() {
       const svg = document.getElementById('svg-overlay');
       if (!svg) return;
-      
       svg.style.height = document.documentElement.scrollHeight + "px";
       svg.style.width = document.documentElement.scrollWidth + "px";
-      
       let html = `<defs><marker id="arrow" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#475569" /></marker></defs>`;
-      
       globalConnections.forEach(conn => {
-        let childDId = domIdMap[conn.from];
-        let parentDId = domIdMap[conn.to];
-        if (!childDId || !parentDId) return;
-
-        const cardChild = document.getElementById(`card_${childDId}`);
-        const cardParent = document.getElementById(`card_${parentDId}`);
+        const cardChild = document.getElementById(`card_${conn.from}`);
+        const cardParent = document.getElementById(`card_${conn.to}`);
+        if (!cardChild || !cardParent) return;
         
         if (cardChild && cardParent) {
-          const winChild = cardChild.closest('.window-body');
-          const winParent = cardParent.closest('.window-body');
+          const winChild = cardChild.closest('.lane') || cardChild.closest('.col-lane') || cardChild.closest('.window-body');
+          const winParent = cardParent.closest('.lane') || cardParent.closest('.col-lane') || cardParent.closest('.window-body');
+          
+
           if (winChild !== winParent) return;
 
-          const sourceEl = cardChild.querySelector('.vsm-title');
-          const targetEl = cardParent.querySelector('.vsm-title');
-
-          if (sourceEl && targetEl) {
-              const rs = sourceEl.getBoundingClientRect();
-              const rt = targetEl.getBoundingClientRect();
-
-              const startX = rs.right + window.scrollX + 4;
-              const startY = rs.top + window.scrollY + (rs.height / 2);
-              const endX = rt.left - 6 + window.scrollX;
-              const endY = rt.top + window.scrollY + (rt.height / 2);
-              
-              const cpX = startX + (endX - startX) * 0.4;
-              
-              html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrow)" />`;
+          const sourceBadges = cardChild.querySelectorAll('.op-text');
+          let sourceEl = null;
+          if (sourceBadges.length > 0) {
+              for (let s = sourceBadges.length - 1; s >= 0; s--) {
+                  if (sourceBadges[s].offsetParent !== null) { sourceEl = sourceBadges[s]; break; }
+              }
           }
+          if (!sourceEl) sourceEl = cardChild.querySelector('.vsm-header');
+          const targetBadges = cardParent.querySelectorAll('.op-text');
+          let targetEl = null;
+          if (targetBadges.length > 0) {
+              for (let t = 0; t < targetBadges.length; t++) {
+                  if (targetBadges[t].offsetParent !== null) { targetEl = targetBadges[t]; break; }
+              }
+          }
+          if (!targetEl) targetEl = cardParent.querySelector('.vsm-header');
+          const rs = sourceEl.getBoundingClientRect();
+          const rt = targetEl.getBoundingClientRect();
+
+          const startX = rs.right + window.scrollX;
+          const startY = rs.top + window.scrollY + (rs.height / 2);
+          const endX = rt.left - 4 + window.scrollX;
+          const endY = rt.top + window.scrollY + (rt.height / 2);
+          const cpX = startX + (endX - startX) * 0.4;
+          html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrow)" />`;
         }
       });
 
