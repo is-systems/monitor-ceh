@@ -76,10 +76,12 @@
             <div class="search-box">
               <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата...">
             </div>
+            <!-- БУТОНИ В АДМИН ПАНЕЛА -->
             <div style="display: flex; gap: 10px;">
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;" onchange="processPDF(event)">
                 <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">📥 Зареди от PDF</button>
                 <button class="btn-primary" onclick="window.open('index.html', '_blank')" style="background-color: #0284c7; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);">📺 Монитор</button>
+                <!-- ОРАНЖЕВ БУТОН ЗА ИЗВЕСТИЯ -->
                 <button class="btn-primary" onclick="openNotificationDialog()" style="background-color: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">📢 Известие</button>
                 <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
             </div>
@@ -104,6 +106,7 @@
           </div>
         </div>
 
+        <!-- МОДАЛНИ ПРОЗОРЦИ -->
         <div class="modal-backdrop" id="modalBackdrop">
           <div class="modal">
             <div class="modal-header" id="modalTitle">Редакция <button onclick="closeModal()" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;">✖</button></div>
@@ -201,7 +204,7 @@
         loadCurrentTableData();
       }
 
-      // ЛОГИКА ЗА ИЗПРАЩАНЕ НА ИЗВЕСТИЯТА С ПРОКСИ
+      // ЛОГИКА ЗА ИЗПРАЩАНЕ НА ИЗВЕСТИЯТА
       async function openNotificationDialog() {
           const { data } = await client.from('chekiraniya').select('Имейл');
           let emails = [];
@@ -228,7 +231,6 @@
       }
 
       async function sendOneSignalNotification(target, title, body) {
-          if(!ONESIGNAL_REST_API_KEY || ONESIGNAL_REST_API_KEY === "ТВОЯТ_REST_API_KEY_ТУК") { Swal.fire('Грешка', 'REST API Key липсва!', 'error'); return; }
           Swal.fire({ title: 'Изпращане...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
           const payload = { app_id: ONESIGNAL_APP_ID, headings: { "en": title, "bg": title }, contents: { "en": body, "bg": body }, target_channel: "push" };
@@ -237,10 +239,10 @@
           else payload.include_aliases = { "external_id": [target] };
 
           try {
-              // ИЗПОЛЗВАМЕ ПРОКСИ, ЗА ДА ПРЕСКОЧИМ БРАУЗЪРНАТА ЗАЩИТА (CORS)
+              // ИЗПОЛЗВАМЕ Key ВМЕСТО Basic СПОРЕД ДОКУМЕНТАЦИЯТА НА ONESIGNAL ЗА V2
               const response = await fetch("https://corsproxy.io/?https://onesignal.com/api/v1/notifications", { 
                   method: "POST", 
-                  headers: { "Content-Type": "application/json; charset=utf-8", "Authorization": "Basic " + ONESIGNAL_REST_API_KEY }, 
+                  headers: { "Content-Type": "application/json; charset=utf-8", "Authorization": "Key " + ONESIGNAL_REST_API_KEY }, 
                   body: JSON.stringify(payload) 
               });
               const result = await response.json();
