@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MES Terminal</title>
+    <title>MES Терминал</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -118,9 +118,33 @@
 
       let currentTaskFilter = 'all';
       let activeTaskId = null; 
+      let isUserCheckedIn = false; // НОВА ПРОМЕНЛИВА ЗА ПРОВЕРКА НА ВХОД
 
       const WORKSHOP_LAT = 41.8937;
       const WORKSHOP_LNG = 23.4875;
+
+      // ПРОВЕРЯВА ДАЛИ РАБОТНИКЪТ Е ЧЕКИРАН ДНЕС
+      async function fetchUserCheckInStatus() {
+          if (!currentEmail) return false;
+          try {
+              const { data, error } = await client.from('chekiraniya')
+                  .select('Действие, Време')
+                  .eq('Имейл', currentEmail)
+                  .order('Време', { ascending: false })
+                  .limit(1);
+              if (error) return false;
+              if (data && data.length > 0) {
+                  const lastAction = data[0]['Действие'];
+                  const lastTime = new Date(data[0]['Време']);
+                  const now = new Date();
+                  // Проверяваме дали последното действие е Влизане и дали е било днес
+                  if (lastAction === 'Влизане' && lastTime.toDateString() === now.toDateString()) {
+                      return true;
+                  }
+              }
+              return false;
+          } catch (err) { return false; }
+      }
 
       async function initTerminal() {
           currentOperator = localStorage.getItem('mes_operator');
@@ -221,7 +245,7 @@
       }
 
       async function processCheckIn(actionType) {
-          if (!currentEmail) { Swal.fire('Внимание', 'Моля, въведете вашия имейл in настройките на профила (⚙️).', 'warning'); return; }
+          if (!currentEmail) { Swal.fire('Внимание', 'Моля, въведете вашия имейл в настройките на профила (⚙️).', 'warning'); return; }
 
           try {
               Swal.fire({ title: 'Проверка...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -260,39 +284,32 @@
               }]);
               if (insertErr) throw insertErr;
 
-             // АЛАРМА ПРИ ЗАКЪСНЕНИЕ (След 07:59 ч.)
+              // АЛАРМА И ГОВОРЕНЕ ПРИ ЗАКЪСНЕНИЕ (След 07:59 ч.)
               if (actionType === 'Влизане') {
                   let now = new Date();
-                  // Ако часът е 08:00 или по-късно
                   if (now.getHours() >= 8) {
-                      
-                      // 1. Системно текстово известие
                       if ("Notification" in window && Notification.permission === "granted") {
                           new Notification("⚠️ Закъснение", {
                               body: `Регистриран вход в ${now.toLocaleTimeString('bg-BG')}`,
                               icon: "icon.png"
                           });
                       }
-
-                      // 2. Телефонът "говори" на български
                       if ('speechSynthesis' in window) {
-                          // Изчистваме, ако случайно говори нещо друго в момента
                           window.speechSynthesis.cancel(); 
-                          
-                          // Създаваме гласовото съобщение
                           let msg = new SpeechSynthesisUtterance("Регистрирано е закъснение.");
-                          msg.lang = 'bg-BG'; // Български език
-                          msg.rate = 1.0;     // Нормална скорост на говорене
-                          msg.pitch = 1.1;    // Леко по-висок тон, за да се чува по-ясно в цеха
-                          
-                          // Изговаряме го
+                          msg.lang = 'bg-BG'; 
+                          msg.rate = 1.0;     
+                          msg.pitch = 1.1;    
                           window.speechSynthesis.speak(msg);
                       }
                   }
               }
 
               let iconType = actionType === 'Влизане' ? 'success' : 'info';
-              Swal.fire({ icon: iconType, title: 'Успешно!', text: `${actionType} е регистрирано.`, timer: 2000, showConfirmButton: false });
+              // След чекиране веднага отключваме/заключваме бутоните за задачите
+              Swal.fire({ icon: iconType, title: 'Успешно!', text: `${actionType} е регистрирано.`, timer: 2000, showConfirmButton: false }).then(() => {
+                  loadTasks(true); 
+              });
 
           } catch (err) {
               console.error(err); Swal.fire('❌ Грешка при връзката', 'Моля, проверете интернета си.', 'error');
@@ -361,6 +378,9 @@
         }
         
         try {
+            // ПРОВЕРЯВАМЕ ДАЛИ РАБОТНИКЪТ Е "НА СМЯНА" ПРЕДИ ДА ЗАРЕДИМ ЗАДАЧИТЕ
+            isUserCheckedIn = await fetchUserCheckInStatus();
+
             const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
                 client.from('plan').select('*').eq('Статус', 'Активен').limit(100000),
                 client.from('bom').select('*').limit(100000),
@@ -422,7 +442,7 @@
                     let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
                     
                     routes.forEach((route, idx) => {
-                        let opName = String(route['Име на operation']).trim(); let opKey = code + '_' + opName;
+                        let opName = String(route['Име на операция']).trim(); let opKey = code + '_' + opName;
                         let doneQty = completedOps[opKey] || 0; let scrapQty = scrappedOps[opKey] || 0; let consumedHere = doneQty + scrapQty; 
                         let scrapStrictlyDownstream = 0;
                         for(let j = idx + 1; j < routes.length; j++) { let dKey = code + '_' + String(routes[j]['Име на операция']).trim(); scrapStrictlyDownstream += (scrappedOps[dKey] || 0); }
@@ -526,10 +546,18 @@
               actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px;">🛑 БЛОКИРАНА ЗАДАЧА</button>`;
           } else if (t.hasLimit) {
               bomBadgeHtml = `<div style="background-color: #dcfce7; border: 1px solid #bbf7d0; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #166534; font-weight: 800; text-align: center;">📦 Възможни: ${t.maxAllowed} бр.</div>`;
-              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              if (!isUserCheckedIn) {
+                  actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor: not-allowed;">🛑 ПЪРВО ВХОД ЗА ДЕНЯ</button>`;
+              } else {
+                  actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              }
           } else {
               bomBadgeHtml = `<div style="background-color: #e0e7ff; border: 1px solid #c7d2fe; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #3730a3; font-weight: 800; text-align: center;">⚡ Първа стъпка (свободно производство)</div>`;
-              actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              if (!isUserCheckedIn) {
+                  actionButtonHtml = `<button disabled style="background-color: #94a3b8; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor: not-allowed;">🛑 ПЪРВО ВХОД ЗА ДЕНЯ</button>`;
+              } else {
+                  actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
+              }
           }
 
           html += `
