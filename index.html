@@ -213,68 +213,130 @@
 
     async function loadData() {
         try {
-            // СТЪПКА 1: Теглим САМО Активните планове първо
-            const plansResponse = await client.from('plan').select('id, Месец, Година, Статус, "ID Детайл"').eq('Статус', 'Активен').limit(5000);
-            if (plansResponse.error) throw plansResponse.error;
-            const plansData = plansResponse.data || [];
+            // ТЕГЛИМ ВСИЧКИ ДАННИ ОТ БАЗАТА ДИРЕКТНО (ВМЕСТО ЧРЕЗ ИЗГЛЕДА)
+            const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
+                client.from('plan').select('*').eq('Статус', 'Активен').limit(5000),
+                client.from('bom').select('*').limit(50000),
+                client.from('marshruti').select('*').limit(50000),
+                client.from('otcheti').select('*').limit(50000),
+                client.from('sklad').select('*').limit(50000),
+                client.from('Номенклатура').select('*').limit(50000)
+            ]);
+
+            if (plansRes.error) throw plansRes.error;
+            const plansData = plansRes.data || [];
 
             if (plansData.length === 0) {
                 document.getElementById('loading').style.display = 'none';
                 return;
             }
 
-            let planMap = {};
-            let explicitPlanItems = new Set(); 
-            let activePlanIds = [];
+            // ПОДГОТВЯМЕ РЕЧНИЦИТЕ
+            let nomMap = {};
+            if (nomRes.data) {
+                nomRes.data.forEach(n => {
+                    if (n['ID Детайл']) nomMap[String(n['ID Детайл']).trim().toLowerCase()] = n;
+                });
+            }
 
-            plansData.forEach(p => { 
-                planMap[p.id] = p; 
-                activePlanIds.push(p.id);
-                if (p['ID Детайл']) {
-                    let codeKey = String(p['ID Детайл']).trim().toUpperCase();
-                    explicitPlanItems.add(`${p.id}___${codeKey}`);
-                }
-            });
-
-            // СТЪПКА 2: Теглим мастър данните САМО ЗА ТЕЗИ ПЛАНОВЕ (за да не претоварим моста)
-            const nodesResponse = await client.from('монитор_мастър_данни')
-                                            .select('*')
-                                            .in('plan_id', activePlanIds)
-                                            .limit(50000);
-            if (nodesResponse.error) throw nodesResponse.error;
-            const nodesData = nodesResponse.data || [];
-
-            // СТЪПКА 3: Теглим маршрутите последователно
-            const routesResponse = await client.from('marshruti').select('*').limit(50000);
-            if (routesResponse.error) throw routesResponse.error;
-            const routesData = routesResponse.data || [];
-
-            // СТЪПКА 4: Теглим отчетите последователно
-            const reportsResponse = await client.from('otcheti').select('*').limit(50000);
-            if (reportsResponse.error) throw reportsResponse.error;
-            const reportsData = reportsResponse.data || [];
+            let skladMap = {};
+            if (skladRes.data) {
+                skladRes.data.forEach(s => {
+                    if (s['ID Детайл']) skladMap[String(s['ID Детайл']).trim().toLowerCase()] = parseFloat(s['Остатък']) || 0;
+                });
+            }
 
             let completedOps = {};
-            reportsData.forEach(r => {
-                let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
-                let qty = parseFloat(r['Количество']) || 0;
-                if (r['Статус'] === 'Отчетено') {
-                    completedOps[key] = (completedOps[key] || 0) + qty;
-                }
-            });
+            if (reportsRes.data) {
+                reportsRes.data.forEach(r => {
+                    let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+                    let qty = parseFloat(r['Количество']) || 0;
+                    if (r['Статус'] === 'Отчетено') {
+                        completedOps[key] = (completedOps[key] || 0) + qty;
+                    }
+                });
+            }
 
             let routesByDetail = {};
-            routesData.forEach(r => {
-                let code = String(r['Код на детайла']).trim();
-                if(!routesByDetail[code]) routesByDetail[code] = [];
-                routesByDetail[code].push(r);
-            });
-            Object.keys(routesByDetail).forEach(code => {
-                routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
+            if (routesRes.data) {
+                routesRes.data.forEach(r => {
+                    let code = String(r['Код на детайла']).trim();
+                    if(!routesByDetail[code]) routesByDetail[code] = [];
+                    routesByDetail[code].push(r);
+                });
+                Object.keys(routesByDetail).forEach(code => {
+                    routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
+                });
+            }
+
+            let bomChildrenMap = {};
+            if (bomRes.data) {
+                bomRes.data.forEach(b => {
+                    let p = String(b['ID Родител']).trim().toLowerCase();
+                    if(!bomChildrenMap[p]) bomChildrenMap[p] = [];
+                    bomChildrenMap[p].push(b);
+                });
+            }
+
+            let planMap = {};
+            let explicitPlanItems = new Set(); 
+            let activeNodes = [];
+
+            // =====================================================================
+            // УМЕН ПРЕВОДАЧ ЗА МЕСЕЧНИЯ ПЛАН (ПРЕВЕЖДА ЧИСЛО В ИМЕ)
+            // =====================================================================
+            plansData.forEach(p => { 
+                planMap[p.id] = p; 
+                
+                let originalPlanCode = String(p['ID Детайл']).trim();
+                let actualBomName = originalPlanCode;
+                let displayName = originalPlanCode;
+                let targetQty = parseFloat(p['Целево количество']) || 0;
+
+                // Проверяваме дали това цифрово име го има като "Вътрешно име" в Номенклатура
+                if (nomRes.data) {
+                    let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === originalPlanCode);
+                    if (translated && translated['ID Детайл']) {
+                        actualBomName = String(translated['ID Детайл']).trim();
+                        // Ако го намерим, за екрана слепваме цифрата и текста!
+                        displayName = `${originalPlanCode} - ${actualBomName}`; 
+                    }
+                }
+
+                explicitPlanItems.add(`${p.id}___${actualBomName.toUpperCase()}`);
+
+                function traverseAndAdd(parentName, currentCode, requiredQty, isRootLevel) {
+                    let currentCodeLower = currentCode.toLowerCase();
+                    let nomEntry = nomMap[currentCodeLower] || {};
+                    let children = bomChildrenMap[currentCodeLower] || [];
+                    
+                    // АНТИ-СПАМ ФИЛТЪР ЗА СУРОВИНИ:
+                    // Пропускаме детайли, които нямат маршрути (операции) И нямат БОМ деца (напр. кабели, тиксо)
+                    let isRawMaterial = (children.length === 0) && (!routesByDetail[currentCode]);
+                    if (isRawMaterial && !isRootLevel) return;
+
+                    activeNodes.push({
+                        plan_id: p.id,
+                        code: currentCode,
+                        display_name: isRootLevel ? displayName : currentCode, // Показва дългото име само на началния детайл
+                        plan_qty: requiredQty,
+                        parent_code: parentName,
+                        ready_qty: skladMap[currentCodeLower] || 0,
+                        drawing_url: nomEntry['Линк към чертеж'] || '',
+                        part_type: nomEntry['Тип'] || ''
+                    });
+
+                    children.forEach(c => {
+                        let childName = String(c['ID Компонент']).trim();
+                        let multiplier = parseFloat(c['Количество']) || 1;
+                        traverseAndAdd(currentCode, childName, requiredQty * multiplier, false);
+                    });
+                }
+
+                traverseAndAdd('', actualBomName, targetQty, true);
             });
 
-            // Тъй като вече теглим само активни, всички са активни
-            let activeNodes = nodesData; 
+            // ГРУПИРАНЕ И СЪЗДАВАНЕ НА ВРЪЗКИ
             let mergedNodes = {};
             let connections = [];
 
@@ -291,6 +353,7 @@
                         planId: row.plan_id, 
                         planMonth: pMonthStr,
                         code: codeStr,
+                        displayName: row.display_name, // ТУК ИЗПОЛЗВАМЕ ИМЕТО ЗА ЕКРАНА
                         planQty: 0, 
                         warehouseQty: row.ready_qty || 0,
                         globalState: 'gray',
@@ -338,11 +401,10 @@
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
                 let searchKey = `${n.planId}___${n.code.toUpperCase()}`;
-                let isDirectlyInPlan = explicitPlanItems.has(searchKey);
                 
+                let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
                 let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
-                let baseSearchKey = `${n.planId}___${baseCode}`;
-                let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(baseSearchKey);
+                let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
                 if (isDirectlyInPlan || isHashVariantOfPlan) {
                     masterData.assembly.push(n);
@@ -368,6 +430,7 @@
 
         } catch (err) {
             document.getElementById('error-box').innerText = "Грешка: " + err.message;
+            document.getElementById('loading').style.display = 'none';
         }
     }
 
@@ -603,7 +666,7 @@
                 colHTML += `
                   <div class="vsm-node" id="card_${dId}">
                     <div class="vsm-header">
-                      <span class="vsm-title ${titleClass}">${rootMarker}${node.code}${drawingLinkHTML}</span>
+                      <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
                       <span class="vsm-qty">| ${warehouseQty}/${node.planQty}</span>
                     </div>
                     ${opsHTML !== '' ? opsHTML : ''}
