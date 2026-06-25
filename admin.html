@@ -28,6 +28,15 @@
       .action-btn:hover { background-color: #f1f5f9; }
       .btn-edit { color: #2563eb; }
       .btn-delete { color: #ef4444; }
+      
+      /* НОВИ СТИЛОВЕ ЗА МАСОВО ДЕЙСТВИЕ */
+      .mass-action-bar { display: none; background-color: #fef2f2; border: 1px solid #fecaca; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1); animation: slideDown 0.3s ease-out; }
+      @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+      .mass-action-text { color: #991b1b; font-weight: 800; font-size: 1.05em; }
+      .btn-danger-mass { background-color: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3); }
+      .btn-danger-mass:hover { background-color: #b91c1c; }
+      .row-checkbox { transform: scale(1.3); cursor: pointer; accent-color: #4338ca; }
+
       .layout-wrapper { display: flex; gap: 20px; align-items: flex-start; }
       .sidebar { width: 280px; flex-shrink: 0; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; display: none; }
       .sidebar-header { background: #f8fafc; padding: 15px; font-weight: 800; color: #334155; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
@@ -76,7 +85,6 @@
             <div class="search-box">
               <input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата...">
             </div>
-            <!-- БУТОНИ В АДМИН ПАНЕЛА -->
             <div style="display: flex; gap: 10px;">
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;" onchange="processPDF(event)">
                 <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">📥 Зареди от PDF</button>
@@ -84,6 +92,11 @@
                 <button class="btn-primary" onclick="openNotificationDialog()" style="background-color: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">📢 Известие</button>
                 <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
             </div>
+          </div>
+          
+          <div class="mass-action-bar" id="massActionBar">
+             <span class="mass-action-text" id="massActionText">Маркирани: 0 записа</span>
+             <button class="btn-danger-mass" onclick="deleteSelectedItems()">🗑️ Изтрий маркираните</button>
           </div>
 
           <div class="layout-wrapper">
@@ -174,7 +187,8 @@
       };
 
       let currentTab = 'plan'; 
-      let globalRows = []; let isEditMode = false; let editingIndex = null; let currentFolderEmail = '';
+      let globalRows = []; let currentRenderedRows = []; let selectedIndices = new Set();
+      let isEditMode = false; let editingIndex = null; let currentFolderEmail = '';
 
       function initializeApp() { buildNavbar(); loadCurrentTableData(); runInvisibleAutoCheckout(); }
 
@@ -188,6 +202,8 @@
 
       function switchTab(tabKey) {
         currentTab = tabKey; buildNavbar(); document.getElementById('searchInput').value = '';
+        selectedIndices.clear(); updateMassActionBar();
+        
         const config = tableConfigs[tabKey]; const addBtn = document.getElementById('addNewBtn');
         const pdfBtn = document.getElementById('pdfBtn'); const sidebar = document.getElementById('personnelSidebar');
         
@@ -199,9 +215,74 @@
         loadCurrentTableData();
       }
 
-      // =========================================================================
-      // 🚀 НОВАТА СИГУРНА ФУНКЦИЯ (ИЗВИКВА ДИРЕКТНО СЪРВЪРА НА SUPABASE)
-      // =========================================================================
+      // ==========================================
+      // ЛОГИКА ЗА МАСОВО МАРКИРАНЕ И ТРИЕНЕ
+      // ==========================================
+      function toggleSelectAll(event) {
+          const isChecked = event.target.checked;
+          const checkboxes = document.querySelectorAll('.row-cb');
+          checkboxes.forEach(cb => {
+              cb.checked = isChecked;
+              const idx = parseInt(cb.dataset.index);
+              if (isChecked) selectedIndices.add(idx); else selectedIndices.delete(idx);
+          });
+          updateMassActionBar();
+      }
+
+      function toggleRowSelection(event, trueIndex) {
+          if (event.target.checked) selectedIndices.add(trueIndex);
+          else selectedIndices.delete(trueIndex);
+          
+          const allCheckbox = document.getElementById('selectAllCb');
+          if (allCheckbox) {
+             const visibleCheckboxes = document.querySelectorAll('.row-cb');
+             const allChecked = Array.from(visibleCheckboxes).every(cb => cb.checked);
+             allCheckbox.checked = visibleCheckboxes.length > 0 && allChecked;
+          }
+          updateMassActionBar();
+      }
+
+      function updateMassActionBar() {
+          const bar = document.getElementById('massActionBar');
+          const text = document.getElementById('massActionText');
+          if (selectedIndices.size > 0 && !tableConfigs[currentTab].readOnlyTab) {
+              text.innerText = `Маркирани: ${selectedIndices.size} записа`;
+              bar.style.display = 'flex';
+          } else {
+              bar.style.display = 'none';
+          }
+      }
+
+      async function deleteSelectedItems() {
+          const config = tableConfigs[currentTab]; 
+          const count = selectedIndices.size;
+          const res = await Swal.fire({ 
+              title: `Изтриване на ${count} записа?`, 
+              text: "Това действие е безвъзвратно!", 
+              icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, изтрий всички!', cancelButtonText: 'Отказ' 
+          });
+          
+          if (res.isConfirmed) { 
+              try { 
+                  Swal.fire({title: 'Изтриване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
+                  
+                  // Събираме всички ключове, които трябва да се изтрият
+                  const keysToDelete = Array.from(selectedIndices).map(idx => globalRows[idx][config.key]);
+                  
+                  // Изпращаме масова заявка към Supabase, където ключът е в списъка
+                  const { error } = await client.from(config.table).delete().in(config.key, keysToDelete); 
+                  if (error) throw error; 
+                  
+                  selectedIndices.clear();
+                  updateMassActionBar();
+                  Swal.fire({icon: 'success', title: 'Изтрити!', timer: 1500, showConfirmButton: false}); 
+                  loadCurrentTableData(); 
+              } catch(err) { 
+                  Swal.fire('Грешка', err.message, 'error'); 
+              } 
+          }
+      }
+
       async function openNotificationDialog() {
           const { data } = await client.from('chekiraniya').select('Имейл');
           let emails = [];
@@ -229,24 +310,12 @@
 
       async function sendOneSignalNotification(target, title, body) {
           Swal.fire({ title: 'Изпращане...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
           try {
-              // ИЗПРАЩАМЕ ДАННИТЕ КЪМ SUPABASE (БАЗАТА ДАННИ), КОЯТО ЩЕ ГИ ПРАТИ ДО ТЕЛЕФОНА
-              const { error } = await client.rpc('send_sys_alert', {
-                  target: target,
-                  title: title,
-                  body: body
-              });
-
+              const { error } = await client.rpc('send_sys_alert', { target: target, title: title, body: body });
               if (error) throw error;
-              
               Swal.fire('Успех!', 'Известието беше изпратено успешно.', 'success');
-          } catch (err) { 
-              console.error(err); 
-              Swal.fire('Грешка при изпращане', err.message, 'error'); 
-          }
+          } catch (err) { console.error(err); Swal.fire('Грешка при изпращане', err.message, 'error'); }
       }
-      // =========================================================================
 
       async function processPDF(event) {
           const file = event.target.files[0]; if (!file) return; event.target.value = ''; 
@@ -363,6 +432,7 @@
 
       async function loadCurrentTableData() {
         const config = tableConfigs[currentTab]; document.getElementById('loadingLayout').style.display = 'block'; document.getElementById('mainTable').style.display = 'none';
+        selectedIndices.clear(); updateMassActionBar();
         try {
             let query = client.from(config.table).select('*').limit(10000);
             if (currentTab === 'otcheti') query = query.order('Дата', { ascending: false });
@@ -373,21 +443,40 @@
       }
 
       function renderDynamicTable(itemsToRender = null) {
-        const items = itemsToRender || globalRows; const config = tableConfigs[currentTab]; document.getElementById('loadingLayout').style.display = 'none';
+        currentRenderedRows = itemsToRender || globalRows; const config = tableConfigs[currentTab]; document.getElementById('loadingLayout').style.display = 'none';
         const table = document.getElementById('mainTable'); const thead = document.getElementById('tableHead'); const tbody = document.getElementById('tableBody');
         thead.innerHTML = ''; tbody.innerHTML = ''; const headerRow = document.createElement('tr');
+        
+        // ДОБАВЯНЕ НА ГЛАВНАТА ОТМЕТКА
+        if (!config.readOnlyTab) {
+            const thCheck = document.createElement('th');
+            thCheck.style.width = '40px'; thCheck.style.textAlign = 'center';
+            thCheck.innerHTML = `<input type="checkbox" id="selectAllCb" class="row-checkbox" onchange="toggleSelectAll(event)">`;
+            headerRow.appendChild(thCheck);
+        }
+
         config.fields.forEach(f => { if (f.hideOnAdd) return; const th = document.createElement('th'); th.innerText = f.label || f.name; headerRow.appendChild(th); });
         if (!config.readOnlyTab) { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
         thead.appendChild(headerRow);
-        if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab ? 0 : 1)}" style="text-align:center; padding:40px;">Няма записи.</td></tr>`; table.style.display = 'table'; return; }
+        
+        if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab ? 0 : 2)}" style="text-align:center; padding:40px;">Няма записи.</td></tr>`; table.style.display = 'table'; return; }
 
-        items.forEach((item) => {
+        currentRenderedRows.forEach((item) => {
           const row = document.createElement('tr'); const trueIndex = globalRows.indexOf(item);
           if (currentTab === 'chekiraniya') {
              let isLate = false; if (item['Действие'] === 'Влизане' && item['Време']) { let d = new Date(item['Време']); if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true; }
              if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) { row.style.backgroundColor = '#fef2f2'; row.style.borderLeft = '5px solid #ef4444'; }
              else if (item['Действие'] === 'Авто излизане') { row.style.backgroundColor = '#fffbeb'; row.style.borderLeft = '5px solid #f59e0b'; }
           }
+
+          // ДОБАВЯНЕ НА КВАДРАТЧЕТО НА ВСЕКИ РЕД
+          if (!config.readOnlyTab) {
+              const tdCheck = document.createElement('td'); tdCheck.style.textAlign = 'center';
+              const isChecked = selectedIndices.has(trueIndex) ? 'checked' : '';
+              tdCheck.innerHTML = `<input type="checkbox" class="row-checkbox row-cb" data-index="${trueIndex}" onchange="toggleRowSelection(event, ${trueIndex})" ${isChecked}>`;
+              row.appendChild(tdCheck);
+          }
+
           config.fields.forEach(f => {
             if (f.hideOnAdd) return; const td = document.createElement('td'); let val = item[f.name] !== undefined && item[f.name] !== null ? item[f.name] : '';
             if (currentTab === 'chekiraniya' && f.name === 'Време' && val) { try { td.innerHTML = `<b>${new Date(val).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
@@ -410,6 +499,14 @@
           tbody.appendChild(row);
         });
         table.style.display = 'table';
+        
+        // Синхронизиране на главната отметка след филтриране
+        const allCheckbox = document.getElementById('selectAllCb');
+        if (allCheckbox) {
+            const visibleCheckboxes = document.querySelectorAll('.row-cb');
+            const allChecked = visibleCheckboxes.length > 0 && Array.from(visibleCheckboxes).every(cb => cb.checked);
+            allCheckbox.checked = allChecked;
+        }
       }
 
       function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
