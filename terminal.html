@@ -32,7 +32,21 @@
       .btn-in:active { background-color: #15803d; transform: scale(0.95); }
       .btn-out { background-color: #dc2626; }
       .btn-out:active { background-color: #b91c1c; transform: scale(0.95); }
-      .machine-bar { width: 100%; background: #e2e8f0; padding: 8px 0; text-align: center; font-size: 0.85em; color: #475569; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+      .machine-bar { 
+          width: 100%; 
+          background: #e2e8f0; 
+          padding: 8px 15px; 
+          text-align: center; 
+          font-size: 0.85em; 
+          color: #475569; 
+          font-weight: 700; 
+          text-transform: uppercase; 
+          cursor: pointer; 
+          box-sizing: border-box;
+          white-space: nowrap; /* Държи текста строго на един ред */
+          overflow: hidden; /* Скрива излишния текст, който излиза от екрана */
+          text-overflow: ellipsis; /* Слага три точки (...) накрая */
+      }
       .machine-title { color: #1e3a8a; font-weight: 900; text-decoration: underline; margin-left: 5px;}
       .task-filters { display: flex; width: 100%; background: white; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
       .t-filter-btn { flex: 1; padding: 12px 5px; text-align: center; font-size: 0.85em; font-weight: 900; color: #64748b; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
