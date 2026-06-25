@@ -365,7 +365,8 @@
                         globalState: 'gray',
                         operations: [],
                         drawingUrl: row.drawing_url,
-                        partType: row.part_type ? String(row.part_type) : ""
+                        partType: row.part_type ? String(row.part_type) : "",
+                        bucket: "" // Ще го добавим малко по-долу
                     };
                 }
 
@@ -415,30 +416,31 @@
 
                 let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
                 
-                let searchKey = `${n.planId}___${n.code.toUpperCase()}`;
-                
                 let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
                 let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
                 let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
-                if (typeStr.includes("тяло") || typeStr.includes("тела")) masterData.tiela.push(n);
-                else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) masterData.predni.push(n);
-                else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) masterData.zadni.push(n);
-                else if (typeStr.includes("мпр")) masterData.mpr.push(n);
-                else if (typeStr.includes("пакет")) masterData.small_rotors.push(n);
-                else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) masterData.statori.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("11")) masterData.var11.push(n);
-                else if (typeStr.includes("ротор") && typeStr.includes("25")) masterData.var25.push(n);
-                else if (typeStr.includes("лагер")) masterData.bearings.push(n);
-                else if (typeStr.includes("щифт")) masterData.small_pins.push(n);
-                else if (typeStr.includes("шпилк")) masterData.small_studs.push(n);
-                else if (typeStr.includes("макар")) masterData.small_spools.push(n);
+                // КАТЕГОРИЗИРАНЕ И ЗАПИСВАНЕ НА BUCKET (ПРОЗОРЕЦА)
+                if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
+                else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) n.bucket = 'predni';
+                else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) n.bucket = 'zadni';
+                else if (typeStr.includes("мпр")) n.bucket = 'mpr';
+                else if (typeStr.includes("пакет")) n.bucket = 'small_rotors';
+                else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) n.bucket = 'statori';
+                else if (typeStr.includes("ротор") && typeStr.includes("11")) n.bucket = 'var11';
+                else if (typeStr.includes("ротор") && typeStr.includes("25")) n.bucket = 'var25';
+                else if (typeStr.includes("лагер")) n.bucket = 'bearings';
+                else if (typeStr.includes("щифт")) n.bucket = 'small_pins';
+                else if (typeStr.includes("шпилк")) n.bucket = 'small_studs';
+                else if (typeStr.includes("макар")) n.bucket = 'small_spools';
                 else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
-                    masterData.assembly.push(n);
+                    n.bucket = 'assembly';
                 } 
                 else {
-                    masterData.small_others.push(n);
+                    n.bucket = 'small_others';
                 }
+                
+                masterData[n.bucket].push(n);
             });
 
             drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
@@ -603,8 +605,8 @@
                 let children = childMap[node.id] || [];
                 
                 let allChildrenDone = true;
-                let anyChildLastOpHasPieces = false;
-                let anyChildLastOpStarted = false;
+                let allChildrenHavePieces = true;
+                let anyLocalChildLastOpStarted = false;
 
                 if (children.length > 0) {
                     allChildrenDone = children.every(cId => {
@@ -614,16 +616,23 @@
                         return chNode.operations.every(o => o.state === 'green');
                     });
 
-                    anyChildLastOpHasPieces = children.some(cId => {
+                    // За да светне ГОЛЯМО СИВО: ВСИЧКИ деца (локални и външни) трябва да имат поне 1 готова бройка
+                    allChildrenHavePieces = children.every(cId => {
                         let chNode = allNodesMap[cId];
-                        if(!chNode || !chNode.operations || chNode.operations.length === 0) return false;
+                        if (!chNode) return false;
+                        if (!chNode.operations || chNode.operations.length === 0) return true; 
                         let lastOp = chNode.operations[chNode.operations.length - 1]; 
                         return lastOp.completed > 0 || lastOp.state === 'green';
                     });
 
-                    anyChildLastOpStarted = children.some(cId => {
+                    // За да светне МАЛКО СИВО: ПОНЕ ЕДНО ЛОКАЛНО дете трябва да е започнато (Синьо)
+                    anyLocalChildLastOpStarted = children.some(cId => {
                         let chNode = allNodesMap[cId];
-                        if(!chNode || !chNode.operations || chNode.operations.length === 0) return false;
+                        if (!chNode || !chNode.operations || chNode.operations.length === 0) return false;
+                        
+                        // ПРОВЕРКАТА ЗА ЛОКАЛНОСТ (в същия прозорец/bucket)
+                        if (chNode.bucket !== node.bucket) return false; 
+                        
                         let lastOp = chNode.operations[chNode.operations.length - 1]; 
                         return lastOp.state === 'blue' || lastOp.state === 'blue_0' || lastOp.completed > 0 || lastOp.state === 'green';
                     });
@@ -633,7 +642,6 @@
                     let len = node.operations.length;
                     let allOpsDone = node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
-                    // ПРЕМАХНАТИ СТРЕЛКИТЕ ОТ САМИТЕ ФУНКЦИИ
                     const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
                     const formatFuture = (op) => `<span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
                     const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
@@ -647,8 +655,8 @@
                         
                         let html = '';
                         if(pastHiddenArr.length > 0) {
-                            html += `<span class="harmony-toggle" id="toggle_${dId}" onclick="toggleHarmony('${dId}')">◀</span> `;
-                            html += `<span id="hist_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
+                            html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
+                            html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
                         html += formatFinishedAll(node.operations[len - 1]);
                         opsHTML = `<div class="vsm-ops">${html}</div>`;
@@ -671,27 +679,24 @@
                                 hasActive = true;
                             } else {
                                 if (i === 0) {
+                                    // Първа операция - Истинската логика за Локални/Външни деца
                                     if (children.length === 0) {
-                                        state = 'waiting'; 
+                                        state = 'waiting'; // Няма деца -> Готова за старт
                                     } else {
-                                        if (allChildrenDone) state = 'waiting';
-                                        else if (anyChildLastOpHasPieces) state = 'waiting'; 
-                                        else if (anyChildLastOpStarted) state = 'future'; 
-                                        else state = 'hidden'; 
+                                        if (allChildrenHavePieces) state = 'waiting'; // Всички деца имат бройки -> Голямо сиво
+                                        else if (anyLocalChildLastOpStarted) state = 'future'; // Локално дете се работи -> Малко сиво
+                                        else state = 'hidden'; // В противен случай -> Скрито
                                     }
                                 } else {
+                                    // Втора и следващи операции
                                     let prev = stateMachine[i - 1];
                                     
-                                    // НОВАТА ЖЕЛЯЗНА ЛОГИКА ЗА БЪДЕЩЕТО:
                                     if (prev === 'past' || prev === 'active') {
-                                        // Ако предната е напълно готова ИЛИ има бройки -> ТАЗИ Е ГОТОВА ЗА ПОЕМАНЕ (Голямо сиво)
-                                        state = 'waiting';
+                                        state = 'waiting'; // Предната има бройки -> Текущата чака за поемане
                                     } else if (prev === 'active_0') {
-                                        // Ако предната е само поета (без бройки) -> ТАЗИ Е В БЪДЕЩЕТО (Малко сиво)
-                                        state = 'future';
+                                        state = 'future'; // Предната е поета, но няма бройки -> Бъдеще
                                     } else {
-                                        // В противен случай (ако предната е waiting, future или hidden) -> ТАЗИ Е СКРИТА
-                                        state = 'hidden';
+                                        state = 'hidden'; // Предната не е започната -> Напълно скрито
                                     }
                                 }
                             }
@@ -701,6 +706,7 @@
                         if (hasActive) titleClass = 'title-blue';
 
                         let pastHiddenArr = [];
+                        let futureHiddenArr = [];
                         let visibleOpsHtml = '';
                         
                         let pastCount = stateMachine.filter(s => s === 'past').length;
@@ -725,16 +731,19 @@
                                 if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
                                 visibleOpsHtml += formatWaiting(op);
                             } else if (state === 'future') {
-                                if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
-                                visibleOpsHtml += formatFuture(op);
+                                if (visibleOpsHtml === '') {
+                                    visibleOpsHtml += `<span class="op-text op-future"><span class="arr">➔</span> ${op.name} | 0/${node.planQty}</span>`;
+                                } else {
+                                    visibleOpsHtml += ' <span class="arr">➔</span> ' + formatFuture(op);
+                                }
                             }
-                            // Ако state === 'hidden', просто я игнорираме. Няма три точки, няма скрити масиви!
+                            // Скритите изобщо не се рисуват!
                         }
 
                         let opsHTMLContent = '';
                         if(pastHiddenArr.length > 0) {
-                            opsHTMLContent += `<span class="harmony-toggle" id="toggle_${dId}" onclick="toggleHarmony('${dId}')">◀</span> `;
-                            opsHTMLContent += `<span id="hist_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
+                            opsHTMLContent += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
+                            opsHTMLContent += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
                         }
                         
                         opsHTMLContent += visibleOpsHtml;
