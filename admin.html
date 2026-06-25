@@ -29,7 +29,7 @@
       .btn-edit { color: #2563eb; }
       .btn-delete { color: #ef4444; }
       
-      /* НОВИ СТИЛОВЕ ЗА МАСОВО ДЕЙСТВИЕ */
+      /* СТИЛОВЕ ЗА МАСОВО ДЕЙСТВИЕ */
       .mass-action-bar { display: none; background-color: #fef2f2; border: 1px solid #fecaca; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1); animation: slideDown 0.3s ease-out; }
       @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       .mass-action-text { color: #991b1b; font-weight: 800; font-size: 1.05em; }
@@ -215,9 +215,6 @@
         loadCurrentTableData();
       }
 
-      // ==========================================
-      // ЛОГИКА ЗА МАСОВО МАРКИРАНЕ И ТРИЕНЕ
-      // ==========================================
       function toggleSelectAll(event) {
           const isChecked = event.target.checked;
           const checkboxes = document.querySelectorAll('.row-cb');
@@ -265,11 +262,7 @@
           if (res.isConfirmed) { 
               try { 
                   Swal.fire({title: 'Изтриване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
-                  
-                  // Събираме всички ключове, които трябва да се изтрият
                   const keysToDelete = Array.from(selectedIndices).map(idx => globalRows[idx][config.key]);
-                  
-                  // Изпращаме масова заявка към Supabase, където ключът е в списъка
                   const { error } = await client.from(config.table).delete().in(config.key, keysToDelete); 
                   if (error) throw error; 
                   
@@ -317,43 +310,109 @@
           } catch (err) { console.error(err); Swal.fire('Грешка при изпращане', err.message, 'error'); }
       }
 
+      // ==========================================================
+      // НОВИЯТ УМЕН СКЕНЕР ЗА PDF (ГЕОГРАФСКИ КООРДИНАТИ)
+      // ==========================================================
       async function processPDF(event) {
           const file = event.target.files[0]; if (!file) return; event.target.value = ''; 
           const { value: formValues } = await Swal.fire({ title: 'Детайли за плана', html: '<label style="display:block; text-align:left; font-size:14px; margin-bottom:5px;">Месец на плана:</label><input id="swal-month" class="swal2-input" value="Юни"><label style="display:block; text-align:left; font-size:14px; margin-top:15px; margin-bottom:5px;">Година:</label><input id="swal-year" type="number" class="swal2-input" value="2026">', focusConfirm: false, showCancelButton: true, confirmButtonText: 'Продължи', cancelButtonText: 'Отказ', preConfirm: () => [document.getElementById('swal-month').value.trim(), document.getElementById('swal-year').value.trim()] });
           if (!formValues) return; const [targetMonth, targetYear] = [formValues[0], parseInt(formValues[1])];
-          Swal.fire({ title: 'Прецизно сканиране...', text: 'Изолирам първите две колони на документа...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          
+          Swal.fire({ title: 'Прецизно сканиране...', text: 'Сверяване с Номенклатура и изолиране на колоните...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
           try {
+              // 1. ИЗТЕГЛЯНЕ НА НОМЕНКЛАТУРАТА ЗА СВЕРЯВАНЕ
+              const { data: nomData, error: nomErr } = await client.from('Номенклатура').select('ID Детайл, Вътрешно име');
+              if (nomErr) throw nomErr;
+              let nomSet = new Set();
+              if (nomData) {
+                  nomData.forEach(n => {
+                      if (n['ID Детайл']) nomSet.add(String(n['ID Детайл']).trim().toUpperCase());
+                      if (n['Вътрешно име']) nomSet.add(String(n['Вътрешно име']).trim().toUpperCase());
+                  });
+              }
+
+              // 2. ОБРАБОТКА НА PDF ЛИСТ ПО ЛИСТ
               const arrayBuffer = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise; let extractedPlan = []; 
-              
-              // 🚀 ТУК Е ПРОМЯНАТА: Разширен филтър за всякакви AMCI детайли
-              const partRegex = /^(2\d{8}[A-Z]?|\d{3}-\d{4,5}(?:-\d+)?#?|(?:H25|DC25)[A-Z0-9-]+)$/i;
               
               for (let i = 1; i <= pdf.numPages; i++) {
                   const page = await pdf.getPage(i); const content = await page.getTextContent();
-                  let validItems = content.items.filter(item => item.str.trim() !== '').map(item => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] })).filter(item => item.x < 230);
-                  validItems.sort((a, b) => { if (Math.abs(b.y - a.y) > 4) return b.y - a.y; return a.x - b.x; });
-                  for (let j = 0; j < validItems.length; j++) {
-                      let item = validItems[j];
-                      if (partRegex.test(item.text)) {
-                          if (j > 0 && /^\d+$/.test(validItems[j - 1].text)) {
-                              let qtyItem = validItems[j - 1];
-                              if (Math.abs(qtyItem.y - item.y) < 5 && qtyItem.x < item.x) {
-                                  let qty = parseInt(qtyItem.text, 10);
-                                  if (qty > 0 && qty < 10000) extractedPlan.push({ 'ID Детайл': item.text.toUpperCase(), 'Целево количество': qty, 'Месец': targetMonth, 'Година': targetYear, 'Статус': 'Активен' });
+                  let validItems = content.items.filter(item => item.str.trim() !== '').map(item => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }));
+                  
+                  // Групиране на текста по редове (с толеранс 5 пиксела по Y)
+                  let rows = [];
+                  validItems.forEach(item => {
+                      let added = false;
+                      for (let row of rows) {
+                          if (Math.abs(row.y - item.y) < 5) { 
+                              row.items.push(item);
+                              added = true; break;
+                          }
+                      }
+                      if (!added) rows.push({ y: item.y, items: [item] });
+                  });
+
+                  // Анализ на всеки ред по координати X
+                  rows.forEach(row => {
+                      row.items.sort((a, b) => a.x - b.x); // Подреждане отляво надясно
+                      
+                      // Колона 1: Търсим число в най-лявата част (x < 80)
+                      let qtyIndex = row.items.findIndex(i => i.x < 80 && /^[\d,.]+$/.test(i.text.replace(/,/g, '')));
+                      
+                      if (qtyIndex !== -1) {
+                          let qtyItem = row.items[qtyIndex];
+                          
+                          // Колона 2: Търсим първия текст веднага след числото (между x=50 и x=250)
+                          let partItem = row.items.find((i, idx) => idx > qtyIndex && i.x > 50 && i.x < 250);
+                          
+                          if (partItem) {
+                              let qty = parseInt(qtyItem.text.replace(/,/g, ''), 10);
+                              let partCode = partItem.text.toUpperCase();
+                              
+                              // Елиминираме случайни заглавки (като думата QTY или PART)
+                              if (qty > 0 && qty < 100000 && partCode.length > 2 && !partCode.includes("PART")) {
+                                  extractedPlan.push({ 
+                                      'ID Детайл': partCode, 
+                                      'Целево количество': qty, 
+                                      'Месец': targetMonth, 
+                                      'Година': targetYear, 
+                                      'Статус': 'Активен',
+                                      '_existsInNom': nomSet.has(partCode) // Временен маркер за червената аларма
+                                  });
                               }
                           }
                       }
-                  }
+                  });
               }
 
               if (extractedPlan.length === 0) { Swal.fire('Внимание', 'Не открих валидни данни в първите две колони.', 'warning'); return; }
-              let summaryHtml = `<div style="max-height: 300px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; background:#f8fafc;"><ol style="margin:0; padding-left:20px;">`;
-              extractedPlan.forEach(p => summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0;"><b style="color: #16a34a; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#1e3a8a;">${p['ID Детайл']}</span></li>`);
+              
+              // 3. ВИЗУАЛИЗАЦИЯ И ЧЕРВЕНА АЛАРМА (ВАРИАНТ Б)
+              let summaryHtml = `<div style="max-height: 350px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; background:#f8fafc;"><ol style="margin:0; padding-left:20px;">`;
+              let hasWarnings = false;
+
+              extractedPlan.forEach(p => {
+                  if (p._existsInNom) {
+                      summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0;"><b style="color: #16a34a; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#1e3a8a;">${p['ID Детайл']}</span></li>`;
+                  } else {
+                      hasWarnings = true;
+                      summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0; background-color: #fef2f2; padding: 6px; border-radius: 6px; border-left: 4px solid #dc2626;"><b style="color: #dc2626; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#dc2626;">${p['ID Детайл']}</span><br><span style="color:#991b1b; font-size:0.85em; font-weight:bold;">⚠️ Внимание: Този детайл липсва в Номенклатурата!</span></li>`;
+                  }
+                  delete p._existsInNom; // Задължително изтриваме маркера, за да не гръмне при запис
+              });
               summaryHtml += `</ol></div>`;
 
-              const confirmRes = await Swal.fire({ title: `Открити поръчки: ${extractedPlan.length} реда`, html: '<p style="font-size:13px; color:#64748b; margin-top:0;">Списъкът е подреден точно в същата последователност, както в PDF файла:</p>' + summaryHtml, icon: 'question', showCancelButton: true, confirmButtonColor: '#4338ca', cancelButtonColor: '#94a3b8', confirmButtonText: '🚀 Зареди в плана', cancelButtonText: 'Отказ' });
-              if (confirmRes.isConfirmed) { Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); const { error } = await client.from('plan').insert(extractedPlan); if (error) throw error; Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше добавен в оригиналния си вид.`, timer: 2000, showConfirmButton: false }); loadCurrentTableData(); }
+              let titleText = hasWarnings ? `<span style="color:#dc2626;">⚠️ Открити поръчки: ${extractedPlan.length} реда</span>` : `Открити поръчки: ${extractedPlan.length} реда`;
+
+              const confirmRes = await Swal.fire({ title: titleText, html: '<p style="font-size:13px; color:#64748b; margin-top:0;">Списъкът е генериран само от първите 2 колони (Количество и Детайл):</p>' + summaryHtml, icon: hasWarnings ? 'warning' : 'question', showCancelButton: true, confirmButtonColor: '#4338ca', cancelButtonColor: '#94a3b8', confirmButtonText: '🚀 Зареди в плана', cancelButtonText: 'Отказ' });
+              
+              if (confirmRes.isConfirmed) { 
+                  Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); 
+                  const { error } = await client.from('plan').insert(extractedPlan); 
+                  if (error) throw error; 
+                  Swal.fire({ icon: 'success', title: 'Успех!', text: `Планът беше добавен успешно.`, timer: 2000, showConfirmButton: false }); 
+                  loadCurrentTableData(); 
+              }
           } catch (err) { console.error(err); Swal.fire('Грешка при импорта', err.message, 'error'); }
       }
 
@@ -379,7 +438,7 @@
               let html = '';
               data.forEach(item => {
                   let isLate = false; if (item['Действие'] === 'Влизане' && item['Време']) { let d = new Date(item['Време']); if (d.getHours() > 8 || (d.getHours() === 8 && d.getMinutes() > 0)) isLate = true; }
-                  let rowStyle = ''; if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) rowStyle = 'background-color: #fef2f2; border-left: 4px solid #ef4444;'; else if (item['Действие'] === 'Авто излизане') rowStyle = 'background-color: #fffbeb; border-left: 4px solid #f59e0b';
+                  let rowStyle = ''; if (isLate || (item['Бележка'] && item['Бележка'].includes('ИЗВЪН ОБЕКТА'))) rowStyle = 'background-color: #fef2f2; border-left: 4px solid #ef4444'; else if (item['Действие'] === 'Авто излизане') rowStyle = 'background-color: #fffbeb; border-left: 4px solid #f59e0b';
                   let timeStr = item['Време'] ? new Date(item['Време']).toLocaleString('bg-BG') : ''; let actionHtml = item['Действие'];
                   if (actionHtml === 'Влизане') actionHtml = `<span style="color:#15803d; font-weight:800;">🟢 Влизане</span>`; if (actionHtml === 'Излизане') actionHtml = `<span style="color:#b91c1c; font-weight:800;">🔴 Излизане</span>`; if (actionHtml === 'Авто излизане') actionHtml = `<span style="color:#b45309; font-weight:800;">🕒 Авто излизане</span>`;
                   let noteHtml = item['Бележка'] || ''; if (noteHtml.includes('ИЗВЪН ОБЕКТА')) noteHtml = `⚠️ <b style="color:#dc2626;">${noteHtml}</b>`; let locHtml = item['Локация'] || '';
@@ -451,7 +510,6 @@
         const table = document.getElementById('mainTable'); const thead = document.getElementById('tableHead'); const tbody = document.getElementById('tableBody');
         thead.innerHTML = ''; tbody.innerHTML = ''; const headerRow = document.createElement('tr');
         
-        // ДОБАВЯНЕ НА ГЛАВНАТА ОТМЕТКА
         if (!config.readOnlyTab) {
             const thCheck = document.createElement('th');
             thCheck.style.width = '40px'; thCheck.style.textAlign = 'center';
@@ -473,7 +531,6 @@
              else if (item['Действие'] === 'Авто излизане') { row.style.backgroundColor = '#fffbeb'; row.style.borderLeft = '5px solid #f59e0b'; }
           }
 
-          // ДОБАВЯНЕ НА КВАДРАТЧЕТО НА ВСЕКИ РЕД
           if (!config.readOnlyTab) {
               const tdCheck = document.createElement('td'); tdCheck.style.textAlign = 'center';
               const isChecked = selectedIndices.has(trueIndex) ? 'checked' : '';
@@ -504,7 +561,6 @@
         });
         table.style.display = 'table';
         
-        // Синхронизиране на главната отметка след филтриране
         const allCheckbox = document.getElementById('selectAllCb');
         if (allCheckbox) {
             const visibleCheckboxes = document.querySelectorAll('.row-cb');
