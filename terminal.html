@@ -8,14 +8,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "2507a9cb-0d28-4952-9b7b-42e800a61613",
-    });
-  });
-</script>
+    <script>
+     window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "2507a9cb-0d28-4952-9b7b-42e800a61613",
+          serviceWorkerParam: { scope: "/monitor-ceh/" },
+          serviceWorkerPath: "/monitor-ceh/OneSignalSDKWorker.js"
+        });
+      });
+    </script>
     <style>
       body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
       .container { padding: 15px; display: flex; flex-direction: column; align-items: center; }
