@@ -141,7 +141,12 @@
       async function fetchUserCheckInStatus() {
           if (!currentEmail) return false;
           try {
-              const { data, error } = await client.from('chekiraniya').select('Действие, Време').eq('Имейл', currentEmail).order('Време', { ascending: false }).limit(1);
+              // НОВО: Филтрираме да търси само влизания и излизания, игнорирайки "Прочетено"
+              const { data, error } = await client.from('chekiraniya')
+                  .select('Действие, Време')
+                  .eq('Имейл', currentEmail)
+                  .in('Действие', ['Влизане', 'Излизане', 'Авто излизане'])
+                  .order('Време', { ascending: false }).limit(1);
               if (error) return false;
               if (data && data.length > 0) {
                   const lastAction = data[0]['Действие']; const lastTime = new Date(data[0]['Време']); const now = new Date();
