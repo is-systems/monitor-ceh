@@ -18,6 +18,19 @@
           serviceWorkerPath: "/monitor-ceh/OneSignalSDKWorker.js",
           notifyButton: { enable: false }
         });
+
+        // НОВО: Прихващаме съобщението в реално време, ако екранът им е отворен!
+        OneSignal.Notifications.addEventListener('foregroundWillDisplay', function(event) {
+            event.preventDefault(); // Спираме известието да се показва тихо "горе"
+            
+            let title = event.notification.title;
+            let body = event.notification.body;
+            
+            // Директно активираме огромния блокиращ прозорец!
+            if (typeof showBlockerMessage === "function") {
+                showBlockerMessage(title, body);
+            }
+        });
       });
     </script>
     <style>
