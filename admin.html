@@ -305,13 +305,16 @@
           Swal.fire({ title: 'Изпращане...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
           
           try {
+              // 1. Опаковаме текста безопасно, за да може да пътува през линка
+              let safeTitle = encodeURIComponent(title);
+              let safeBody = encodeURIComponent(body);
+
               let payload = {
                   app_id: "2507a9cb-0d28-4952-9b7b-42e800a61613",
                   headings: { "en": title, "bg": title },
                   contents: { "en": body, "bg": body },
-                  // ПРОМЯНА 1: Отваря директно Терминала, а не Монитора
-                  url: "https://is-systems.github.io/monitor-ceh/terminal.html", 
-                  // ПРОМЯНА 2: Максимален приоритет - принуждава телефона да звънне веднага!
+                  // 2. Залепяме заглавието и съобщението в самия линк
+                  url: `https://is-systems.github.io/monitor-ceh/terminal.html?sysTitle=${safeTitle}&sysMsg=${safeBody}`, 
                   priority: 10 
               };
 
@@ -322,7 +325,6 @@
                   payload.target_channel = "push";
               }
 
-              // ТРИК ЗА ЗАОБИКАЛЯНЕ НА РОБОТИТЕ НА GITHUB:
               const secretKey = "os_v2_app_eud2tsynfbevfg33iluabjqwcngcem2gdkaebuebdt" + "ob2ewfduy6d6lsudjvxyol6gqh7tatgimm7kewbh4sjp7yea5hzqmmdydqxkq";
 
               const response = await fetch("https://corsproxy.io/?https://onesignal.com/api/v1/notifications", {
