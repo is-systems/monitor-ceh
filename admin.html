@@ -22,6 +22,7 @@
       .search-box { flex: 1; max-width: 400px; min-width: 250px; }
       .search-box input { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95em; box-sizing: border-box; outline: none; }
       .search-box input:focus { border-color: #4338ca; box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.1); }
+      .action-buttons-group { display: flex; gap: 10px; }
       .btn-primary { background-color: #4338ca; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s; font-size: 0.95em; }
       .btn-primary:hover { background-color: #3730a3; }
       .action-btn { background: transparent; border: none; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 1.1em; }
@@ -67,6 +68,18 @@
       .modal-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
       .modal-table th, .modal-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
       .modal-table th { background: #f1f5f9; font-weight: 800; color: #475569; }
+
+      /* СПЕЦИАЛЕН МОБИЛЕН ИЗГЛЕД (Подрежда всичко перфектно на телефон) */
+      @media (max-width: 850px) {
+        .layout-wrapper { flex-direction: column; }
+        .sidebar { width: 100%; border-radius: 8px; margin-bottom: 15px; }
+        .sidebar-list { display: flex; flex-direction: row; overflow-x: auto; max-height: none; padding: 0; }
+        .sidebar-item { padding: 12px 20px; border-bottom: none; border-right: 1px solid #e2e8f0; flex-shrink: 0; }
+        .controls-row { flex-direction: column; align-items: stretch; gap: 10px; }
+        .action-buttons-group { flex-direction: column; width: 100%; }
+        .btn-primary { width: 100%; justify-content: center; padding: 14px; font-size: 1.05em; }
+        .search-box { max-width: 100%; width: 100%; }
+      }
     </style>
   </head>
   <body>
@@ -79,7 +92,7 @@
         <div class="main-container">
           <div class="controls-row">
             <div class="search-box"><input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата..."></div>
-            <div style="display: flex; gap: 10px;">
+            <div class="action-buttons-group">
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;" onchange="processPDF(event)">
                 <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">📥 Зареди от PDF</button>
                 <button class="btn-primary" onclick="window.open('index.html', '_blank')" style="background-color: #0284c7; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);">📺 Монитор</button>
@@ -163,8 +176,8 @@
 
       const tableConfigs = {
         plan: { label: '📅 Месечен План', table: 'plan', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Целево количество', type: 'number', required: true }, { name: 'Месец', type: 'text', required: true }, { name: 'Година', type: 'number', required: true }, { name: 'Статус', type: 'select', options: ['Активен', 'Завършен', '📦 Опакован', '🚚 Изпратен'], required: true } ] },
-        personal: { label: '🔒 Оторизиран Персонал', table: 'personal', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'Имейл', type: 'text', required: true }, { name: 'Име', type: 'text' }, { name: 'Статус', type: 'select', options: ['Активен', 'Блокиран'], required: true, def: 'Активен' } ] },
-        chekiraniya: { label: '👥 Присъствие & Достъп', table: 'chekiraniya', readOnlyTab: true, fields: [ { name: 'Време', type: 'text' }, { name: 'Имейл', type: 'text' }, { name: 'Действие', type: 'text' }, { name: 'Локация', type: 'text' }, { name: 'Бележка', type: 'text' } ] },
+        personal: { label: '👥 Персонал & Досиета', table: 'personal', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'Имейл', type: 'text', required: true }, { name: 'Име', type: 'text' }, { name: 'Статус', type: 'select', options: ['Активен', 'Блокиран'], required: true, def: 'Активен' } ] },
+        chekiraniya: { label: '⏱️ Хронология Чекирания', table: 'chekiraniya', readOnlyTab: true, fields: [ { name: 'Време', type: 'text' }, { name: 'Имейл', type: 'text' }, { name: 'Действие', type: 'text' }, { name: 'Локация', type: 'text' }, { name: 'Бележка', type: 'text' } ] },
         sklad_gp: { label: '🏭 Склад Цех', table: 'computed_sklad_gp', readOnlyTab: true, fields: [ { name: 'ID Детайл', type: 'text' }, { name: 'Име', type: 'text' }, { name: 'Операция', type: 'text' }, { name: 'Наличност в цеха', type: 'number' } ] },
         nomenklatura: { label: '🗂️ Номенклатура', table: 'Номенклатура', key: 'id', fields: [ { name: 'id', type: 'number', readonly: true, hideOnAdd: true }, { name: 'ID Детайл', type: 'text', required: true }, { name: 'Вътрешно име', type: 'text' }, { name: 'Тип', type: 'text' }, { name: 'ID Родител', type: 'text' }, { name: 'Разходна норма', type: 'number', def: 1 }, { name: 'Единици', type: 'text', def: 'бр.' }, { name: 'Линк към чертеж', type: 'text' } ] },
         sklad: { label: '📦 Склад Материали', table: 'sklad', key: 'ID Детайл', fields: [ { name: 'ID Детайл', type: 'text', required: true, readonlyOnEdit: true }, { name: 'Начална наличност', type: 'number', def: 0 }, { name: 'Доставено', type: 'number', def: 0 }, { name: 'Изразходено', type: 'number', def: 0 }, { name: 'Остатък', type: 'number', def: 0, readonly: true }, { name: 'Минимално количество', type: 'number', def: 0 }, { name: 'Бележки', type: 'text' } ] },
@@ -198,7 +211,8 @@
         addBtn.style.display = config.readOnlyTab ? 'none' : 'flex';
         if (pdfBtn) pdfBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
 
-        if (tabKey === 'chekiraniya') { sidebar.style.display = 'block'; loadPersonnelSidebar(); } else { sidebar.style.display = 'none'; }
+        // Тук прехвърлихме показването на папките само когато сме в менюто Персонал
+        if (tabKey === 'personal') { sidebar.style.display = 'block'; loadPersonnelSidebar(); } else { sidebar.style.display = 'none'; }
         loadCurrentTableData();
       }
 
@@ -285,7 +299,6 @@
 
               if (!response.ok) { const errData = await response.json(); throw new Error("Грешка от сървъра: " + JSON.stringify(errData.errors)); }
 
-              // Записва се в базата, за да може работниците да го видят в Пощенската си кутия!
               await client.from('chekiraniya').insert([{
                   "Имейл": "СИСТЕМА",
                   "Действие": "Съобщение",
