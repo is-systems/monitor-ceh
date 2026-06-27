@@ -18,19 +18,6 @@
           serviceWorkerPath: "/monitor-ceh/OneSignalSDKWorker.js",
           notifyButton: { enable: false }
         });
-
-        // НОВО: Прихващаме съобщението в реално време, ако екранът им е отворен!
-        OneSignal.Notifications.addEventListener('foregroundWillDisplay', function(event) {
-            event.preventDefault(); // Спираме известието да се показва тихо "горе"
-            
-            let title = event.notification.title;
-            let body = event.notification.body;
-            
-            // Директно активираме огромния блокиращ прозорец!
-            if (typeof showBlockerMessage === "function") {
-                showBlockerMessage(title, body);
-            }
-        });
       });
     </script>
     <style>
@@ -92,20 +79,17 @@
     </style>
   </head>
   <body>
-    <!-- ГОРНО МЕНЮ (ХЕДЪР) -->
     <div class="app-header">
       <div class="profile-area" onclick="setupProfile()" title="Настройки на профила">
         <img src="icon.png" style="height: 38px; width: 38px; border-radius: 8px; object-fit: cover; box-shadow: 0 2px 5px rgba(0,0,0,0.15); margin-right: 5px;" onerror="this.style.display='none'">
         <div><div style="font-weight:900; color:#1e3a8a; font-size: 1.1em;">ИС-СИСТЕМС</div><div class="operator-name" id="uiOperatorName">ОПЕРАТОР</div></div>
       </div>
       <div class="action-buttons">
-        <!-- Сменихме зеления бутон с бутон за Монитора -->
         <button class="btn-check btn-monitor" onclick="window.location.href='index.html'">📺 МОНИТОР</button>
         <button class="btn-check btn-out" onclick="processCheckIn('Излизане')">🔴 ИЗХОД</button>
       </div>
     </div>
 
-    <!-- ГОЛЕМИЯТ ЕКРАН "ВХОД ЗА СМЯНА" (Показва се само ако не е чекиран) -->
     <div id="bigLoginScreen" style="display: none; padding: 20px; align-items: center; justify-content: center; min-height: 75vh;">
       <div style="background: white; padding: 40px 20px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; border: 2px solid #e2e8f0; width: 100%; max-width: 450px;">
           <div style="font-size: 5em; margin-bottom: 10px;">🏭</div>
@@ -115,7 +99,6 @@
       </div>
     </div>
 
-    <!-- ГЛАВНО СЪДЪРЖАНИЕ (Скрито, докато не се чекира) -->
     <div id="mainAppContent" style="display: none;">
         <div class="machine-bar" onclick="changeMachine()">Работно място: <span class="machine-title" id="uiMachineName">ВСИЧКИ</span> ✏️</div>
         
@@ -131,12 +114,18 @@
             </div>
         </div>
 
-        <!-- ИСТОРИЯ (също се скрива при липса на вход) -->
         <button class="history-toggle-btn" onclick="toggleHistory()">🕒</button>
         <div class="local-history" id="historyPanel">
           <button onclick="toggleHistory()" style="position: absolute; top: 10px; right: 10px; background: transparent; border: none; font-size: 16px; color: #94a3b8; font-weight: bold;">✖</button>
           <h4>🕒 История на този телефон</h4>
           <ul id="historyList" class="history-list"><li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li></ul>
+        </div>
+
+        <button onclick="toggleMessages()" style="position: fixed; bottom: 85px; right: 15px; background: #2563eb; color: white; border: none; border-radius: 50%; width: 55px; height: 55px; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; z-index: 9001; display: flex; justify-content: center; align-items: center;">📬</button>
+        <div class="local-history" id="messagesPanel" style="bottom: 150px; display: none; z-index: 9002;">
+          <button onclick="toggleMessages()" style="position: absolute; top: 10px; right: 10px; background: transparent; border: none; font-size: 16px; color: #94a3b8; font-weight: bold;">✖</button>
+          <h4>📬 Всички съобщения</h4>
+          <ul id="messagesList" class="history-list"><li class="history-item" style="color:#94a3b8; text-align:center;">Зареждане...</li></ul>
         </div>
     </div>
 
@@ -154,7 +143,7 @@
       async function fetchUserCheckInStatus() {
           if (!currentEmail) return false;
           try {
-              // НОВО: Филтрираме да търси само влизания и излизания, игнорирайки "Прочетено"
+              // Игнорираме 'Прочетено' и 'Съобщение', гледаме само Влизане и Излизане
               const { data, error } = await client.from('chekiraniya')
                   .select('Действие, Време')
                   .eq('Имейл', currentEmail)
@@ -176,46 +165,27 @@
           if (savedMachine === null) { await changeMachine(true); } else { currentMachine = savedMachine; document.getElementById('uiMachineName').innerText = currentMachine || "ВСИЧКИ"; }
           
           checkSystemMessage();
-          
-          // Извикваме loadTasks, за да провери чекирането и да скрие/покаже екраните
           loadTasks();
 
           setInterval(() => { if (!activeTaskId && isUserCheckedIn) loadTasks(true); }, 30000); 
       }
 
-      // Това е самият блокиращ прозорец. Той стои над всичко останало.
-      function showBlockerMessage(title, body) {
-          Swal.fire({
-              title: '📢 ' + title,
-              text: body,
-              icon: 'info',
-              confirmButtonText: 'ОК, РАЗБРАХ',
-              confirmButtonColor: '#2563eb',
-              allowOutsideClick: false // Блокира цъкането извън прозореца!
-          }).then(() => {
-              // Като го прочетат, изчистваме линка и записваме в Досието
-              window.history.replaceState({}, document.title, window.location.pathname);
-              if (currentEmail) {
-                  client.from('chekiraniya').insert([{
-                      "Имейл": currentEmail,
-                      "Действие": "📢 Прочетено",
-                      "Време": new Date().toISOString(),
-                      "Локация": "Системно",
-                      "Бележка": title 
-                  }]).then(res => {
-                      if(res.error) console.error("Грешка при запис на прочит", res.error);
-                  });
-              }
-          });
-      }
-
-      // Тази проверява дали не идват от кликнато известие на заключен екран
       function checkSystemMessage() {
           const urlParams = new URLSearchParams(window.location.search);
           const sysTitle = urlParams.get('sysTitle');
           const sysMsg = urlParams.get('sysMsg');
+
           if (sysTitle && sysMsg) {
-              showBlockerMessage(sysTitle, sysMsg);
+              Swal.fire({
+                  title: '📢 ' + sysTitle, text: sysMsg, icon: 'info', confirmButtonText: 'ОК, РАЗБРАХ', confirmButtonColor: '#2563eb', allowOutsideClick: false
+              }).then(() => {
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                  if (currentEmail) {
+                      client.from('chekiraniya').insert([{ "Имейл": currentEmail, "Действие": "📢 Прочетено", "Време": new Date().toISOString(), "Локация": "Системно", "Бележка": sysTitle }]).then(res => {
+                          if(res.error) console.error("Грешка при запис на прочит", res.error);
+                      });
+                  }
+              });
           }
       }
 
@@ -271,8 +241,6 @@
           if (!currentEmail) { Swal.fire('Внимание', 'Моля, въведете вашия имейл в настройките на профила (⚙️).', 'warning'); return; }
           try {
               Swal.fire({ title: 'Проверка...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-              
-              // НОВО: Добавен филтър .in(...) и тук!
               const { data: lastRecord, error: fetchErr } = await client.from('chekiraniya')
                   .select('Действие, Време')
                   .eq('Имейл', currentEmail)
@@ -314,7 +282,60 @@
         localHistoryData.forEach(item => { var color = item.type === 'БРАК' ? '#e74c3c' : '#16a34a'; html += `<li class="history-item"><span class="history-time">${item.time}</span><span><span style="color:${color}; font-weight:bold;">${item.qty} бр.</span> ${item.name}</span></li>`; });
         list.innerHTML = html;
       }
-      function toggleHistory() { var panel = document.getElementById('historyPanel'); panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; }
+      
+      function toggleHistory() { 
+          var panel = document.getElementById('historyPanel'); 
+          panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; 
+          if(panel.style.display === 'block') document.getElementById('messagesPanel').style.display = 'none';
+      }
+
+      async function toggleMessages() {
+          var panel = document.getElementById('messagesPanel');
+          if (panel.style.display === 'none' || panel.style.display === '') {
+              panel.style.display = 'block';
+              document.getElementById('historyPanel').style.display = 'none';
+              await fetchMessages();
+          } else {
+              panel.style.display = 'none';
+          }
+      }
+
+      async function fetchMessages() {
+          if (!currentEmail) return;
+          var list = document.getElementById('messagesList');
+          list.innerHTML = '<li class="history-item" style="text-align:center;">Зареждане... 🔄</li>';
+          try {
+              const { data, error } = await client.from('chekiraniya')
+                  .select('Време, Бележка')
+                  .eq('Действие', 'Съобщение')
+                  .in('Локация', ['ALL', currentEmail])
+                  .order('Време', { ascending: false })
+                  .limit(20);
+              
+              if (error) throw error;
+              if (!data || data.length === 0) {
+                  list.innerHTML = '<li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни съобщения</li>';
+                  return;
+              }
+              
+              var html = '';
+              data.forEach(msg => {
+                  let dateStr = new Date(msg['Време']).toLocaleString('bg-BG', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                  let parts = msg['Бележка'].split('|||');
+                  let title = parts[0] || 'Съобщение';
+                  let body = parts[1] || '';
+                  html += `<li class="history-item" style="background: #f8fafc; padding: 10px; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                      <span style="font-size:10px; color:#64748b; margin-bottom:4px; display:block;">${dateStr}</span>
+                      <strong style="color:#1e293b; font-size:13px; margin-bottom:2px; display:block;">${title}</strong>
+                      <span style="color:#475569; font-size:12px; display:block;">${body}</span>
+                  </li>`;
+              });
+              list.innerHTML = html;
+          } catch (e) {
+              list.innerHTML = '<li class="history-item" style="color:red; text-align:center;">Грешка при зареждане</li>';
+          }
+      }
+
       function addLogToHistory(type, qty, taskId) {
          var now = new Date(); var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
          let taskData = globalTasks.find(t => t.id === taskId); var name = taskData ? (taskData.name) : 'Детайл';
@@ -348,7 +369,7 @@
         if (!isUserCheckedIn) {
             document.getElementById('mainAppContent').style.display = 'none';
             document.getElementById('bigLoginScreen').style.display = 'flex';
-            // НОВО: Премахнахме Swal.close(); от тук, за да не затваря известията!
+            // ВАЖНО: Без Swal.close() тук, за да не затваря известията!
             return; 
         }
         
