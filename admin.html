@@ -14,6 +14,7 @@
     <script src="admin/admin-notif.js" defer></script>
     <script src="admin/admin-personnel.js" defer></script>
     <script src="admin/admin-core.js" defer></script>
+    <script src="admin/admin-resolver.js" defer></script>
   </head>
   <body>
     <div id="appContent" style="display: none;">
@@ -85,6 +86,18 @@
             <div id="f-att" class="folder-content active"><table class="modal-table"><thead><tr><th>Дата и час</th><th>Действие</th><th>Локация</th><th>Бележка</th></tr></thead><tbody id="workerAttList"></tbody></table></div>
             <div id="f-work" class="folder-content"><table class="modal-table"><thead><tr><th>Дата</th><th>Детайл</th><th>Операция</th><th>К-во</th><th>Статус</th></tr></thead><tbody id="workerWorkList"></tbody></table></div>
             <div id="f-docs" class="folder-content"><div class="upload-area"><input type="file" id="docUploadInput" style="margin-bottom: 10px;"><button class="btn-primary" onclick="uploadWorkerDoc()" style="margin: 0 auto; padding: 8px 16px;">⬆️ Качи Файл</button></div><div id="workerDocsList" style="margin-top: 15px;">Зареждане на документи...</div></div>
+          </div>
+        </div>
+
+        <div class="modal-backdrop" id="resolverModalBackdrop">
+          <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <div>🌳 Технологично Дърво: <span id="resolverTitle" style="color: #4338ca;"></span></div>
+                <button onclick="document.getElementById('resolverModalBackdrop').style.display='none'" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">✖</button>
+            </div>
+            <div id="resolverContent" style="padding: 20px; max-height: 60vh; overflow-y: auto; background: #f8fafc; border-radius: 8px; margin: 15px;">
+                Зареждане...
+            </div>
           </div>
         </div>
     </div>

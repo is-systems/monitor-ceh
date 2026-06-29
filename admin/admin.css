@@ -68,3 +68,13 @@ tr:hover td { background-color: #f8fafc; }
   .btn-primary { width: 100%; justify-content: center; padding: 14px; font-size: 1.05em; }
   .search-box { max-width: 100%; width: 100%; }
 }
+
+
+/* Resolver Tree Styles */
+.tree-root { list-style-type: none; padding-left: 0; }
+.tree-root ul { list-style-type: none; padding-left: 25px; border-left: 2px dashed #cbd5e1; margin-left: 15px; }
+.tree-node { font-weight: bold; margin: 10px 0 5px 0; display: flex; align-items: center; gap: 8px; }
+.tree-part { background: #3b82f6; color: white; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 1.1em; }
+.tree-qty { color: #64748b; font-size: 0.9em; }
+.tree-ops { margin-left: 30px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; border-left: 3px solid #f59e0b; padding-left: 10px; }
+.op-badge { background: #fef3c7; color: #b45309; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; border: 1px solid #fde68a; }
