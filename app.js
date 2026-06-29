@@ -172,7 +172,7 @@ function buildBOMTree(plansData, skladData) {
     plansData.forEach(p => { 
         planMap[p.id] = p; 
         
-        let originalPlanCode = String(p['ID Детайл']).trim();
+        let originalPlanCode = String(p['Вътрешно име']).trim();
         let actualBomName = originalPlanCode;
         let displayName = originalPlanCode;
         let targetQty = parseFloat(p['Целево количество']) || 0;

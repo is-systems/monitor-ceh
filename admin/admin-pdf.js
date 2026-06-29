@@ -26,7 +26,7 @@ async function processPDF(event) {
                         let qty = parseInt(qtyItem.text.replace(/,/g, ''), 10);
                         let partCode = partItem.text.toUpperCase();
                         if (qty > 0 && qty < 100000 && partCode.length > 2 && !partCode.includes("PART")) {
-                            extractedPlan.push({ 'ID Детайл': partCode, 'Целево количество': qty, 'Месец': targetMonth, 'Година': targetYear, 'Статус': 'Активен', _existsInNom: nomSet.has(partCode) });
+                            extractedPlan.push({ 'Вътрешно име': partCode, 'Целево количество': qty, 'Месец': targetMonth, 'Година': targetYear, 'Статус': 'Активен', _existsInNom: nomSet.has(partCode) });
                         }
                     }
                 }
@@ -39,8 +39,8 @@ async function processPDF(event) {
         let hasWarnings = false;
 
         extractedPlan.forEach(p => {
-            if (p._existsInNom) { summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0;"><b style="color: #16a34a; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#1e3a8a;">${p['ID Детайл']}</span></li>`; } 
-            else { hasWarnings = true; summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0; background-color: #fef2f2; padding: 6px; border-radius: 6px; border-left: 4px solid #dc2626;"><b style="color: #dc2626; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#dc2626;">${p['ID Детайл']}</span><br><span style="color:#991b1b; font-size:0.85em; font-weight:bold;">⚠️ Внимание: Този детайл липсва в Номенклатурата!</span></li>`; }
+            if (p._existsInNom) { summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0;"><b style="color: #16a34a; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#1e3a8a;">${p['Вътрешно име']}</span></li>`; } 
+            else { hasWarnings = true; summaryHtml += `<li style="margin-bottom: 6px; padding-bottom:4px; border-bottom:1px dashed #e2e8f0; background-color: #fef2f2; padding: 6px; border-radius: 6px; border-left: 4px solid #dc2626;"><b style="color: #dc2626; font-size:1.1em;">${p['Целево количество']} бр.</b> — <span style="font-family:monospace; font-weight:bold; color:#dc2626;">${p['Вътрешно име']}</span><br><span style="color:#991b1b; font-size:0.85em; font-weight:bold;">⚠️ Внимание: Този детайл липсва в Номенклатурата!</span></li>`; }
             delete p._existsInNom; 
         });
         summaryHtml += `</ol></div>`;

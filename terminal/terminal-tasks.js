@@ -64,14 +64,14 @@ async function loadTasks(isSilent = false) {
       let planGroups = {}; 
       plansRes.data.forEach(plan => {
           let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim(); 
-          let rootItem = String(plan['ID Детайл']).trim(); 
+          let rootItem = String(plan['Вътрешно име']).trim(); 
+          let targetQty = parseFloat(plan['Целево количество']) || 0;
           
           if (nomRes.data) {
               let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === rootItem);
               if (translated && translated['ID Детайл']) rootItem = String(translated['ID Детайл']).trim();
           }
 
-          let targetQty = parseFloat(plan['Целево количество']) || 0;
           if(!planGroups[planId]) planGroups[planId] = [];
           planGroups[planId].push({ детайл_код: rootItem, общо_необходимо_количество: targetQty });
 

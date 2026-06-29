@@ -75,7 +75,21 @@ async function loadCurrentTableData() {
       if (currentTab === 'otcheti') query = query.order('Дата', { ascending: false });
       if (currentTab === 'chekiraniya') query = query.order('Време', { ascending: false });
       const { data, error } = await query; if (error) throw error;
-      globalRows = data || []; filterTable();
+      let rows = data || [];
+      if (currentTab === 'plan') {
+          const nomRes = await client.from('Номенклатура').select('*');
+          if (!nomRes.error && nomRes.data) {
+              const nomMap = {};
+              nomRes.data.forEach(n => { 
+                  if (n['Вътрешно име']) nomMap[n['Вътрешно име']] = n['ID Детайл']; 
+                  if (n['ID Детайл']) nomMap[n['ID Детайл']] = n['ID Детайл'];
+              });
+              rows.forEach(r => { 
+                  r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
+              });
+          }
+      }
+      globalRows = rows; filterTable();
   } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
 }
 
@@ -134,6 +148,10 @@ function renderDynamicTable(itemsToRender = null) {
       if (currentTab === 'chekiraniya' && f.name === 'Локация' && val && val.includes(',')) { let coords = val.replace(/\s/g, ''); td.innerHTML = `<a href="https://www.google.com/maps?q=${coords}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:none;">📍 Карта</a>`; row.appendChild(td); return; }
       if (currentTab === 'chekiraniya' && f.name === 'Бележка' && val.includes('ИЗВЪН ОБЕКТА')) { td.innerHTML = `⚠️ <b style="color:#dc2626;">${val}</b>`; row.appendChild(td); return; }
       if (typeof val === 'string' && val.startsWith('http')) { td.innerHTML = `<a href="${val}" target="_blank" style="background:#e0e7ff; color:#4338ca; padding:5px 12px; border-radius:6px; font-weight:800; text-decoration:none; font-size:0.85em; display:inline-block;">🔗 Отвори</a>`; row.appendChild(td); return; }
+      if (currentTab === 'plan' && f.name === 'ID Детайл' && val) {
+          td.innerHTML = `<button onclick="openResolverTree('${val}')" style="background:none; border:none; color:#2563eb; font-weight:900; text-decoration:underline; cursor:pointer; font-size:1em; padding:0;">${val}</button>`;
+          row.appendChild(td); return;
+      }
       td.innerText = val; row.appendChild(td);
     });
     if (!config.readOnlyTab) {
