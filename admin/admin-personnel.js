@@ -60,8 +60,15 @@ async function deleteWorkerDoc(fileName) { if (!confirm(`Изтриване на
 
 async function runInvisibleAutoCheckout() {
     try {
-        const { data, error } = await client.from('chekiraniya').select('*').order('Време', { ascending: true }); if(error) return;
-        let userState = {}; let userLastTime = {}; data.forEach(r => { userState[r['Имейл']] = r['Действие']; userLastTime[r['Имейл']] = r['Време']; }); let toCheckout = []; let now = new Date();
+        const { data, error } = await client.from('chekiraniya').select('*').in('Действие', ['Влизане', 'Излизане', 'Авто излизане']).order('Време', { ascending: false }).limit(2000); if(error) return;
+        let userState = {}; let userLastTime = {}; 
+        data.forEach(r => { 
+            if (!userState[r['Имейл']]) {
+                userState[r['Имейл']] = r['Действие']; 
+                userLastTime[r['Имейл']] = r['Време']; 
+            }
+        }); 
+        let toCheckout = []; let now = new Date();
         for(let email in userState) {
             if(userState[email] === 'Влизане') {
                 let loginTime = new Date(userLastTime[email]);
