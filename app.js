@@ -600,7 +600,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     let dId = getDomId(node.id);
 
     const isRoot = !parentMap[node.id]; 
-    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Главен детайл (Корен)">👑</span>' : '';
+    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
     
     let headerQty = 0;
     if (node.operations && node.operations.length > 0) {
@@ -631,17 +631,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
 
         if (allOpsDone) {
             titleClass = 'title-green';
-            let pastHiddenArr = [];
-            for(let i=0; i < len - 1; i++) pastHiddenArr.push(formatPast(node.operations[i]));
-            
-            let html = '';
-            if(pastHiddenArr.length > 0) {
-                html += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
-                html += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
-            }
-            html += formatFinishedAll(node.operations[len - 1]);
-            opsHTML = `<div class="vsm-ops">${html}</div>`;
-            
+            opsHTML = ''; // Completely hide operations to save screen space when the part is fully ready
         } else {
             if (hasActive) titleClass = 'title-blue';
 
