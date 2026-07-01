@@ -241,7 +241,7 @@ async function loadSkladOperations(detailCode) {
     if (!detailCode || detailCode.trim().length < 2) { sel.innerHTML = '<option value="">-- Въведете детайл първо --</option>'; return; }
     sel.innerHTML = '<option value="">Зареждане...</option>';
     try {
-        const { data, error } = await client.from('marshruti').select('Име на операция').eq('Код на детайла', detailCode.trim()).order('№ Операция', { ascending: true });
+        const { data, error } = await client.from('marshruti').select('*').eq('Код на детайла', detailCode.trim()).order('№ Операция', { ascending: true });
         if (error) throw error;
         sel.innerHTML = '';
         if (!data || data.length === 0) { sel.innerHTML = '<option value="">Не са намерени операции</option>'; return; }
