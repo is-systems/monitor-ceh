@@ -77,8 +77,23 @@ async function finishTask(taskId, btn) {
   Swal.fire({ title: 'Сигурен ли си?', html: `Ще отчетеш <b style="color:#16a34a; font-size:1.2em;">${val} здрави бройки</b>.`, icon: 'question', showCancelButton: true, confirmButtonColor: '#16a34a', confirmButtonText: '🟢 ДА, ПРЕДАЙ', cancelButtonText: 'Отказ'
   }).then(async (result) => {
     if (result.isConfirmed) {
-      btn.disabled = true; btn.innerHTML = "ЗАПИС..."; Swal.fire({ title: 'Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+      btn.disabled = true; btn.innerHTML = "ЗАПИС..."; Swal.fire({ title: 'Проверка и Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
       try {
+          if (taskData.hasLimit) {
+              const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
+              if (repErr) throw repErr;
+              let currentConsumed = 0;
+              currentReports.forEach(r => { currentConsumed += (parseFloat(r['Количество']) || 0); });
+              
+              let originalConsumed = (taskData.totalDone || 0) + (taskData.totalScrapped || 0);
+              let diff = currentConsumed - originalConsumed;
+              let realMaxAllowed = taskData.maxAllowed - diff;
+              
+              if (val > realMaxAllowed) {
+                  throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${realMaxAllowed > 0 ? realMaxAllowed : 0} бр.`);
+              }
+          }
+
           let startedAt = window['startTime_' + taskId] || new Date().toISOString();
           const { error } = await client.from('otcheti').insert([{ "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }]);
           if(error) throw error;
@@ -110,8 +125,23 @@ async function reportScrap(taskId, btn) {
 }
 
 async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNames) {
-    Swal.fire({ title: 'Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+    Swal.fire({ title: 'Проверка и Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
     try {
+        if (taskData.hasLimit) {
+            const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
+            if (repErr) throw repErr;
+            let currentConsumed = 0;
+            currentReports.forEach(r => { currentConsumed += (parseFloat(r['Количество']) || 0); });
+            
+            let originalConsumed = (taskData.totalDone || 0) + (taskData.totalScrapped || 0);
+            let diff = currentConsumed - originalConsumed;
+            let realMaxAllowed = taskData.maxAllowed - diff;
+            
+            if (val > realMaxAllowed) {
+                throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${realMaxAllowed > 0 ? realMaxAllowed : 0} бр.`);
+            }
+        }
+
         let startedAt = window['startTime_' + taskData.id] || new Date().toISOString();
         let inserts = [{ "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Брак", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
 

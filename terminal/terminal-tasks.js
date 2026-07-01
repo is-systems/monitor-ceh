@@ -155,7 +155,7 @@ async function loadTasks(isSilent = false) {
                   if (defaultInput <= 0 && isBlocked) defaultInput = 0;
                   let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
-                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty });
+                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty, totalScrapped: scrapQty });
               });
           });
       }
