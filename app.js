@@ -331,7 +331,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         else if (typeStr.includes("лагер")) n.bucket = 'bearings';
         else if (typeStr.includes("щифт")) n.bucket = 'small_pins';
         else if (typeStr.includes("шпилк")) n.bucket = 'small_studs';
-        else if (typeStr.includes("макар")) n.bucket = 'temp_spools';
+        else if (typeStr.includes("макар") || n.code.toLowerCase().includes("мак.")) n.bucket = 'temp_spools';
         else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
             n.bucket = 'assembly';
         } 
@@ -757,7 +757,8 @@ function drawArrows() {
                 
                 const cpX = startX + (endX - startX) * 0.4;
                 
-                let isSpool = conn.from.toLowerCase().includes("макар");
+                let fromLower = conn.from.toLowerCase();
+                let isSpool = fromLower.includes("макар") || fromLower.includes("мак.");
                 let strokeColor = isSpool ? "#818cf8" : "#475569";
                 let markerId = isSpool ? "url(#arrow-spool)" : "url(#arrow)";
                 
