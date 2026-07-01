@@ -147,7 +147,7 @@ async function loadData() {
         }
 
         const { mergedNodes, connections, explicitPlanItems } = buildBOMTree(dynamicData.plansData, dynamicData.skladData);
-        const masterData = categorizeParts(mergedNodes, dynamicData.reportsData, explicitPlanItems);
+        const masterData = categorizeParts(mergedNodes, dynamicData.reportsData, explicitPlanItems, connections);
 
         drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
 
@@ -260,7 +260,7 @@ function buildBOMTree(plansData, skladData) {
     return { mergedNodes, connections, explicitPlanItems };
 }
 
-function categorizeParts(mergedNodes, reportsData, explicitPlanItems) {
+function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connections) {
     let completedOps = {};
     let opStatusMap = {}; 
     
@@ -285,7 +285,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems) {
     let masterData = {
         tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
         var11: [], var25: [], bearings: [],
-        small_pins: [], small_studs: [], small_rotors: [], small_spools: [], small_others: []
+        small_pins: [], small_studs: [], small_rotors: [], small_spools: [], small_others: [], temp_spools: []
     };
 
     Object.values(mergedNodes).forEach(n => {
@@ -331,7 +331,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems) {
         else if (typeStr.includes("лагер")) n.bucket = 'bearings';
         else if (typeStr.includes("щифт")) n.bucket = 'small_pins';
         else if (typeStr.includes("шпилк")) n.bucket = 'small_studs';
-        else if (typeStr.includes("макар")) n.bucket = 'small_spools';
+        else if (typeStr.includes("макар")) n.bucket = 'temp_spools';
         else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
             n.bucket = 'assembly';
         } 
@@ -341,6 +341,28 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems) {
         
         masterData[n.bucket].push(n);
     });
+    
+    let parentMap = {};
+    if (connections) {
+        connections.forEach(c => parentMap[c.from] = c.to);
+    }
+    
+    let spools = masterData['temp_spools'] || [];
+    spools.forEach(n => {
+        let currId = n.id;
+        let finalBucket = 'small_others';
+        while (parentMap[currId]) {
+            currId = parentMap[currId];
+            let pNode = mergedNodes[currId];
+            if (pNode && pNode.bucket && pNode.bucket !== 'temp_spools') {
+                finalBucket = pNode.bucket;
+                break;
+            }
+        }
+        n.bucket = finalBucket;
+        masterData[finalBucket].push(n);
+    });
+    delete masterData['temp_spools'];
     
     return masterData;
 }
