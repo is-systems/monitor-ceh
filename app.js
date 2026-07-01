@@ -600,9 +600,15 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     let dId = getDomId(node.id);
 
     const isRoot = !parentMap[node.id]; 
-    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
+    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Главен детайл (Корен)">👑</span>' : '';
     
-    const warehouseQty = node.warehouseQty || 0; 
+    let headerQty = 0;
+    if (node.operations && node.operations.length > 0) {
+        headerQty = node.operations[node.operations.length - 1].completed || 0;
+    } else {
+        headerQty = node.warehouseQty || 0; 
+    }
+    
     const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
         ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
 
@@ -693,7 +699,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         <div class="vsm-node" id="card_${dId}">
         <div class="vsm-header">
             <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
-            <span class="vsm-qty">| ${warehouseQty}/${node.planQty}</span>
+            <span class="vsm-qty">| ${headerQty}/${node.planQty}</span>
         </div>
         ${opsHTML !== '' ? opsHTML : ''}
         </div>
