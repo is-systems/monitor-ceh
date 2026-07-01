@@ -725,7 +725,10 @@ function drawArrows() {
     svg.style.height = document.documentElement.scrollHeight + "px";
     svg.style.width = document.documentElement.scrollWidth + "px";
     
-    let html = `<defs><marker id="arrow" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#475569" /></marker></defs>`;
+    let html = `<defs>
+        <marker id="arrow" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#475569" /></marker>
+        <marker id="arrow-spool" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#818cf8" /></marker>
+    </defs>`;
     
     globalConnections.forEach(conn => {
         let childDId = domIdMap[conn.from];
@@ -754,7 +757,11 @@ function drawArrows() {
                 
                 const cpX = startX + (endX - startX) * 0.4;
                 
-                html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrow)" />`;
+                let isSpool = conn.from.toLowerCase().includes("макар");
+                let strokeColor = isSpool ? "#818cf8" : "#475569";
+                let markerId = isSpool ? "url(#arrow-spool)" : "url(#arrow)";
+                
+                html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="3,3" marker-end="${markerId}" />`;
             }
         }
     });
