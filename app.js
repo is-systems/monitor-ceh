@@ -743,7 +743,7 @@ function drawArrows() {
             const winParent = cardParent.closest('.window-body');
             if (winChild !== winParent) return;
 
-            const sourceEl = cardChild.querySelector('.vsm-title');
+            const sourceEl = cardChild.querySelector('.vsm-header');
             const targetEl = cardParent.querySelector('.vsm-title');
 
             if (sourceEl && targetEl) {
