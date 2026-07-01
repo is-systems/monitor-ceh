@@ -34,7 +34,17 @@ async function loadWorkerAttendance() {
 async function loadWorkerWork() {
     const tbody = document.getElementById('workerWorkList'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Зареждане...</td></tr>';
     try {
-        const { data, error } = await client.from('otcheti').select('*').ilike('Оператор', `%${currentFolderEmail}%`).order('Дата', { ascending: false }).limit(50); if (error) throw error;
+        const { data: pData } = await client.from('personal').select('Име').eq('Имейл', currentFolderEmail).limit(1);
+        let operatorName = (pData && pData.length > 0) ? pData[0]['Име'] : null;
+        
+        let query = client.from('otcheti').select('*');
+        if (operatorName) {
+            query = query.ilike('Оператор', `%${operatorName}%`);
+        } else {
+            query = query.ilike('Оператор', `%${currentFolderEmail}%`);
+        }
+        
+        const { data, error } = await query.order('Дата', { ascending: false }).limit(50); if (error) throw error;
         if (!data || data.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Няма отчетена работа.</td></tr>';
         else { let html = ''; data.forEach(r => { let d = new Date(r['Дата']).toLocaleDateString('bg-BG'); let statusColor = r['Статус'] === 'Брак' ? 'color:#dc2626; font-weight:800;' : 'color:#16a34a; font-weight:800;'; html += `<tr><td>${d}</td><td style="font-weight:800;">${r['ID Детайл']}</td><td>${r['Операция']}</td><td style="font-weight:800;">${r['Количество']}</td><td style="${statusColor}">${r['Статус']}</td></tr>`; }); tbody.innerHTML = html; }
     } catch(err) { tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Грешка: ${err.message}</td></tr>`; }
