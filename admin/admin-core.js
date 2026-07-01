@@ -26,7 +26,7 @@ function switchTab(tabKey) {
   const pdfBtn = document.getElementById('pdfBtn'); const sidebar = document.getElementById('personnelSidebar');
   
   addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
-  addBtn.style.display = config.readOnlyTab ? 'none' : 'flex';
+  addBtn.style.display = (config.readOnlyTab && tabKey !== 'sklad_gp') ? 'none' : 'flex';
   if (pdfBtn) pdfBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
 
   // Тук прехвърлихме показването на папките само когато сме в менюто Персонал
@@ -176,6 +176,16 @@ function filterTable() { const q = document.getElementById('searchInput').value.
 
 function buildForm(data = null) {
   const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; const fields = tableConfigs[currentTab].fields;
+  
+  if (currentTab === 'sklad_gp' && !isEditMode) {
+      area.innerHTML = `
+        <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" oninput="loadSkladOperations(this.value)" required autocomplete="off"></div>
+        <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
+        <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
+      `;
+      return;
+  }
+
   fields.forEach(f => {
     if (f.hideOnAdd && !isEditMode) return; const group = document.createElement('div'); group.className = 'form-group'; const label = document.createElement('label'); label.innerText = f.label || f.name; group.appendChild(label); let input;
     if (f.type === 'select') { input = document.createElement('select'); f.options.forEach(opt => { const option = document.createElement('option'); option.value = opt; option.innerText = opt; input.appendChild(option); }); if (data && data[f.name]) input.value = data[f.name]; else if (f.def) input.value = f.def; } 
@@ -191,7 +201,26 @@ function openEditModal(index) { isEditMode = true; editingIndex = index; documen
 function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
 
 async function saveForm(e) {
-  e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; let payload = {};
+  e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
+  
+  if (currentTab === 'sklad_gp' && !isEditMode) {
+      try {
+          const det = document.getElementById('inp_skladDetail').value.trim();
+          const op = document.getElementById('inp_skladOp').value.trim();
+          const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
+          if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
+          
+          let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
+          const { error } = await client.from('otcheti').insert([payload]); 
+          if (error) throw error; 
+          
+          Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
+          closeModal(); loadCurrentTableData();
+      } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
+      return;
+  }
+
+  let payload = {};
   config.fields.forEach(f => { const el = document.getElementById('inp_' + f.name); if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) { let val = el.value; if (f.type === 'number') val = parseFloat(val) || 0; payload[f.name] = val; } });
   try {
     if (isEditMode) { const row = globalRows[editingIndex]; const keyVal = row[config.key]; const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false}); } 
@@ -204,4 +233,26 @@ async function deleteItem(index) {
   const config = tableConfigs[currentTab]; const row = globalRows[index]; const keyVal = row[config.key];
   const res = await Swal.fire({ title: 'Сигурни ли сте?', text: "Записът ще бъде изтрит безвъзвратно!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, изтрий!', cancelButtonText: 'Отказ' });
   if (res.isConfirmed) { try { Swal.fire({title: 'Изтриване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); const { error } = await client.from(config.table).delete().eq(config.key, keyVal); if (error) throw error; Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); loadCurrentTableData(); } catch(err) { Swal.fire('Грешка', err.message, 'error'); } }
+}
+
+async function loadSkladOperations(detailCode) {
+    const sel = document.getElementById('inp_skladOp');
+    if (!sel) return;
+    if (!detailCode || detailCode.trim().length < 2) { sel.innerHTML = '<option value="">-- Въведете детайл първо --</option>'; return; }
+    sel.innerHTML = '<option value="">Зареждане...</option>';
+    try {
+        const { data, error } = await client.from('marshruti').select('Име на операция').eq('Код на детайла', detailCode.trim()).order('№ Операция', { ascending: true });
+        if (error) throw error;
+        sel.innerHTML = '';
+        if (!data || data.length === 0) { sel.innerHTML = '<option value="">Не са намерени операции</option>'; return; }
+        data.forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = String(op['Име на операция']).trim();
+            opt.innerText = String(op['Име на операция']).trim();
+            sel.appendChild(opt);
+        });
+    } catch(err) {
+        sel.innerHTML = '<option value="">Грешка при зареждане</option>';
+        console.error(err);
+    }
 }
