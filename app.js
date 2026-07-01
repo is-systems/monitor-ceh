@@ -727,7 +727,7 @@ function drawArrows() {
     
     let html = `<defs>
         <marker id="arrow" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#475569" /></marker>
-        <marker id="arrow-spool" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#818cf8" /></marker>
+        <marker id="arrow-spool" viewBox="0 0 14 14" refX="10" refY="7" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 14 7 L 0 14 z" fill="#94a3b8" /></marker>
     </defs>`;
     
     globalConnections.forEach(conn => {
@@ -761,7 +761,7 @@ function drawArrows() {
                 
                 let fromLower = conn.from.toLowerCase();
                 let isSpool = fromLower.includes("макар") || fromLower.includes("мак.");
-                let strokeColor = isSpool ? "#818cf8" : "#475569";
+                let strokeColor = isSpool ? "#94a3b8" : "#475569";
                 let markerId = isSpool ? "url(#arrow-spool)" : "url(#arrow)";
                 
                 html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="3,3" marker-end="${markerId}" />`;
