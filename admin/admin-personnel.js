@@ -78,6 +78,25 @@ async function runInvisibleAutoCheckout() {
                 }
             }
         }
-        if(toCheckout.length > 0) { await client.from('chekiraniya').insert(toCheckout); loadCurrentTableData(); }
+        if(toCheckout.length > 0) { 
+            await client.from('chekiraniya').insert(toCheckout); 
+            
+            const { data: pData } = await client.from('personal').select('Име, Имейл');
+            let emailToName = {};
+            if (pData) {
+                pData.forEach(p => { emailToName[p['Имейл']] = p['Име']; });
+            }
+            
+            for (let item of toCheckout) {
+                let email = item['Имейл'];
+                let name = emailToName[email];
+                if (name) {
+                    await client.from('otcheti').delete().eq('Оператор', name).eq('Статус', 'Започната');
+                }
+                await client.from('otcheti').delete().ilike('Оператор', `%${email}%`).eq('Статус', 'Започната');
+            }
+            
+            loadCurrentTableData(); 
+        }
     } catch(e) { console.error("Auto checkout error", e); }
 }

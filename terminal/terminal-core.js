@@ -152,6 +152,7 @@ async function processCheckIn(actionType) {
             if (lastAction === 'Влизане' && lastTime.toDateString() !== now.toDateString()) {
                 let autoOutTime = new Date(lastTime); autoOutTime.setHours(17, 0, 0, 0);
                 await client.from('chekiraniya').insert([{ "Имейл": currentEmail, "Действие": 'Авто излизане', "Време": autoOutTime.toISOString(), "Локация": "Системно", "Бележка": "Авто корекция" }]);
+                await client.from('otcheti').delete().eq('Оператор', currentOperator).eq('Статус', 'Започната');
             } else {
                 if (actionType === 'Влизане' && lastAction === 'Влизане') { Swal.fire('Внимание!', 'Вече сте чекирани за Влизане днес.', 'info'); return; }
                 if (actionType === 'Излизане' && (lastAction === 'Излизане' || lastAction === 'Авто излизане')) { Swal.fire('Внимание!', 'Вече сте се изписали.', 'info'); return; }
@@ -161,6 +162,11 @@ async function processCheckIn(actionType) {
         Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         const { error: insertErr } = await client.from('chekiraniya').insert([{ "Имейл": currentEmail, "Действие": actionType, "Време": new Date().toISOString(), "Локация": geoInfo.loc, "Бележка": geoInfo.note }]);
         if (insertErr) throw insertErr;
+        
+        if (actionType === 'Излизане') {
+            await client.from('otcheti').delete().eq('Оператор', currentOperator).eq('Статус', 'Започната');
+        }
+        
         if (actionType === 'Влизане') {
             let now = new Date();
             if (now.getHours() >= 8 && 'speechSynthesis' in window) {
