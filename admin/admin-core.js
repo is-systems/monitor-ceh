@@ -90,6 +90,9 @@ async function loadCurrentTableData() {
           }
       } else if (currentTab === 'sklad_gp') {
           const bufferRes = await client.from('sklad_bufferi').select('*');
+          if (bufferRes.error) {
+              console.error('Buffer fetch error:', bufferRes.error);
+          }
           if (!bufferRes.error && bufferRes.data) {
               const bufferMap = {};
               bufferRes.data.forEach(b => {
