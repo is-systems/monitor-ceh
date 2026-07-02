@@ -47,6 +47,10 @@ async function initTerminal() {
             Swal.fire('ОТКАЗАН ДОСТЪП', access.msg, 'error').then(() => { location.reload(); });
             return; 
         }
+        if (access.name) {
+            currentOperator = access.name;
+            localStorage.setItem('mes_operator', currentOperator);
+        }
         OneSignalDeferred.push(function(OneSignal) { OneSignal.login(currentEmail); }); 
     }
 
@@ -98,8 +102,8 @@ async function setupProfile() {
         preConfirm: () => { return [ document.getElementById('swal-name').value.trim(), document.getElementById('swal-email').value.trim() ] }
     });
     
-    if (formValues && formValues[0] && formValues[1]) {
-        let enteredEmail = formValues[1].toLowerCase();
+    if (formValues && formValues[0]) {
+        let enteredEmail = formValues[0].toLowerCase();
         
         Swal.fire({ title: 'Проверка на правата...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         let access = await verifyUserAccess(enteredEmail);
@@ -109,12 +113,12 @@ async function setupProfile() {
             return;
         }
 
-        currentOperator = formValues[0]; currentEmail = enteredEmail;
+        currentOperator = access.name || "Неизвестен"; currentEmail = enteredEmail;
         localStorage.setItem('mes_operator', currentOperator); localStorage.setItem('mes_email', currentEmail);
         document.getElementById('uiOperatorName').innerText = currentOperator;
         OneSignalDeferred.push(function(OneSignal) { OneSignal.login(currentEmail); });
         Swal.fire({icon: 'success', title: 'Профилът е одобрен!', timer: 1500, showConfirmButton: false});
-    } else if (!currentOperator) { Swal.fire('Внимание', 'Име и имейл са задължителни!', 'error').then(() => location.reload()); }
+    } else if (!currentOperator) { Swal.fire('Внимание', 'Имейлът е задължителен!', 'error').then(() => location.reload()); }
 }
 
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
