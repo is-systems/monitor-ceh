@@ -88,6 +88,19 @@ async function loadCurrentTableData() {
                   r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
               });
           }
+      } else if (currentTab === 'sklad_gp') {
+          const bufferRes = await client.from('sklad_bufferi').select('*');
+          if (!bufferRes.error && bufferRes.data) {
+              const bufferMap = {};
+              bufferRes.data.forEach(b => {
+                  let bKey = String(b['ID Детайл']).trim() + '_' + String(b['Операция']).trim();
+                  bufferMap[bKey] = parseFloat(b['Буфер']) || 0;
+              });
+              rows.forEach(r => {
+                  let rKey = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+                  r['Минимално количество/Буфер'] = bufferMap[rKey] || 0;
+              });
+          }
       }
       globalRows = rows; filterTable();
   } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
@@ -236,6 +249,7 @@ function buildForm(data = null) {
             <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" value="${data['Операция']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" value="${data['Наличност в цеха']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" required value="${data['Наличност в цеха']}"></div>
+            <div class="form-group"><label>Буфер (Минимално количество):</label><input type="number" id="inp_skladBuffer" class="form-input" step="any" min="0" required value="${data['Минимално количество/Буфер'] || 0}"></div>
           `;
       }
       return;
@@ -276,15 +290,20 @@ async function saveForm(e) {
               const op = document.getElementById('inp_skladOp').value;
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
+              const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
               const diff = newQty - oldQty;
               
-              if (diff === 0) { closeModal(); btn.innerText = 'Запази запис'; btn.disabled = false; return; }
+              if (diff !== 0) {
+                  let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
+                  const { error } = await client.from('otcheti').insert([payload]); 
+                  if (error) throw error; 
+              }
               
-              let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
-              const { error } = await client.from('otcheti').insert([payload]); 
-              if (error) throw error; 
+              await client.from('sklad_bufferi').delete().eq('ID Детайл', det).eq('Операция', op);
+              const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBuffer }]);
+              if (bufError) throw bufError;
               
-              Swal.fire({icon: 'success', title: 'Успешна корекция!', timer: 1500, showConfirmButton: false});
+              Swal.fire({icon: 'success', title: 'Успешен запис!', timer: 1500, showConfirmButton: false});
           }
           closeModal(); loadCurrentTableData();
       } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
