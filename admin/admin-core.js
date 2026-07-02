@@ -174,33 +174,62 @@ function renderDynamicTable(itemsToRender = null) {
 
 function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
 
+let globalNomenclatureCodes = [];
+
+function filterSkladDetails(val) {
+    let dropdown = document.getElementById('skladDetailDropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
+    let q = val.toLowerCase().trim();
+    if (!q) { dropdown.style.display = 'none'; return; }
+    
+    let matches = globalNomenclatureCodes.filter(code => code.toLowerCase().includes(q));
+    if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+    
+    matches.slice(0, 50).forEach(match => {
+        let div = document.createElement('div');
+        div.style.padding = '8px 12px';
+        div.style.cursor = 'pointer';
+        div.style.borderBottom = '1px solid #f1f5f9';
+        div.innerText = match;
+        div.onmouseover = () => div.style.backgroundColor = '#f8fafc';
+        div.onmouseout = () => div.style.backgroundColor = 'transparent';
+        div.onclick = () => {
+            document.getElementById('inp_skladDetail').value = match;
+            dropdown.style.display = 'none';
+            loadSkladOperations(match);
+        };
+        dropdown.appendChild(div);
+    });
+    dropdown.style.display = 'block';
+}
+
 function buildForm(data = null) {
   const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; const fields = tableConfigs[currentTab].fields;
   
   if (currentTab === 'sklad_gp') {
       if (!isEditMode) {
           area.innerHTML = `
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
                 <label>ID Детайл (Код):</label>
-                <input type="text" id="inp_skladDetail" class="form-input" list="skladDetailList" oninput="loadSkladOperations(this.value)" required autocomplete="off">
-                <datalist id="skladDetailList"></datalist>
+                <input type="text" id="inp_skladDetail" class="form-input" 
+                    oninput="filterSkladDetails(this.value); loadSkladOperations(this.value);" 
+                    onfocus="filterSkladDetails(this.value)" 
+                    onblur="setTimeout(() => { let d = document.getElementById('skladDetailDropdown'); if(d) d.style.display = 'none'; }, 200)" 
+                    required autocomplete="off">
+                <div id="skladDetailDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #cbd5e1; border-radius:4px; z-index:1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"></div>
             </div>
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
             <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
           `;
-          client.from('Номенклатура').select('*').limit(100000).then(res => {
-              if (res.data) {
-                  let list = document.getElementById('skladDetailList');
-                  if(!list) return;
-                  res.data.forEach(n => {
-                      if(n['ID Детайл']) {
-                          let option = document.createElement('option');
-                          option.value = String(n['ID Детайл']).trim();
-                          list.appendChild(option);
-                      }
-                  });
-              }
-          });
+          
+          if (globalNomenclatureCodes.length === 0) {
+              client.from('Номенклатура').select('*').limit(100000).then(res => {
+                  if (res.data) {
+                      globalNomenclatureCodes = res.data.map(n => String(n['ID Детайл']).trim()).filter(Boolean);
+                  }
+              });
+          }
       } else {
           area.innerHTML = `
             <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" value="${data['ID Детайл']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
