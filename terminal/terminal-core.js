@@ -10,11 +10,11 @@ const WORKSHOP_LAT = 41.8937; const WORKSHOP_LNG = 23.4875;
 
 async function verifyUserAccess(email) {
     try {
-        const { data, error } = await client.from('personal').select('Статус').eq('Имейл', email).limit(1);
-        if (error) return { allowed: false, msg: "Грешка при връзката със сървъра." };
-        if (!data || data.length === 0) return { allowed: false, msg: "Неразпознат служител! Свържете се с ръководител." };
-        if (data[0]['Статус'] === 'Блокиран') return { allowed: false, msg: "Достъпът ви до системата е ограничен!" };
-        return { allowed: true };
+        const { data, error } = await client.from('personal').select('Статус, Име').eq('Имейл', email).limit(1);
+        if (error) return { allowed: false, msg: "Грешка при проверка на достъпа." };
+        if (!data || data.length === 0) return { allowed: false, msg: "Непознат имейл адрес! Моля, свържете се с администратор." };
+        if (data[0]['Статус'] === 'Блокиран') return { allowed: false, msg: "Достъпът ви е временно блокиран!" };
+        return { allowed: true, name: data[0]['Име'] };
     } catch (err) {
         return { allowed: false, msg: err.message };
     }
