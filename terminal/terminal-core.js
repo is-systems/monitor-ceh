@@ -93,13 +93,13 @@ async function setupProfile() {
         title: 'Профил Работник',
         html:
             '<div style="background: #e0e7ff; padding: 10px; border-radius: 8px; margin-bottom: 15px;"><button type="button" onclick="triggerPushPrompt()" style="background: #4338ca; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; width:100%; box-shadow: 0 2px 4px rgba(67,56,202,0.3);">🔔 Поискай известия (Ръчно)</button><p style="font-size: 11px; color: #475569; margin: 5px 0 0 0; text-align: center;">Ако все още не сте се абонирали.</p></div>' +
-            '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-bottom:5px; color:#475569;">Име и Фамилия</label><input id="swal-name" class="swal2-input" style="margin-top:0;" value="' + (currentOperator || '') + '">' +
+            '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-bottom:5px; color:#475569;">Име и Фамилия</label><input id="swal-name" class="swal2-input" style="margin-top:0; background:#f1f5f9; color:#94a3b8; cursor:not-allowed;" readonly placeholder="Автоматично попълване" value="' + (currentOperator || '') + '">' +
             '<label style="display:block; text-align:left; font-size:14px; font-weight:bold; margin-top:15px; margin-bottom:5px; color:#475569;">Личен Имейл</label><input id="swal-email" class="swal2-input" type="email" style="margin-top:0;" value="' + (currentEmail || '') + '">' +
             '<div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: center; gap: 10px;">' +
             '<button type="button" onclick="window.location.href=\'admin.html\'" style="background: transparent; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔒 Админ</button>' +
             '<button type="button" disabled style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #94a3b8; padding: 6px 12px; border-radius: 6px; cursor: not-allowed; font-size: 12px; font-weight: bold; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">🔒 Досие (Скоро)</button></div>',
         focusConfirm: false, allowOutsideClick: !!currentOperator, confirmButtonText: 'Запази профила', confirmButtonColor: '#2563eb',
-        preConfirm: () => { return [ document.getElementById('swal-name').value.trim(), document.getElementById('swal-email').value.trim() ] }
+        preConfirm: () => { return [ document.getElementById('swal-email').value.trim() ] }
     });
     
     if (formValues && formValues[0]) {
