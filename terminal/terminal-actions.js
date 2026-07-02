@@ -52,8 +52,6 @@ function claimCurrentTaskDOM(taskId) {
 
 function pauseTaskDOM(taskId) {
   if (navigator.vibrate) navigator.vibrate(50); activeTaskId = null; 
-  document.querySelectorAll('.card').forEach(c => c.style.display = 'flex'); 
-  document.getElementById('free_state_' + taskId).style.display = 'block'; document.getElementById('focus_state_' + taskId).style.display = 'none';
 
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData) {
@@ -68,6 +66,8 @@ function pauseTaskDOM(taskId) {
           "Време Старт": window['startTime_' + taskId] || new Date().toISOString() 
       }]).then(res => { if(res.error) console.error("Грешка при сигнал Прекъсната", res.error); });
   }
+
+  renderTasks(globalTasks);
 }
 
 async function finishTask(taskId, btn) {
