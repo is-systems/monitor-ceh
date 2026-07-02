@@ -202,6 +202,10 @@ function renderTasks(tasks) {
         actionButtonHtml = `<button onclick="claimCurrentTaskDOM('${t.id}')" style="background-color: #2563eb; color: white; width: 100%; padding: 16px; font-size: 1.15em; font-weight: 800; border: none; border-radius: 10px; cursor:pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">🚀 ПОЕМИ ЗАДАЧА</button>`;
     }
 
+    let isFocused = t.isTaken || (typeof activeTaskId !== 'undefined' && t.id === activeTaskId);
+    let freeStateStyle = isFocused ? 'display: none;' : 'display: block;';
+    let focusStateStyle = isFocused ? 'display: block;' : 'display: none;';
+
     html += `
       <div class="card" id="card_${t.id}" style="${borderStyle}">
         <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${t.totalNeed} бр.</span></div>
@@ -209,8 +213,8 @@ function renderTasks(tasks) {
         ${sopHtml} ${descHtml}
         <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
         ${bomBadgeHtml}
-        <div id="free_state_${t.id}">${actionButtonHtml}</div>
-        <div id="focus_state_${t.id}" style="display: none;">
+        <div id="free_state_${t.id}" style="${freeStateStyle}">${actionButtonHtml}</div>
+        <div id="focus_state_${t.id}" style="${focusStateStyle}">
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 12px; margin-top: 5px; border: 2px solid #bae6fd;">
             <p style="color: #0369a1; font-weight: 900; text-align:center; margin-top:0; font-size: 1.1em;">🟢 В ПРОЦЕС НА РАБОТА</p>
             <div style="display:flex; justify-content:space-between; margin-bottom: 5px; font-size: 0.85em; font-weight:bold; color: #64748b;"><span>Готови до момента:</span><span>${t.totalDone} бр.</span></div>

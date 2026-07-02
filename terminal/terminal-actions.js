@@ -37,6 +37,7 @@ function claimCurrentTaskDOM(taskId) {
 
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData) {
+      taskData.isTaken = true;
       client.from('otcheti').insert([{ 
           "ID Детайл": taskData.name, 
           "Оператор": currentOperator, 
@@ -56,6 +57,7 @@ function pauseTaskDOM(taskId) {
 
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData) {
+      taskData.isTaken = false;
       client.from('otcheti').insert([{ 
           "ID Детайл": taskData.name, 
           "Оператор": currentOperator, 
