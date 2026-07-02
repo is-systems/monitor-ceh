@@ -52,10 +52,12 @@ async function loadTasks(isSilent = false) {
       routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
       Object.keys(globalRoutesByDetail).forEach(code => globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
 
-      let completedOps = {}; let scrappedOps = {}; 
+      let completedOps = {}; let scrappedOps = {}; let takenOps = {};
       reportsRes.data.forEach(r => {
           let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim(); let qty = parseFloat(r['Количество']) || 0;
-          if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty; else completedOps[key] = (completedOps[key] || 0) + qty;
+          if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty; 
+          else if (r['Статус'] === 'Започната') takenOps[key] = true;
+          else completedOps[key] = (completedOps[key] || 0) + qty;
       });
 
       let skladData = skladRes.data || [];
@@ -155,7 +157,8 @@ async function loadTasks(isSilent = false) {
                   if (defaultInput <= 0 && isBlocked) defaultInput = 0;
                   let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
-                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty, totalScrapped: scrapQty });
+                  let isTaken = takenOps[opKey] === true;
+                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken });
               });
           });
       }
@@ -167,7 +170,7 @@ function renderTasks(tasks) {
   var container = document.getElementById('tasksContainer');
   let filteredTasks = tasks;
   if (currentTaskFilter === 'ready') filteredTasks = tasks.filter(t => !t.isBlocked);
-  else if (currentTaskFilter === 'blocked') filteredTasks = tasks.filter(t => t.isBlocked);
+  else if (currentTaskFilter === 'taken') filteredTasks = tasks.filter(t => t.isTaken);
 
   if(filteredTasks.length === 0) { 
       let msg = currentTaskFilter === 'all' ? '🎉 Всички задачи са изпълнени!' : 'Няма задачи в тази категория.';
