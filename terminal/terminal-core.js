@@ -59,6 +59,7 @@ async function initTerminal() {
     
     checkSystemMessage();
     loadTasks();
+    loadHistoryFromDB();
 
     setInterval(() => { if (!activeTaskId && isUserCheckedIn) loadTasks(true); }, 30000); 
 }

@@ -6,6 +6,36 @@ function updateHistoryUI() {
   list.innerHTML = html;
 }
 
+async function loadHistoryFromDB() {
+    if (!currentOperator || !navigator.onLine) return;
+    try {
+        const { data, error } = await client.from('otcheti')
+            .select('ID Детайл, Количество, Дата, Статус')
+            .eq('Оператор', currentOperator)
+            .in('Статус', ['Отчетено', 'Брак'])
+            .order('Дата', { ascending: false })
+            .limit(5);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+            localHistoryData = data.map(r => {
+                let d = new Date(r['Дата']);
+                let timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                let isScrap = r['Статус'] === 'Брак';
+                return {
+                    time: timeStr,
+                    type: isScrap ? 'БРАК' : 'ГОТОВО',
+                    qty: r['Количество'],
+                    name: String(r['ID Детайл']).trim()
+                };
+            });
+            updateHistoryUI();
+        }
+    } catch (e) {
+        console.error("Грешка при зареждане на история от базата:", e);
+    }
+}
+
 function toggleHistory() { 
     var panel = document.getElementById('historyPanel'); 
     panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; 
