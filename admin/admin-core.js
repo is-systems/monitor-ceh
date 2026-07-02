@@ -106,10 +106,10 @@ function renderDynamicTable(itemsToRender = null) {
   }
 
   config.fields.forEach(f => { if (f.hideOnAdd) return; const th = document.createElement('th'); th.innerText = f.label || f.name; headerRow.appendChild(th); });
-  if (!config.readOnlyTab) { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
+  if (!config.readOnlyTab || currentTab === 'sklad_gp') { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
   thead.appendChild(headerRow);
   
-  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab ? 0 : 2)}" style="text-align:center; padding:40px;">Няма записи.</td></tr>`; table.style.display = 'table'; return; }
+  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab && currentTab !== 'sklad_gp' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
 
   currentRenderedRows.forEach((item) => {
     const row = document.createElement('tr'); const trueIndex = globalRows.indexOf(item);
@@ -155,11 +155,11 @@ function renderDynamicTable(itemsToRender = null) {
       }
       td.innerText = val; row.appendChild(td);
     });
-    if (!config.readOnlyTab) {
-        const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
-        tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})">✏️</button><button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})">🗑️</button>`;
-        row.appendChild(tdActions);
-    }
+      if (!config.readOnlyTab || currentTab === 'sklad_gp') {
+          const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
+          tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})">✏️</button><button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})">🗑️</button>`;
+          row.appendChild(tdActions);
+      }
     tbody.appendChild(row);
   });
   table.style.display = 'table';
@@ -177,12 +177,36 @@ function filterTable() { const q = document.getElementById('searchInput').value.
 function buildForm(data = null) {
   const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; const fields = tableConfigs[currentTab].fields;
   
-  if (currentTab === 'sklad_gp' && !isEditMode) {
-      area.innerHTML = `
-        <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" oninput="loadSkladOperations(this.value)" required autocomplete="off"></div>
-        <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
-        <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
-      `;
+  if (currentTab === 'sklad_gp') {
+      if (!isEditMode) {
+          area.innerHTML = `
+            <div class="form-group">
+                <label>ID Детайл (Код):</label>
+                <input type="text" id="inp_skladDetail" class="form-input" list="skladDetailList" oninput="loadSkladOperations(this.value)" required autocomplete="off">
+                <datalist id="skladDetailList"></datalist>
+            </div>
+            <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
+            <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
+          `;
+          client.from('Номенклатура').select('ID Детайл').then(res => {
+              if (res.data) {
+                  let list = document.getElementById('skladDetailList');
+                  if(!list) return;
+                  res.data.forEach(n => {
+                      let option = document.createElement('option');
+                      option.value = String(n['ID Детайл']).trim();
+                      list.appendChild(option);
+                  });
+              }
+          });
+      } else {
+          area.innerHTML = `
+            <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" value="${data['ID Детайл']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
+            <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" value="${data['Операция']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
+            <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" value="${data['Наличност в цеха']}" readonly style="background:#f1f5f9; color:#64748b;"></div>
+            <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" required value="${data['Наличност в цеха']}"></div>
+          `;
+      }
       return;
   }
 
@@ -203,18 +227,34 @@ function closeModal() { document.getElementById('modalBackdrop').style.display =
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
   
-  if (currentTab === 'sklad_gp' && !isEditMode) {
+  if (currentTab === 'sklad_gp') {
       try {
-          const det = document.getElementById('inp_skladDetail').value.trim();
-          const op = document.getElementById('inp_skladOp').value.trim();
-          const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
-          if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
-          
-          let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
-          const { error } = await client.from('otcheti').insert([payload]); 
-          if (error) throw error; 
-          
-          Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
+          if (!isEditMode) {
+              const det = document.getElementById('inp_skladDetail').value.trim();
+              const op = document.getElementById('inp_skladOp').value.trim();
+              const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
+              if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
+              
+              let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
+              const { error } = await client.from('otcheti').insert([payload]); 
+              if (error) throw error; 
+              
+              Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
+          } else {
+              const det = document.getElementById('inp_skladDetail').value;
+              const op = document.getElementById('inp_skladOp').value;
+              const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
+              const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
+              const diff = newQty - oldQty;
+              
+              if (diff === 0) { closeModal(); btn.innerText = 'Запази запис'; btn.disabled = false; return; }
+              
+              let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
+              const { error } = await client.from('otcheti').insert([payload]); 
+              if (error) throw error; 
+              
+              Swal.fire({icon: 'success', title: 'Успешна корекция!', timer: 1500, showConfirmButton: false});
+          }
           closeModal(); loadCurrentTableData();
       } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
       return;
@@ -230,7 +270,24 @@ async function saveForm(e) {
 }
 
 async function deleteItem(index) {
-  const config = tableConfigs[currentTab]; const row = globalRows[index]; const keyVal = row[config.key];
+  const config = tableConfigs[currentTab]; const row = globalRows[index]; 
+  
+  if (currentTab === 'sklad_gp') {
+      const res = await Swal.fire({ title: 'Нулиране на наличността?', text: `Наличността за ${row['ID Детайл']} (${row['Операция']}) ще бъде зададена на 0.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, нулирай!', cancelButtonText: 'Отказ' });
+      if (res.isConfirmed) { 
+          try { 
+              Swal.fire({title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
+              let payload = { "ID Детайл": row['ID Детайл'], "Операция": row['Операция'], "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
+              const { error } = await client.from('otcheti').insert([payload]); 
+              if (error) throw error; 
+              Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); 
+              loadCurrentTableData(); 
+          } catch(err) { Swal.fire('Грешка', err.message, 'error'); } 
+      }
+      return;
+  }
+
+  const keyVal = row[config.key];
   const res = await Swal.fire({ title: 'Сигурни ли сте?', text: "Записът ще бъде изтрит безвъзвратно!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, изтрий!', cancelButtonText: 'Отказ' });
   if (res.isConfirmed) { try { Swal.fire({title: 'Изтриване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); const { error } = await client.from(config.table).delete().eq(config.key, keyVal); if (error) throw error; Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); loadCurrentTableData(); } catch(err) { Swal.fire('Грешка', err.message, 'error'); } }
 }
