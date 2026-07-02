@@ -188,14 +188,16 @@ function buildForm(data = null) {
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
             <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
           `;
-          client.from('Номенклатура').select('ID Детайл').then(res => {
+          client.from('Номенклатура').select('*').limit(100000).then(res => {
               if (res.data) {
                   let list = document.getElementById('skladDetailList');
                   if(!list) return;
                   res.data.forEach(n => {
-                      let option = document.createElement('option');
-                      option.value = String(n['ID Детайл']).trim();
-                      list.appendChild(option);
+                      if(n['ID Детайл']) {
+                          let option = document.createElement('option');
+                          option.value = String(n['ID Детайл']).trim();
+                          list.appendChild(option);
+                      }
                   });
               }
           });
