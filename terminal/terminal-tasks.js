@@ -56,7 +56,11 @@ async function loadTasks(isSilent = false) {
       reportsRes.data.forEach(r => {
           let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim(); let qty = parseFloat(r['Количество']) || 0;
           if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty; 
-          else if (r['Статус'] === 'Започната') takenOps[key] = true;
+          else if (r['Статус'] === 'Започната') {
+              if (String(r['Оператор']).trim() === currentOperator.trim()) {
+                  takenOps[key] = true;
+              }
+          }
           else completedOps[key] = (completedOps[key] || 0) + qty;
       });
 
