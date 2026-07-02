@@ -52,16 +52,27 @@ async function loadTasks(isSilent = false) {
       routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
       Object.keys(globalRoutesByDetail).forEach(code => globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
 
+      reportsRes.data.sort((a, b) => new Date(a['Дата']) - new Date(b['Дата']));
+
       let completedOps = {}; let scrappedOps = {}; let takenOps = {};
       reportsRes.data.forEach(r => {
-          let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim(); let qty = parseFloat(r['Количество']) || 0;
-          if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty; 
-          else if (r['Статус'] === 'Започната') {
-              if (String(r['Оператор']).trim() === currentOperator.trim()) {
-                  takenOps[key] = true;
-              }
+          let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim(); 
+          let qty = parseFloat(r['Количество']) || 0;
+          
+          if (r['Статус'] === 'Брак') {
+              scrappedOps[key] = (scrappedOps[key] || 0) + qty;
+              if (String(r['Оператор']).trim() === currentOperator.trim()) takenOps[key] = false;
+          } 
+          else if (r['Статус'] === 'Отчетено') {
+              completedOps[key] = (completedOps[key] || 0) + qty;
+              if (String(r['Оператор']).trim() === currentOperator.trim()) takenOps[key] = false;
           }
-          else completedOps[key] = (completedOps[key] || 0) + qty;
+          else if (r['Статус'] === 'Започната') {
+              if (String(r['Оператор']).trim() === currentOperator.trim()) takenOps[key] = true;
+          }
+          else if (r['Статус'] === 'Прекъсната') {
+              if (String(r['Оператор']).trim() === currentOperator.trim()) takenOps[key] = false;
+          }
       });
 
       let skladData = skladRes.data || [];
