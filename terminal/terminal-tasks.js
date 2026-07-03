@@ -277,13 +277,8 @@ function renderTasks(tasks) {
     var descHtml = t.desc ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
     var bomBadgeHtml = ''; var actionButtonHtml = ''; var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
     
-    let displayNeedHtml = `<span class="qty-badge">${t.totalNeed} бр.</span>`;
-    if (t.totalNeed > t.pureQty && t.pureQty > 0) {
-        let extra = t.totalNeed - t.pureQty;
-        displayNeedHtml = `<span class="qty-badge">${t.pureQty} бр.</span> <span class="qty-badge" style="background-color: #16a34a; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3);">+${extra} бр.</span>`;
-    } else if (t.totalNeed > t.pureQty && t.pureQty === 0) {
-        displayNeedHtml = `<span class="qty-badge" style="background-color: #16a34a; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3);">+${t.totalNeed} бр.</span>`;
-    }
+    let remainingQty = Math.max(0, t.totalNeed - t.totalDone);
+    let displayNeedHtml = `<span class="qty-badge">${remainingQty} бр.</span>`;
 
     if (t.isBlocked) {
         let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
