@@ -37,16 +37,25 @@ async function loadTasks(isSilent = false) {
   if (!isSilent) container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи... 🔄</div>';
   
   try {
-      const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes] = await Promise.all([
+      const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes, bufferRes] = await Promise.all([
           client.from('plan').select('*').eq('Статус', 'Активен').limit(100000), client.from('bom').select('*').limit(100000),
           client.from('marshruti').select('*').limit(100000), client.from('otcheti').select('*').limit(100000), 
-          client.from('sklad').select('*').limit(100000), client.from('Номенклатура').select('*').limit(100000) 
+          client.from('sklad').select('*').limit(100000), client.from('Номенклатура').select('*').limit(100000),
+          client.from('sklad_bufferi').select('*').limit(100000)
       ]);
 
       if (plansRes.error) throw plansRes.error; if (bomRes.error) throw bomRes.error;
       if (routesRes.error) throw routesRes.error; if (reportsRes.error) throw reportsRes.error;
 
       let namesMap = {}; if (nomRes.data) nomRes.data.forEach(n => { let code = String(n['ID Детайл']).trim().toLowerCase(); namesMap[code] = n['Вътрешно име'] || ''; });
+      
+      let bufferMap = {};
+      if (bufferRes && bufferRes.data) {
+          bufferRes.data.forEach(b => {
+              let bKey = String(b['ID Детайл']).trim();
+              bufferMap[bKey] = parseFloat(b['Буфер']) || 0;
+          });
+      }
 
       globalBomData = bomRes.data || []; globalRoutesByDetail = {};
       routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
@@ -154,10 +163,21 @@ async function loadTasks(isSilent = false) {
           allItems.forEach(item => getDepth(item));
           allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
 
+          let combinedBom = {};
           Object.keys(planRoots[planId]).forEach(root => { 
               aggregatedBom[root] = planRoots[planId][root]; 
               purePlanBom[root] = planRoots[planId][root];
+              combinedBom[root] = (planRoots[planId][root] || 0);
           });
+          Object.keys(bufferMap).forEach(code => {
+              combinedBom[code] = (combinedBom[code] || 0) + bufferMap[code];
+              if (!allItemsSet.has(code)) {
+                  allItemsSet.add(code);
+                  allItems.push(code);
+                  getDepth(code);
+              }
+          });
+          allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
 
           allItems.forEach(item => {
               let baseNeed = aggregatedBom[item] || 0;
@@ -170,6 +190,16 @@ async function loadTasks(isSilent = false) {
                   });
               }
               
+              let cBaseNeed = combinedBom[item] || 0;
+              if (cBaseNeed > 0 || getStarted(item) > 0) {
+                  let cEffective = Math.max(cBaseNeed + getScrap(item), getStarted(item));
+                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+                  children.forEach(c => {
+                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                      combinedBom[childName] = (combinedBom[childName] || 0) + (cEffective * multiplier);
+                  });
+              }
+
               let pureBaseNeed = purePlanBom[item] || 0;
               if (pureBaseNeed > 0) {
                   let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
@@ -180,8 +210,9 @@ async function loadTasks(isSilent = false) {
               }
           });
           
-          Object.keys(aggregatedBom).forEach((code, nodeIndex) => {
-              let planQty = aggregatedBom[code];
+          Object.keys(combinedBom).forEach((code, nodeIndex) => {
+              let planQty = aggregatedBom[code] || 0;
+              let combinedQty = combinedBom[code] || 0;
               let pureQty = purePlanBom[code] || 0;
               let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
               
@@ -190,9 +221,11 @@ async function loadTasks(isSilent = false) {
                   let doneQty = trueDoneOps[opKey] || 0; let scrapQty = scrappedOps[opKey] || 0; let consumedHere = doneQty + scrapQty; 
                   let scrapStrictlyDownstream = 0;
                   for(let j = idx + 1; j < routes.length; j++) { let dKey = code + '_' + String(routes[j]['Име на операция']).trim(); scrapStrictlyDownstream += (scrappedOps[dKey] || 0); }
+                  
                   let effectivePlanQty = planQty + scrapStrictlyDownstream;
+                  let effectiveCombinedQty = combinedQty + scrapStrictlyDownstream;
 
-                  if(doneQty >= effectivePlanQty) return; 
+                  if(doneQty >= effectiveCombinedQty) return; 
                   let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; 
 
                   if (idx > 0) {
@@ -247,14 +280,31 @@ async function loadTasks(isSilent = false) {
 
                   blockingReasons = [...new Set(blockingReasons)];
 
-                  let defaultInput = (effectivePlanQty - doneQty > 0) ? (effectivePlanQty - doneQty) : 0;
-                  if (hasLimit && defaultInput > maxAllowed) defaultInput = maxAllowed;
-                  if (defaultInput <= 0 && !hasLimit) defaultInput = 1; 
-                  if (defaultInput <= 0 && isBlocked) defaultInput = 0;
-                  let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
-
                   let isTaken = takenOps[opKey] === true;
-                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken });
+                  let safeIdBase = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
+
+                  let blueDeficit = Math.max(0, effectivePlanQty - doneQty);
+                  let greenDeficit = Math.max(0, effectiveCombinedQty - Math.max(doneQty, effectivePlanQty));
+
+                  if (blueDeficit > 0) {
+                      let blueInput = blueDeficit;
+                      if (hasLimit && blueInput > maxAllowed) blueInput = maxAllowed;
+                      if (blueInput <= 0 && !hasLimit) blueInput = 1;
+                      if (blueInput <= 0 && isBlocked) blueInput = 0;
+                      globalTasks.push({ id: safeIdBase + '_blue', plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: blueInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: false });
+                  }
+                  
+                  if (greenDeficit > 0) {
+                      // Green tasks calculate maxAllowed somewhat differently (the blue task might have consumed some maxAllowed)
+                      // But for UI simplicity we use the same maxAllowed. The worker can only type up to maxAllowed anyway.
+                      let greenInput = greenDeficit;
+                      // Wait! The blue task already "reserves" some maxAllowed if both are generated. 
+                      // Actually, they will be combined or filtered out later.
+                      if (hasLimit && greenInput > maxAllowed) greenInput = maxAllowed;
+                      if (greenInput <= 0 && !hasLimit) greenInput = 1;
+                      if (greenInput <= 0 && isBlocked) greenInput = 0;
+                      globalTasks.push({ id: safeIdBase + '_green', plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: greenInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectiveCombinedQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: true });
+                  }
               });
           });
       }
@@ -264,9 +314,17 @@ async function loadTasks(isSilent = false) {
 
 function renderTasks(tasks) {
   var container = document.getElementById('tasksContainer');
-  let filteredTasks = tasks;
-  if (currentTaskFilter === 'ready') filteredTasks = tasks.filter(t => !t.isBlocked);
-  else if (currentTaskFilter === 'taken') filteredTasks = tasks.filter(t => t.isTaken);
+  
+  // Filter Green Cards if there are any Blue Cards for the current machine
+  let hasBlueCards = tasks.some(t => !t.isGreenCard);
+  let visibleTasks = tasks;
+  if (hasBlueCards) {
+      visibleTasks = tasks.filter(t => !t.isGreenCard);
+  }
+
+  let filteredTasks = visibleTasks;
+  if (currentTaskFilter === 'ready') filteredTasks = visibleTasks.filter(t => !t.isBlocked);
+  else if (currentTaskFilter === 'taken') filteredTasks = visibleTasks.filter(t => t.isTaken);
 
   if(filteredTasks.length === 0) { 
       let msg = currentTaskFilter === 'all' ? '🎉 Всички задачи са изпълнени!' : 'Няма задачи в тази категория.';
@@ -276,14 +334,16 @@ function renderTasks(tasks) {
   
   var html = '';
   filteredTasks.forEach(function(t) {
-    let borderStyle = 'border-left: 6px solid #3b82f6;'; let partCode = t.name; let internalNameHtml = t.internalName ? `<div class="detail-code">${t.internalName}</div>` : '';
+    let borderStyle = t.isGreenCard ? 'border-left: 6px solid #16a34a;' : 'border-left: 6px solid #3b82f6;';
+    let labelHtml = t.isGreenCard ? `<span class="plan-label" style="color: #16a34a;">БУФЕР: Склад</span>` : `<span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span>`;
+    let partCode = t.name; let internalNameHtml = t.internalName ? `<div class="detail-code">${t.internalName}</div>` : '';
     let linkHtml = t.drawing_link && t.drawing_link.startsWith('http') ? `<a href="${t.drawing_link}" target="_blank">${partCode} 🔗</a>` : partCode;
     var sopHtml = (t.sop_link && t.sop_link.startsWith('http')) ? `<a href="${t.sop_link}" target="_blank" style="display:inline-block; margin-bottom:12px; background:#f59e0b; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px;">📑 Отвори СОП</a>` : '';
     var descHtml = t.desc ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
     var bomBadgeHtml = ''; var actionButtonHtml = ''; var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
     
     let remainingQty = Math.max(0, t.totalNeed - t.totalDone);
-    let displayNeedHtml = `<span class="qty-badge">${remainingQty} бр.</span>`;
+    let displayNeedHtml = `<span class="qty-badge" style="${t.isGreenCard ? 'background-color:#16a34a;' : ''}">${remainingQty} бр.</span>`;
 
     if (t.isBlocked) {
         let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
@@ -303,7 +363,7 @@ function renderTasks(tasks) {
 
     html += `
       <div class="card" id="card_${t.id}" style="${borderStyle}">
-        <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><div style="display:flex; gap: 6px;">${displayNeedHtml}</div></div>
+        <div class="task-header">${labelHtml}<div style="display:flex; gap: 6px;">${displayNeedHtml}</div></div>
         <div class="detail-info"><div class="internal-name">${linkHtml}</div>${internalNameHtml}</div>
         ${sopHtml} ${descHtml}
         <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
