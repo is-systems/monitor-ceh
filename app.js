@@ -315,15 +315,20 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     });
 
     let totalShippedCache = {};
-    function getTotalShipped(item) {
+    function getTotalShipped(item, visited = new Set()) {
         let lc = item.toLowerCase();
         if (totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
+        if (visited.has(lc)) return 0;
+        visited.add(lc);
         
-        let directShipped = shippedQty[item] || 0;
+        let directShipped = shippedQty[lc] || 0;
         let parents = staticCache.bomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
         let indirectShipped = 0;
         parents.forEach(p => {
-            indirectShipped += getTotalShipped(String(p['ID Родител']).trim()) * (parseFloat(p['Количество']) || 1);
+            let parentCode = String(p['ID Родител']).trim().toLowerCase();
+            if (parentCode !== lc) {
+                indirectShipped += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
+            }
         });
         
         totalShippedCache[lc] = directShipped + indirectShipped;
