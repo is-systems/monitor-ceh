@@ -169,85 +169,90 @@ async function loadTasks(isSilent = false) {
       });
 
       globalTasks = [];
+
+      let aggregatedBom = {}; 
+      let purePlanBom = {};
+      let combinedBom = {};
+      let activePlanNames = [];
+
       for(let planId in planRoots) {
-          let aggregatedBom = {}; 
-          let purePlanBom = {};
+          activePlanNames.push(planId.replace('_', ' '));
+          Object.keys(planRoots[planId]).forEach(root => {
+              aggregatedBom[root] = (aggregatedBom[root] || 0) + planRoots[planId][root];
+              purePlanBom[root] = (purePlanBom[root] || 0) + planRoots[planId][root];
+              combinedBom[root] = (combinedBom[root] || 0) + planRoots[planId][root];
+          });
+      }
+
+      let globalPlanId = activePlanNames.length > 0 ? "АКТИВНИ ПЛАНОВЕ" : "БУФЕРИ";
+
+      let depths = {};
+      let getDepth = (item, visited = new Set()) => {
+          if (depths[item] !== undefined) return depths[item];
+          if (visited.has(item)) return 0; 
+          visited.add(item);
           
-          let depths = {};
-          let getDepth = (item, visited = new Set()) => {
-              if (depths[item] !== undefined) return depths[item];
-              if (visited.has(item)) return 0; 
-              visited.add(item);
-              
-              let parents = globalBomData.filter(b => String(b['ID Компонент']).trim() === item);
-              if (parents.length === 0) { depths[item] = 0; return 0; }
-              let maxP = -1;
-              parents.forEach(p => {
-                  let pCode = String(p['ID Родител']).trim();
-                  if (pCode !== item) { let d = getDepth(pCode, new Set(visited)); if (d > maxP) maxP = d; }
+          let parents = globalBomData.filter(b => String(b['ID Компонент']).trim() === item);
+          if (parents.length === 0) { depths[item] = 0; return 0; }
+          let maxP = -1;
+          parents.forEach(p => {
+              let pCode = String(p['ID Родител']).trim();
+              if (pCode !== item) { let d = getDepth(pCode, new Set(visited)); if (d > maxP) maxP = d; }
+          });
+          depths[item] = maxP + 1; return depths[item];
+      };
+
+      let allItemsSet = new Set(Object.keys(aggregatedBom));
+      globalBomData.forEach(b => { allItemsSet.add(String(b['ID Родител']).trim()); allItemsSet.add(String(b['ID Компонент']).trim()); });
+      let allItems = Array.from(allItemsSet);
+      
+      Object.keys(bufferMap).forEach(code => {
+          combinedBom[code] = (combinedBom[code] || 0) + bufferMap[code];
+          if (!allItemsSet.has(code)) {
+              allItemsSet.add(code);
+              allItems.push(code);
+          }
+      });
+
+      allItems.forEach(item => getDepth(item));
+      allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
+
+      allItems.forEach(item => {
+          let baseNeed = aggregatedBom[item] || 0;
+          if (baseNeed > 0 || getStarted(item) > 0) {
+              let effective = Math.max(baseNeed + getScrap(item), getStarted(item));
+              let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+              children.forEach(c => {
+                  let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                  aggregatedBom[childName] = (aggregatedBom[childName] || 0) + (effective * multiplier);
               });
-              depths[item] = maxP + 1; return depths[item];
-          };
-
-          let allItemsSet = new Set(Object.keys(planRoots[planId]));
-          globalBomData.forEach(b => { allItemsSet.add(String(b['ID Родител']).trim()); allItemsSet.add(String(b['ID Компонент']).trim()); });
-          let allItems = Array.from(allItemsSet);
+          }
           
-          allItems.forEach(item => getDepth(item));
-          allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
+          let cBaseNeed = combinedBom[item] || 0;
+          if (cBaseNeed > 0 || getStarted(item) > 0) {
+              let cEffective = Math.max(cBaseNeed + getScrap(item), getStarted(item));
+              let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+              children.forEach(c => {
+                  let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                  combinedBom[childName] = (combinedBom[childName] || 0) + (cEffective * multiplier);
+              });
+          }
 
-          let combinedBom = {};
-          Object.keys(planRoots[planId]).forEach(root => { 
-              aggregatedBom[root] = planRoots[planId][root]; 
-              purePlanBom[root] = planRoots[planId][root];
-              combinedBom[root] = (planRoots[planId][root] || 0);
-          });
-          Object.keys(bufferMap).forEach(code => {
-              combinedBom[code] = (combinedBom[code] || 0) + bufferMap[code];
-              if (!allItemsSet.has(code)) {
-                  allItemsSet.add(code);
-                  allItems.push(code);
-                  getDepth(code);
-              }
-          });
-          allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
-
-          allItems.forEach(item => {
-              let baseNeed = aggregatedBom[item] || 0;
-              if (baseNeed > 0 || getStarted(item) > 0) {
-                  let effective = Math.max(baseNeed + getScrap(item), getStarted(item));
-                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
-                  children.forEach(c => {
-                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
-                      aggregatedBom[childName] = (aggregatedBom[childName] || 0) + (effective * multiplier);
-                  });
-              }
-              
-              let cBaseNeed = combinedBom[item] || 0;
-              if (cBaseNeed > 0 || getStarted(item) > 0) {
-                  let cEffective = Math.max(cBaseNeed + getScrap(item), getStarted(item));
-                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
-                  children.forEach(c => {
-                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
-                      combinedBom[childName] = (combinedBom[childName] || 0) + (cEffective * multiplier);
-                  });
-              }
-
-              let pureBaseNeed = purePlanBom[item] || 0;
-              if (pureBaseNeed > 0) {
-                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
-                  children.forEach(c => {
-                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
-                      purePlanBom[childName] = (purePlanBom[childName] || 0) + (pureBaseNeed * multiplier);
-                  });
-              }
-          });
-          
-          Object.keys(combinedBom).forEach((code, nodeIndex) => {
-              let planQty = aggregatedBom[code] || 0;
-              let combinedQty = combinedBom[code] || 0;
-              let pureQty = purePlanBom[code] || 0;
-              let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
+          let pureBaseNeed = purePlanBom[item] || 0;
+          if (pureBaseNeed > 0) {
+              let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+              children.forEach(c => {
+                  let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                  purePlanBom[childName] = (purePlanBom[childName] || 0) + (pureBaseNeed * multiplier);
+              });
+          }
+      });
+      
+      Object.keys(combinedBom).forEach((code, nodeIndex) => {
+          let planQty = aggregatedBom[code] || 0;
+          let combinedQty = combinedBom[code] || 0;
+          let pureQty = purePlanBom[code] || 0;
+          let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return;
               
               routes.forEach((route, idx) => {
                   let opName = String(route['Име на операция']).trim(); let opKey = code + '_' + opName;
@@ -314,7 +319,7 @@ async function loadTasks(isSilent = false) {
                   blockingReasons = [...new Set(blockingReasons)];
 
                   let isTaken = takenOps[opKey] === true;
-                  let safeIdBase = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
+                  let safeIdBase = (globalPlanId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
                   let blueDeficit = Math.max(0, effectivePlanQty - doneQty);
                   let greenDeficit = Math.max(0, effectiveCombinedQty - Math.max(doneQty, effectivePlanQty));
@@ -324,23 +329,19 @@ async function loadTasks(isSilent = false) {
                       if (hasLimit && blueInput > maxAllowed) blueInput = maxAllowed;
                       if (blueInput <= 0 && !hasLimit) blueInput = 1;
                       if (blueInput <= 0 && isBlocked) blueInput = 0;
-                      globalTasks.push({ id: safeIdBase + '_blue', plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: blueInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: false });
+                      globalTasks.push({ id: safeIdBase + '_blue', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: blueInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: false });
                   }
                   
                   if (greenDeficit > 0) {
-                      // Green tasks calculate maxAllowed somewhat differently (the blue task might have consumed some maxAllowed)
-                      // But for UI simplicity we use the same maxAllowed. The worker can only type up to maxAllowed anyway.
                       let greenInput = greenDeficit;
-                      // Wait! The blue task already "reserves" some maxAllowed if both are generated. 
-                      // Actually, they will be combined or filtered out later.
                       if (hasLimit && greenInput > maxAllowed) greenInput = maxAllowed;
                       if (greenInput <= 0 && !hasLimit) greenInput = 1;
                       if (greenInput <= 0 && isBlocked) greenInput = 0;
-                      globalTasks.push({ id: safeIdBase + '_green', plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: greenInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectiveCombinedQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: true });
+                      globalTasks.push({ id: safeIdBase + '_green', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: greenInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectiveCombinedQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken, isGreenCard: true });
                   }
               });
           });
-      }
+      
       globalTasks.sort((a, b) => a.opNum - b.opNum); renderTasks(globalTasks);
   } catch (err) { console.error(err); document.getElementById('tasksContainer').innerHTML = '<div style="text-align:center; padding: 40px; color:#ef4444; font-weight:bold;">❌ Грешка:<br>' + err.message + '</div>'; }
 }
