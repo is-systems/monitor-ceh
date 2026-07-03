@@ -91,18 +91,45 @@ async function loadTasks(isSilent = false) {
       let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
       let trueDoneOps = {}; let grossTrueDoneOps = {};
+      let shippedQty = {};
       Object.keys(globalRoutesByDetail).forEach(code => {
           let routes = globalRoutesByDetail[code];
           if (routes.length === 0) return;
+          
           let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim();
-          trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+          let localTrueLast = completedOps[lastOpKey] || 0;
           grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+          
           for (let i = routes.length - 2; i >= 0; i--) {
               let opKey = code + '_' + String(routes[i]['Име на операция']).trim();
               let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim();
-              trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
               grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
           }
+
+          shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - localTrueLast);
+      });
+
+      let totalShippedCache = {};
+      function getTotalShipped(item) {
+          let lc = item.toLowerCase();
+          if (totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
+          let directShipped = shippedQty[lc] || 0;
+          let parents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
+          let indirectShipped = 0;
+          parents.forEach(p => {
+              indirectShipped += getTotalShipped(String(p['ID Родител']).trim()) * (parseFloat(p['Количество']) || 1);
+          });
+          totalShippedCache[lc] = directShipped + indirectShipped;
+          return totalShippedCache[lc];
+      }
+
+      Object.keys(globalRoutesByDetail).forEach(code => {
+          let routes = globalRoutesByDetail[code];
+          let consumedByShipped = getTotalShipped(code);
+          routes.forEach(route => {
+              let opKey = code + '_' + String(route['Име на операция']).trim();
+              trueDoneOps[opKey] = Math.max(0, (grossTrueDoneOps[opKey] || 0) - consumedByShipped);
+          });
       });
 
       let startedOpsCache = {};
