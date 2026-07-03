@@ -124,11 +124,12 @@ async function loadTasks(isSilent = false) {
       globalTasks = [];
       for(let planId in planRoots) {
           let aggregatedBom = {}; 
+          let purePlanBom = {};
           
           let depths = {};
           let getDepth = (item, visited = new Set()) => {
               if (depths[item] !== undefined) return depths[item];
-              if (visited.has(item)) return 0; // Prevent infinite loop in circular BOM
+              if (visited.has(item)) return 0; 
               visited.add(item);
               
               let parents = globalBomData.filter(b => String(b['ID Компонент']).trim() === item);
@@ -148,7 +149,10 @@ async function loadTasks(isSilent = false) {
           allItems.forEach(item => getDepth(item));
           allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
 
-          Object.keys(planRoots[planId]).forEach(root => { aggregatedBom[root] = planRoots[planId][root]; });
+          Object.keys(planRoots[planId]).forEach(root => { 
+              aggregatedBom[root] = planRoots[planId][root]; 
+              purePlanBom[root] = planRoots[planId][root];
+          });
 
           allItems.forEach(item => {
               let baseNeed = aggregatedBom[item] || 0;
@@ -160,10 +164,20 @@ async function loadTasks(isSilent = false) {
                       aggregatedBom[childName] = (aggregatedBom[childName] || 0) + (effective * multiplier);
                   });
               }
+              
+              let pureBaseNeed = purePlanBom[item] || 0;
+              if (pureBaseNeed > 0) {
+                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+                  children.forEach(c => {
+                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                      purePlanBom[childName] = (purePlanBom[childName] || 0) + (pureBaseNeed * multiplier);
+                  });
+              }
           });
           
           Object.keys(aggregatedBom).forEach((code, nodeIndex) => {
               let planQty = aggregatedBom[code];
+              let pureQty = purePlanBom[code] || 0;
               let routes = globalRoutesByDetail[code] || []; if(routes.length === 0) return; 
               
               routes.forEach((route, idx) => {
@@ -235,7 +249,7 @@ async function loadTasks(isSilent = false) {
                   let safeId = (planId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
                   let isTaken = takenOps[opKey] === true;
-                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken });
+                  globalTasks.push({ id: safeId, plan_id: planId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: defaultInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: effectivePlanQty, pureQty: pureQty, totalDone: doneQty, totalScrapped: scrapQty, isTaken: isTaken });
               });
           });
       }
@@ -262,6 +276,14 @@ function renderTasks(tasks) {
     var sopHtml = (t.sop_link && t.sop_link.startsWith('http')) ? `<a href="${t.sop_link}" target="_blank" style="display:inline-block; margin-bottom:12px; background:#f59e0b; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px;">📑 Отвори СОП</a>` : '';
     var descHtml = t.desc ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
     var bomBadgeHtml = ''; var actionButtonHtml = ''; var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
+    
+    let displayNeed = t.totalNeed;
+    if (t.totalNeed > t.pureQty && t.pureQty > 0) {
+        let extra = t.totalNeed - t.pureQty;
+        displayNeed = `${t.pureQty}+${extra}`;
+    } else if (t.totalNeed > t.pureQty && t.pureQty === 0) {
+        displayNeed = `0+${t.totalNeed}`;
+    }
 
     if (t.isBlocked) {
         let reasonsText = t.blockingReasons.length > 0 ? t.blockingReasons.join(', ') : "Предходни детайли";
@@ -281,7 +303,7 @@ function renderTasks(tasks) {
 
     html += `
       <div class="card" id="card_${t.id}" style="${borderStyle}">
-        <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${t.totalNeed} бр.</span></div>
+        <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${displayNeed} бр.</span></div>
         <div class="detail-info"><div class="internal-name">${linkHtml}</div>${internalNameHtml}</div>
         ${sopHtml} ${descHtml}
         <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
