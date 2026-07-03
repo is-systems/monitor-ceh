@@ -78,7 +78,35 @@ async function loadTasks(isSilent = false) {
       let skladData = skladRes.data || [];
       let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
-      let planGroups = {}; 
+      let trueDoneOps = {};
+      Object.keys(globalRoutesByDetail).forEach(code => {
+          let routes = globalRoutesByDetail[code];
+          if (routes.length === 0) return;
+          let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim();
+          trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+          for (let i = routes.length - 2; i >= 0; i--) {
+              let opKey = code + '_' + String(routes[i]['Име на операция']).trim();
+              let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim();
+              trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (trueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+          }
+      });
+
+      let startedOpsCache = {};
+      let getStarted = (code) => {
+          if (startedOpsCache[code] !== undefined) return startedOpsCache[code];
+          let pRoutes = globalRoutesByDetail[code] || [];
+          if (pRoutes.length > 0) {
+              let firstOpKey = code + '_' + String(pRoutes[0]['Име на операция']).trim();
+              startedOpsCache[code] = (trueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+          } else { startedOpsCache[code] = 0; }
+          return startedOpsCache[code];
+      };
+
+      let getScrap = (code) => {
+          let s = 0; for (let key in scrappedOps) if (key.startsWith(code + '_')) s += scrappedOps[key]; return s;
+      };
+
+      let planRoots = {}; 
       plansRes.data.forEach(plan => {
           let planId = String(plan['Месец']).trim() + '_' + String(plan['Година']).trim(); 
           let rootItem = String(plan['Вътрешно име']).trim(); 
@@ -89,29 +117,49 @@ async function loadTasks(isSilent = false) {
               if (translated && translated['ID Детайл']) rootItem = String(translated['ID Детайл']).trim();
           }
 
-          if(!planGroups[planId]) planGroups[planId] = [];
-          planGroups[planId].push({ детайл_код: rootItem, общо_необходимо_количество: targetQty });
-
-          function traverseAndAdd(parentName, parentBaseQty) {
-              let parentScrapTotal = 0; for (let key in scrappedOps) if (key.startsWith(parentName + '_')) parentScrapTotal += scrappedOps[key];
-              let actualParentNeed = parentBaseQty + parentScrapTotal;
-              let children = globalBomData.filter(b => String(b['ID Родител']).trim() === parentName);
-              children.forEach(c => {
-                  let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1; let childNeededQty = actualParentNeed * multiplier;
-                  planGroups[planId].push({ детайл_код: childName, общо_необходимо_количество: childNeededQty });
-                  traverseAndAdd(childName, childNeededQty);
-              });
-          }
-          traverseAndAdd(rootItem, targetQty);
+          if(!planRoots[planId]) planRoots[planId] = {};
+          planRoots[planId][rootItem] = (planRoots[planId][rootItem] || 0) + targetQty;
       });
 
       globalTasks = [];
-      for(let planId in planGroups) {
-          let aggregatedBom = {};
-          planGroups[planId].forEach(node => {
-              let code = node.детайл_код;
-              if(!aggregatedBom[code]) aggregatedBom[code] = 0;
-              aggregatedBom[code] += node.общо_необходимо_количество;
+      for(let planId in planRoots) {
+          let aggregatedBom = {}; 
+          
+          let depths = {};
+          let getDepth = (item, visited = new Set()) => {
+              if (depths[item] !== undefined) return depths[item];
+              if (visited.has(item)) return 0; // Prevent infinite loop in circular BOM
+              visited.add(item);
+              
+              let parents = globalBomData.filter(b => String(b['ID Компонент']).trim() === item);
+              if (parents.length === 0) { depths[item] = 0; return 0; }
+              let maxP = -1;
+              parents.forEach(p => {
+                  let pCode = String(p['ID Родител']).trim();
+                  if (pCode !== item) { let d = getDepth(pCode, new Set(visited)); if (d > maxP) maxP = d; }
+              });
+              depths[item] = maxP + 1; return depths[item];
+          };
+
+          let allItemsSet = new Set(Object.keys(planRoots[planId]));
+          globalBomData.forEach(b => { allItemsSet.add(String(b['ID Родител']).trim()); allItemsSet.add(String(b['ID Компонент']).trim()); });
+          let allItems = Array.from(allItemsSet);
+          
+          allItems.forEach(item => getDepth(item));
+          allItems.sort((a, b) => (depths[a] || 0) - (depths[b] || 0));
+
+          Object.keys(planRoots[planId]).forEach(root => { aggregatedBom[root] = planRoots[planId][root]; });
+
+          allItems.forEach(item => {
+              let baseNeed = aggregatedBom[item] || 0;
+              if (baseNeed > 0 || getStarted(item) > 0) {
+                  let effective = Math.max(baseNeed + getScrap(item), getStarted(item));
+                  let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
+                  children.forEach(c => {
+                      let childName = String(c['ID Компонент']).trim(); let multiplier = parseFloat(c['Количество']) || 1;
+                      aggregatedBom[childName] = (aggregatedBom[childName] || 0) + (effective * multiplier);
+                  });
+              }
           });
           
           Object.keys(aggregatedBom).forEach((code, nodeIndex) => {
@@ -120,7 +168,7 @@ async function loadTasks(isSilent = false) {
               
               routes.forEach((route, idx) => {
                   let opName = String(route['Име на операция']).trim(); let opKey = code + '_' + opName;
-                  let doneQty = completedOps[opKey] || 0; let scrapQty = scrappedOps[opKey] || 0; let consumedHere = doneQty + scrapQty; 
+                  let doneQty = trueDoneOps[opKey] || 0; let scrapQty = scrappedOps[opKey] || 0; let consumedHere = doneQty + scrapQty; 
                   let scrapStrictlyDownstream = 0;
                   for(let j = idx + 1; j < routes.length; j++) { let dKey = code + '_' + String(routes[j]['Име на операция']).trim(); scrapStrictlyDownstream += (scrappedOps[dKey] || 0); }
                   let effectivePlanQty = planQty + scrapStrictlyDownstream;
@@ -130,7 +178,7 @@ async function loadTasks(isSilent = false) {
 
                   if (idx > 0) {
                       let prevRoute = routes[idx - 1]; let prevOpName = String(prevRoute['Име на операция']).trim(); let prevOpKey = code + '_' + prevOpName;
-                      let prevDoneQty = completedOps[prevOpKey] || 0; maxAllowed = prevDoneQty - consumedHere;
+                      let prevDoneQty = trueDoneOps[prevOpKey] || 0; maxAllowed = prevDoneQty - consumedHere;
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (${prevDoneQty} готови)`);
                   } else {
                       let children = globalBomData.filter(b => String(b['ID Родител']).trim() === code);
@@ -142,13 +190,27 @@ async function loadTasks(isSilent = false) {
                               let multiplier = parseFloat(child['Количество']) || 1;
                               let cRoutes = globalRoutesByDetail[cCode] || []; 
                               let cDone = 0; let isManufactured = (cRoutes.length > 0);
+                              
+                              let consumedByOthers = 0;
+                              let allParents = globalBomData.filter(b => String(b['ID Компонент']).trim() === cCode && String(b['ID Родител']).trim() !== code);
+                              allParents.forEach(p => {
+                                  let pCode = String(p['ID Родител']).trim();
+                                  let pMultiplier = parseFloat(p['Количество']) || 1;
+                                  let pRoutes = globalRoutesByDetail[pCode] || [];
+                                  if (pRoutes.length > 0) {
+                                      let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim();
+                                      let pStarted = (trueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+                                      consumedByOthers += pStarted * pMultiplier;
+                                  }
+                              });
+
                               if (isManufactured) { 
                                   let lastRoute = cRoutes[cRoutes.length - 1]; 
                                   let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim(); 
-                                  cDone = completedOps[cOpKey] || 0; 
+                                  cDone = Math.max(0, (trueDoneOps[cOpKey] || 0) - consumedByOthers); 
                               } 
                               else { 
-                                  cDone = getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0); 
+                                  cDone = Math.max(0, getSkladQty(cCode) + (completedOps[cCode + '_Възстановен'] || 0) - consumedByOthers); 
                               }
                               let possibleSets = Math.floor(cDone / multiplier);
                               if (possibleSets < minSets) minSets = possibleSets;
@@ -229,7 +291,7 @@ function renderTasks(tasks) {
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 12px; margin-top: 5px; border: 2px solid #bae6fd;">
             <p style="color: #0369a1; font-weight: 900; text-align:center; margin-top:0; font-size: 1.1em;">🟢 В ПРОЦЕС НА РАБОТА</p>
             <div style="display:flex; justify-content:space-between; margin-bottom: 5px; font-size: 0.85em; font-weight:bold; color: #64748b;"><span>Готови до момента:</span><span>${t.totalDone} бр.</span></div>
-            <input type="number" id="qty_${t.id}" value="${t.defaultQty}" ${inputMaxHtml} inputmode="numeric" style="margin-bottom:15px;">
+            <input type="number" id="qty_${t.id}" value="" placeholder="${t.defaultQty}" ${inputMaxHtml} inputmode="numeric" style="margin-bottom:15px;">
             <div style="display: flex; gap: 10px;">
               <button class="btn" id="btn_${t.id}" onclick="finishTask('${t.id}', this)">✅ ОТЧЕТИ</button>
               <button class="btn-danger" id="btn_scrap_${t.id}" onclick="reportScrap('${t.id}', this)">БРАК</button>

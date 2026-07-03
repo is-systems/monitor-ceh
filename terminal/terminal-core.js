@@ -5,7 +5,7 @@ const client = supabase.createClient(
 
 let currentOperator = ""; let currentEmail = ""; let currentMachine = "";
 let globalTasks = []; let localHistoryData = []; let globalBomData = []; let globalRoutesByDetail = {};
-let currentTaskFilter = 'all'; let activeTaskId = null; let isUserCheckedIn = false; 
+let currentTaskFilter = 'ready'; let activeTaskId = null; let isUserCheckedIn = false; 
 const WORKSHOP_LAT = 41.8937; const WORKSHOP_LNG = 23.4875;
 
 async function verifyUserAccess(email) {
