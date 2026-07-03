@@ -54,7 +54,7 @@ async function loadTasks(isSilent = false) {
 
       reportsRes.data.sort((a, b) => new Date(a['Дата']) - new Date(b['Дата']));
 
-      let completedOps = {}; let scrappedOps = {}; let takenOps = {};
+      let completedOps = {}; let scrappedOps = {}; let takenOps = {}; let grossCompletedOps = {};
       reportsRes.data.forEach(r => {
           let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim(); 
           let qty = parseFloat(r['Количество']) || 0;
@@ -65,6 +65,9 @@ async function loadTasks(isSilent = false) {
           } 
           else if (r['Статус'] === 'Отчетено') {
               completedOps[key] = (completedOps[key] || 0) + qty;
+              if (r['Оператор'] === 'СИСТЕМА (Експедиция)') { }
+              else if (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) { }
+              else { grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; }
               if (String(r['Оператор']).trim() === currentOperator.trim()) takenOps[key] = false;
           }
           else if (r['Статус'] === 'Започната') {
@@ -78,16 +81,18 @@ async function loadTasks(isSilent = false) {
       let skladData = skladRes.data || [];
       let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
-      let trueDoneOps = {};
+      let trueDoneOps = {}; let grossTrueDoneOps = {};
       Object.keys(globalRoutesByDetail).forEach(code => {
           let routes = globalRoutesByDetail[code];
           if (routes.length === 0) return;
           let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim();
           trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+          grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
           for (let i = routes.length - 2; i >= 0; i--) {
               let opKey = code + '_' + String(routes[i]['Име на операция']).trim();
               let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim();
-              trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (trueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+              trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+              grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
           }
       });
 
@@ -97,7 +102,7 @@ async function loadTasks(isSilent = false) {
           let pRoutes = globalRoutesByDetail[code] || [];
           if (pRoutes.length > 0) {
               let firstOpKey = code + '_' + String(pRoutes[0]['Име на операция']).trim();
-              startedOpsCache[code] = (trueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+              startedOpsCache[code] = (grossTrueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
           } else { startedOpsCache[code] = 0; }
           return startedOpsCache[code];
       };

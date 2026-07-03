@@ -114,39 +114,46 @@ async function loadCurrentTableData() {
                   Object.keys(globalRoutesByDetail).forEach(code => globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
               }
               
-              let completedOps = {}; let scrappedOps = {};
+              let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {};
               if (otchetiRes.data) {
                   otchetiRes.data.forEach(r => {
                       let code = String(r['ID Детайл']).trim().toLowerCase();
                       let op = String(r['Операция']).trim().toLowerCase();
                       let key = code + '_' + op;
                       let qty = parseFloat(r['Количество']) || 0;
-                      if (r['Статус'] === 'Отчетено') completedOps[key] = (completedOps[key] || 0) + qty;
+                      if (r['Статус'] === 'Отчетено') {
+                          completedOps[key] = (completedOps[key] || 0) + qty;
+                          if (r['Оператор'] === 'СИСТЕМА (Експедиция)') { }
+                          else if (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) { }
+                          else { grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; }
+                      }
                       else if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty;
                   });
               }
 
-              let trueDoneOps = {};
+              let trueDoneOps = {}; let grossTrueDoneOps = {};
               Object.keys(globalRoutesByDetail).forEach(code => {
                   let routes = globalRoutesByDetail[code];
                   if (routes.length === 0) return;
                   let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
                   trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+                  grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
                   for (let i = routes.length - 2; i >= 0; i--) {
                       let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
                       let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-                      trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (trueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+                      trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+                      grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
                   }
               });
 
               let startedOpsCache = {};
-              let getStarted = (code) => {
-                  let lcCode = code.toLowerCase();
+              let getStarted = (pCode) => {
+                  let lcCode = pCode.toLowerCase();
                   if (startedOpsCache[lcCode] !== undefined) return startedOpsCache[lcCode];
                   let pRoutes = globalRoutesByDetail[lcCode] || [];
                   if (pRoutes.length > 0) {
                       let firstOpKey = lcCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
-                      startedOpsCache[lcCode] = (trueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+                      startedOpsCache[lcCode] = (grossTrueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
                   } else { startedOpsCache[lcCode] = 0; }
                   return startedOpsCache[lcCode];
               };
@@ -176,7 +183,7 @@ async function loadCurrentTableData() {
                       } else {
                           let nextOpName = String(cRoutes[opIndex+1]['Име на операция']).trim().toLowerCase();
                           let nextOpKey = cCode + '_' + nextOpName;
-                          stockHere = Math.max(0, (trueDoneOps[rKey] || 0) - ((trueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0)));
+                          stockHere = Math.max(0, (trueDoneOps[rKey] || 0) - ((grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0)));
                       }
                   } else {
                       stockHere = Math.max(0, r['Наличност в цеха'] || 0);
