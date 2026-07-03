@@ -96,7 +96,7 @@ async function loadCurrentTableData() {
           let bufferMap = {};
           if (!bufferRes.error && bufferRes.data) {
               bufferRes.data.forEach(b => {
-                  let bKey = String(b['ID Детайл']).trim() + '_' + String(b['Операция']).trim();
+                  let bKey = String(b['ID Детайл']).trim().toLowerCase();
                   bufferMap[bKey] = parseFloat(b['Буфер']) || 0;
               });
           }
@@ -190,14 +190,14 @@ async function loadCurrentTableData() {
                   }
                   
                   r['Наличност в цеха'] = stockHere;
-                  r['Минимално количество/Буфер'] = bufferMap[rawCode + '_' + rawOp] || 0;
+                  r['Минимално количество/Буфер'] = bufferMap[cCode] || 0;
               });
 
           } catch (e) {
               console.error("Error computing sklad_gp pipeline: ", e);
               rows.forEach(r => {
-                  let rKey = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
-                  r['Минимално количество/Буфер'] = bufferMap[rKey] || 0;
+                  let cCode = String(r['ID Детайл']).trim().toLowerCase();
+                  r['Минимално количество/Буфер'] = bufferMap[cCode] || 0;
               });
           }
       }
@@ -403,7 +403,7 @@ async function saveForm(e) {
                   if (error) throw error; 
               }
               
-              await client.from('sklad_bufferi').delete().eq('ID Детайл', det).eq('Операция', op);
+              await client.from('sklad_bufferi').delete().eq('ID Детайл', det);
               const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBuffer }]);
               if (bufError) throw bufError;
               
