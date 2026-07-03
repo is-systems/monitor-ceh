@@ -154,7 +154,7 @@ function renderDynamicTable(itemsToRender = null) {
           row.appendChild(td); return;
       }
 
-      if (currentTab === 'chekiraniya' && f.name === 'Време' && val) { try { td.innerHTML = `<b>${new Date(val).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
+      if ((f.name === 'Време' || f.name === 'Дата') && val) { try { td.innerHTML = `<b>${new Date(val).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
       if (currentTab === 'chekiraniya' && f.name === 'Действие') {
           if (val === 'Влизане') td.innerHTML = `<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🟢 ${val}</span>`;
           else if (val === 'Излизане') td.innerHTML = `<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🔴 ${val}</span>`;
@@ -321,6 +321,47 @@ async function saveForm(e) {
   let payload = {};
   config.fields.forEach(f => { const el = document.getElementById('inp_' + f.name); if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) { let val = el.value; if (f.type === 'number') val = parseFloat(val) || 0; payload[f.name] = val; } });
   try {
+    if (currentTab === 'plan' && payload['Статус'] === '🚚 Изпратен') {
+        let oldStatus = isEditMode ? globalRows[editingIndex]['Статус'] : null;
+        if (oldStatus !== '🚚 Изпратен') {
+            let detailID = payload['ID Детайл'];
+            if (!detailID && isEditMode) detailID = globalRows[editingIndex]['ID Детайл'];
+            let qtyToDeduct = payload['Целево количество'] || 0;
+            
+            Swal.fire({title: 'Проверка на маршрут и наличности...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            
+            const { data: routeData, error: routeErr } = await client.from('marshruti').select('*').eq('Код на детайла', detailID);
+            if (routeErr) throw routeErr;
+            
+            let selectedOp = '';
+            if (routeData && routeData.length > 0) {
+                routeData.sort((a, b) => (parseInt(a['№ Операция']) || 0) - (parseInt(b['№ Операция']) || 0));
+                selectedOp = String(routeData[routeData.length - 1]['Име на операция']).trim();
+            } else {
+                Swal.close();
+                throw new Error("Не е намерена маршрутна карта за този детайл. Не може да се определи последната операция!");
+            }
+            
+            const { data: stockData, error: stockErr } = await client.from('computed_sklad_gp').select('*').eq('ID Детайл', detailID).eq('Операция', selectedOp);
+            if (stockErr) throw stockErr;
+            
+            let availableStock = 0;
+            if (stockData && stockData.length > 0) {
+                availableStock = parseFloat(stockData[0]['Наличност в цеха']) || 0;
+            }
+            
+            if (availableStock < qtyToDeduct) {
+                Swal.close();
+                throw new Error(`Няма достатъчно завършени бройки на последната операция (${selectedOp})! Налични: ${availableStock} бр., Опитвате да изпратите: ${qtyToDeduct} бр.`);
+            }
+            
+            Swal.fire({title: 'Изписване от склад...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            let otchetiPayload = { "ID Детайл": detailID, "Операция": selectedOp, "Количество": -qtyToDeduct, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Експедиция)", "Дата": new Date().toISOString() };
+            const { error: otchetiErr } = await client.from('otcheti').insert([otchetiPayload]);
+            if (otchetiErr) throw otchetiErr;
+        }
+    }
+
     if (isEditMode) { const row = globalRows[editingIndex]; const keyVal = row[config.key]; const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false}); } 
     else { const { error } = await client.from(config.table).insert([payload]); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно добавено!', timer: 1000, showConfirmButton: false}); }
     closeModal(); loadCurrentTableData();
