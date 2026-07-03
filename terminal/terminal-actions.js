@@ -7,13 +7,13 @@ function updateHistoryUI() {
 }
 
 async function loadHistoryFromDB() {
-    if (!currentOperator || !navigator.onLine) return;
+    if (!currentOperator || currentOperator === "undefined" || !navigator.onLine) return;
     try {
         const { data, error } = await client.from('otcheti')
             .select('ID Детайл, Количество, Дата, Статус')
             .eq('Оператор', currentOperator)
             .in('Статус', ['Отчетено', 'Брак'])
-            .order('Дата', { ascending: false })
+            .order('"Дата"', { ascending: false })
             .limit(5);
 
         if (error) throw error;
