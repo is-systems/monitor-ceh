@@ -277,12 +277,12 @@ function renderTasks(tasks) {
     var descHtml = t.desc ? `<div style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 10px; margin-bottom: 12px; font-size: 13px; color: #854d0e; font-weight: 700; border-radius: 4px;">💡 ${t.desc}</div>` : '';
     var bomBadgeHtml = ''; var actionButtonHtml = ''; var inputMaxHtml = t.hasLimit ? `max="${t.maxAllowed}"` : '';
     
-    let displayNeed = t.totalNeed;
+    let displayNeedHtml = `<span class="qty-badge">${t.totalNeed} бр.</span>`;
     if (t.totalNeed > t.pureQty && t.pureQty > 0) {
         let extra = t.totalNeed - t.pureQty;
-        displayNeed = `${t.pureQty}+${extra}`;
+        displayNeedHtml = `<span class="qty-badge">${t.pureQty} бр.</span> <span class="qty-badge" style="background-color: #16a34a; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3);">+${extra} бр.</span>`;
     } else if (t.totalNeed > t.pureQty && t.pureQty === 0) {
-        displayNeed = `0+${t.totalNeed}`;
+        displayNeedHtml = `<span class="qty-badge" style="background-color: #16a34a; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3);">+${t.totalNeed} бр.</span>`;
     }
 
     if (t.isBlocked) {
@@ -303,7 +303,7 @@ function renderTasks(tasks) {
 
     html += `
       <div class="card" id="card_${t.id}" style="${borderStyle}">
-        <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><span class="qty-badge">${displayNeed} бр.</span></div>
+        <div class="task-header"><span class="plan-label">ПЛАН: ${t.plan_id.replace('_', ' ')}</span><div style="display:flex; gap: 6px;">${displayNeedHtml}</div></div>
         <div class="detail-info"><div class="internal-name">${linkHtml}</div>${internalNameHtml}</div>
         ${sopHtml} ${descHtml}
         <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
