@@ -241,7 +241,16 @@ async function loadTasks(isSilent = false) {
               let opKey = code + '_' + opName;
               let doneQty = grossTrueDoneOps[opKey] || 0; 
               
-              if(doneQty >= totalGrossTarget) return; 
+              let opScrapRemaining = 0;
+              for (let j = idx; j < routes.length; j++) {
+                  let jOpKey = code + '_' + String(routes[j]['Име на операция']).trim();
+                  opScrapRemaining += (scrappedOps[jOpKey] || 0);
+              }
+              
+              let opBlueTarget = blueTarget + opScrapRemaining + inv.consumedByParents + inv.directShipped;
+              let opGreenTarget = totalNetTarget + opScrapRemaining + inv.consumedByParents + inv.directShipped;
+
+              if(doneQty >= opGreenTarget) return; 
               
               let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; 
               let consumedHere = doneQty + (scrappedOps[opKey] || 0);
@@ -300,8 +309,7 @@ async function loadTasks(isSilent = false) {
               let isTaken = takenOps[opKey] === true;
               let safeIdBase = (globalPlanId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
-              let opBlueTarget = blueTarget + inv.totalScrap + inv.consumedByParents + inv.directShipped;
-              let opGreenTarget = totalGrossTarget; 
+
               
               let blueDeficit = Math.max(0, opBlueTarget - doneQty);
               let greenDeficit = Math.max(0, opGreenTarget - Math.max(doneQty, opBlueTarget));
