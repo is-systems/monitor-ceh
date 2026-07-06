@@ -286,7 +286,7 @@ async function loadTasks(isSilent = false) {
                           }
                       });
                       maxAllowed = minSets;
-                      if (maxAllowed === Infinity) maxAllowed = 0; // if no manufactured children
+                      if (maxAllowed === Infinity) { hasLimit = false; } 
                       if (maxAllowed <= 0 && blockingReasons.length > 0) blockingReasons.push(`Липсващи компоненти`);
                   }
               }
