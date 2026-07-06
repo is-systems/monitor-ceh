@@ -151,6 +151,27 @@ async function loadData() {
 
         drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
 
+        // Auto-complete logic for fully finished root plans
+        let plansToComplete = [];
+        let pMap = {}; connections.forEach(c => pMap[c.from] = c.to);
+
+        Object.values(masterData).forEach(nodeList => {
+            nodeList.forEach(node => {
+                if (!pMap[node.id]) { // Is root node
+                    let allOpsDone = node.operations && node.operations.length > 0 && node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
+                    if (allOpsDone && node.planDbIds && node.planDbIds.length > 0) {
+                        plansToComplete.push(...node.planDbIds);
+                    }
+                }
+            });
+        });
+
+        if (plansToComplete.length > 0) {
+            client.from('plan').update({ 'Статус': 'Завършен' }).in('id', plansToComplete).then(res => {
+                if (!res.error && plansToComplete.length > 0) console.log("Auto-completed plans:", plansToComplete);
+            });
+        }
+
     } catch (err) {
         document.getElementById('error-box').innerText = "Грешка: " + err.message;
         document.getElementById('loading').style.display = 'none';
@@ -233,6 +254,7 @@ function buildBOMTree(plansData, skladData) {
                 id: mergedId,
                 planId: row.plan_id, 
                 planMonth: pMonthStr,
+                planDbIds: [],
                 code: codeStr,
                 displayName: row.display_name, 
                 planQty: 0, 
@@ -246,6 +268,9 @@ function buildBOMTree(plansData, skladData) {
         }
 
         mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
+        if (!mergedNodes[mergedId].planDbIds.includes(row.plan_id)) {
+            mergedNodes[mergedId].planDbIds.push(row.plan_id);
+        }
 
         if (row.parent_code) {
             let parentCodeStr = String(row.parent_code).trim();

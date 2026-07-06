@@ -23,11 +23,12 @@ function switchTab(tabKey) {
   selectedIndices.clear(); updateMassActionBar();
   
   const config = tableConfigs[tabKey]; const addBtn = document.getElementById('addNewBtn');
-  const pdfBtn = document.getElementById('pdfBtn'); const sidebar = document.getElementById('personnelSidebar');
+  const pdfBtn = document.getElementById('pdfBtn'); const logBtn = document.getElementById('logisticsBtn'); const sidebar = document.getElementById('personnelSidebar');
   
   addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
   addBtn.style.display = (config.readOnlyTab && tabKey !== 'sklad_gp') ? 'none' : 'flex';
   if (pdfBtn) pdfBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
+  if (logBtn) logBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
 
   // Тук прехвърлихме показването на папките само когато сме в менюто Персонал
   if (tabKey === 'personal') { sidebar.style.display = 'block'; loadPersonnelSidebar(); } else { sidebar.style.display = 'none'; }
@@ -544,3 +545,66 @@ async function loadSkladOperations(detailCode) {
         console.error(err);
     }
 }
+window.openLogisticsModal = function() {
+    if (currentTab !== 'plan') return;
+    
+    // Group active plan rows
+    let plansMap = {};
+    globalRows.forEach(row => {
+        let key = row['Месец'] + ' ' + row['Година'];
+        if (!plansMap[key]) plansMap[key] = { name: key, month: row['Месец'], year: row['Година'], total: 0, done: 0, packed: 0 };
+        
+        plansMap[key].total++;
+        if (row['Статус'] === 'Завършен') plansMap[key].done++;
+        if (row['Статус'] === 'Опакован') plansMap[key].packed++;
+    });
+
+    let html = '';
+    let plansList = Object.values(plansMap).sort((a,b) => b.year - a.year || b.month - a.month);
+    
+    if (plansList.length === 0) {
+        html = '<div style="text-align:center; padding:20px; color:#64748b;">Няма заредени планове.</div>';
+    } else {
+        plansList.forEach(p => {
+            html += \<div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-weight:bold; font-size:1.1em; margin-bottom:10px; color:#334155;">📅 План: Месец \ / \ (Общо \ детайла)</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="font-size:0.95em;">
+                        <div style="color:#059669; margin-bottom:4px;">🟢 Завършени: <b>\</b> бр.</div>
+                        <div style="color:#0284c7;">📦 Опаковани: <b>\</b> бр.</div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button class="btn-primary" \ onclick="window.massLogisticsAction('\', '\', 'Завършен', 'Опакован')" style="background:#0284c7; min-width:200px;">📦 Опаковай Завършените</button>
+                        <button class="btn-primary" \ onclick="window.massLogisticsAction('\', '\', 'Опакован', '🚚 Изпратен')" style="background:#f59e0b; min-width:200px;">🚚 Изпрати Опакованите</button>
+                    </div>
+                </div>
+            </div>\;
+        });
+    }
+
+    document.getElementById('logisticsContent').innerHTML = html;
+    document.getElementById('logisticsModalBackdrop').style.display = 'flex';
+};
+
+window.massLogisticsAction = async function(month, year, fromStatus, toStatus) {
+    const res = await Swal.fire({ title: 'Сигурни ли сте?', text: \Искате ли да промените всички детайли от статус '\' на '\' за Месец \ / \?\, icon: 'question', showCancelButton: true, confirmButtonText: 'Да, продължи', cancelButtonText: 'Отказ' });
+    if (!res.isConfirmed) return;
+
+    try {
+        Swal.fire({title: 'Обновяване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        
+        const { data, error } = await client.from('plan')
+            .update({ 'Статус': toStatus })
+            .eq('Месец', month).eq('Година', year).eq('Статус', fromStatus)
+            .select('id');
+            
+        if (error) throw error;
+        
+        Swal.fire({icon: 'success', title: 'Успешно!', text: \Обновени са \ записа.\, timer: 2000, showConfirmButton: false});
+        
+        document.getElementById('logisticsModalBackdrop').style.display = 'none';
+        loadCurrentTableData();
+    } catch(err) {
+        Swal.fire('Грешка', err.message, 'error');
+    }
+};
