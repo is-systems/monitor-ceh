@@ -359,7 +359,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 else if (doneQty > 0) opState = 'blue'; 
                 else if (latestStatus === 'Започната') opState = 'blue_0'; 
                 
-                n.operations.push({ name: opName, completed: doneQty, state: opState });
+                let scrapped = scrappedOps[opKey] || 0;
+                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrapped });
             });
         } else {
             n.operations.push({ 
@@ -670,7 +671,7 @@ function drawDashboard(jsonString) {
     setTimeout(() => {
         drawArrows();
         setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-    }, 800);
+    }, 50);
 }
 
 function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
@@ -680,15 +681,21 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
     
     let headerQty = 0;
+    let headerScrap = 0;
+    const formatHeaderQty = (c, p) => c > p ? `${p}+${c - p}/${p}` : `${c}/${p}`;
+    const headerScrapHtml = (headerScrap > 0) ? ` <span style="color:#ef4444; font-weight:bold;">-${headerScrap}</span>` : '';
+
     if (node.operations && node.operations.length > 0) {
-        headerQty = node.operations[node.operations.length - 1].completed || 0;
+        let lastOp = node.operations[node.operations.length - 1];
+        headerQty = lastOp.completed || 0;
+        headerScrap = lastOp.scrapped || 0;
     } else {
         headerQty = node.warehouseQty || 0; 
     }
     
     const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
-        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
-
+        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">🗺️</a>` : '';
+        
     let opsHTML = '';
     let titleClass = 'title-gray';
 
@@ -700,11 +707,13 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         let len = node.operations.length;
         let allOpsDone = node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
-        const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${op.completed}/${node.planQty}</span>`;
-        const formatFuture = (op) => `<span class="op-text op-future">${op.name} | 0/${node.planQty}</span>`;
-        const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${op.completed}/${node.planQty}</span>`;
-        const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${op.completed}/${node.planQty}</span>`;
-        const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${op.completed}/${node.planQty}</span>`;
+        const formatQty = (c, p) => c > p ? `${p}+${c - p}/${p}` : `${c}/${p}`;
+        const formatScrap = (op) => (op.scrapped && op.scrapped > 0) ? ` <span style="color:#ef4444; font-weight:bold;">-${op.scrapped}</span>` : '';
+        const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
+        const formatFuture = (op) => `<span class="op-text op-future">${op.name} | ${formatQty(0, node.planQty)}${formatScrap(op)}</span>`;
+        const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
+        const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
+        const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
 
         if (allOpsDone) {
             titleClass = 'title-green';
@@ -766,7 +775,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         <div class="vsm-node" id="card_${dId}">
         <div class="vsm-header">
             <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
-            <span class="vsm-qty">| ${headerQty}/${node.planQty}</span>
+            <span class="vsm-qty">| ${formatHeaderQty(headerQty, node.planQty)}${headerScrapHtml}</span>
         </div>
         ${opsHTML !== '' ? opsHTML : ''}
         </div>
