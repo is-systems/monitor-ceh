@@ -298,12 +298,23 @@ async function loadTasks(isSilent = false) {
               let isTaken = takenOps[opKey] === true;
               let safeIdBase = (globalPlanId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
+              let opBlueTarget = Math.max(blueTarget, inv.projected) + inv.totalScrap + inv.consumedByParents + inv.directShipped;
+              let opGreenTarget = totalGrossTarget; 
+              
+              let blueDeficit = Math.max(0, opBlueTarget - doneQty);
+              let greenDeficit = Math.max(0, opGreenTarget - Math.max(doneQty, opBlueTarget));
+              
+              if (globalPlanId === "БУФЕРИ") {
+                  greenDeficit = Math.max(0, opGreenTarget - doneQty);
+                  blueDeficit = 0;
+              }
+
               if (blueDeficit > 0) {
                   let blueInput = blueDeficit;
                   if (hasLimit && blueInput > maxAllowed) blueInput = maxAllowed;
                   if (blueInput <= 0 && !hasLimit) blueInput = 1;
                   if (blueInput <= 0 && isBlocked) blueInput = 0;
-                  globalTasks.push({ id: safeIdBase + '_blue', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: blueInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: totalNetTarget, pureQty: 0, totalDone: doneQty, totalScrapped: scrappedOps[opKey] || 0, isTaken: isTaken, isGreenCard: false });
+                  globalTasks.push({ id: safeIdBase + '_blue', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: blueInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: opBlueTarget, pureQty: 0, totalDone: doneQty, totalScrapped: scrappedOps[opKey] || 0, isTaken: isTaken, isGreenCard: false });
               }
               
               if (greenDeficit > 0) {
@@ -311,7 +322,7 @@ async function loadTasks(isSilent = false) {
                   if (hasLimit && greenInput > maxAllowed) greenInput = maxAllowed;
                   if (greenInput <= 0 && !hasLimit) greenInput = 1;
                   if (greenInput <= 0 && isBlocked) greenInput = 0;
-                  globalTasks.push({ id: safeIdBase + '_green', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: greenInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: totalNetTarget, pureQty: 0, totalDone: doneQty, totalScrapped: scrappedOps[opKey] || 0, isTaken: isTaken, isGreenCard: true });
+                  globalTasks.push({ id: safeIdBase + '_green', plan_id: globalPlanId, name: code, internalName: namesMap[code.toLowerCase()] || '', op: opName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", defaultQty: greenInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, totalNeed: opGreenTarget, pureQty: 0, totalDone: doneQty, totalScrapped: scrappedOps[opKey] || 0, isTaken: isTaken, isGreenCard: true });
               }
           });
       });
