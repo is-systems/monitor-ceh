@@ -267,7 +267,7 @@ async function loadTasks(isSilent = false) {
                               let lastRoute = cRoutes[cRoutes.length - 1]; 
                               let cOpKey = cCode + '_' + String(lastRoute['Име на операция']).trim(); 
                               let cGross = grossTrueDoneOps[cOpKey] || 0;
-                              cFree = Math.max(0, cGross - cInv.totalScrap - cInv.consumedByParents - cInv.directShipped);
+                              cFree = Math.max(0, cGross - cInv.consumedByParents - cInv.directShipped);
                           } else {
                               // If it's a purchased part (no route), just read from direct sklad
                               // Wait, purchased parts don't have routes, so getInventoryStatus sets startedGross=0, lifetimeDone=0
