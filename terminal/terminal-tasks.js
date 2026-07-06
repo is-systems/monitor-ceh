@@ -229,7 +229,7 @@ async function loadTasks(isSilent = false) {
           let greenTarget = bufferMap[code] || 0;
           let inv = getInventoryStatus(code);
           
-          let totalNetTarget = Math.max(blueTarget + greenTarget, inv.projected);
+          let totalNetTarget = blueTarget + greenTarget;
           let totalGrossTarget = totalNetTarget + inv.totalScrap + inv.consumedByParents + inv.directShipped;
           
           let blueDeficit = Math.max(0, blueTarget - inv.projected);
@@ -299,7 +299,7 @@ async function loadTasks(isSilent = false) {
               let isTaken = takenOps[opKey] === true;
               let safeIdBase = (globalPlanId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
 
-              let opBlueTarget = Math.max(blueTarget, inv.projected) + inv.totalScrap + inv.consumedByParents + inv.directShipped;
+              let opBlueTarget = blueTarget + inv.totalScrap + inv.consumedByParents + inv.directShipped;
               let opGreenTarget = totalGrossTarget; 
               
               let blueDeficit = Math.max(0, opBlueTarget - doneQty);
