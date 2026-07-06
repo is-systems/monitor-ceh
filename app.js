@@ -372,6 +372,9 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
 
     Object.values(mergedNodes).forEach(n => {
         let partRoutes = staticCache.routesByDetail[n.code] || [];
+        
+        let recovered = completedOps[n.code + '_Възстановен'] || 0;
+        n.warehouseQty += recovered;
 
         if (partRoutes.length > 0) {
             let consumedByShipped = getTotalShipped(n.code);

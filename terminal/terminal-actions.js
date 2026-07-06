@@ -161,7 +161,11 @@ async function reportScrap(taskId, btn) {
       let children = globalBomData.filter(b => String(b['ID Родител']).trim() === taskData.name);
       if (children.length > 0) {
           let checkboxHtml = '<div style="text-align:left; margin-top:15px; font-size:14px; max-height: 250px; overflow-y: auto;"><p style="color:#e74c3c; font-weight:bold; margin-bottom:12px;">Кои компоненти вътре бяха счупени?<br><span style="font-size: 0.8em; color: #64748b;">(Отмаркирайте спасените детайли)</span></p>';
-          children.forEach(c => { let cName = String(c['ID Компонент']).trim(); checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:8px; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;"><input type="checkbox" class="scrap-child-cb" value="${cName}" checked style="transform: scale(1.5); margin-right:15px;"><span style="font-weight:700; font-size: 1.1em; color: #1e293b;">${cName}</span></label>`; });
+          children.forEach(c => { 
+              let cName = String(c['ID Компонент']).trim(); 
+              let safeName = cName.replace(/"/g, '&quot;');
+              checkboxHtml += `<label style="display:flex; align-items:center; margin-bottom:8px; padding:12px; background:#f8fafc; border-radius:6px; border:1px solid #cbd5e1;"><input type="checkbox" class="scrap-child-cb" value="${safeName}" checked style="transform: scale(1.5); margin-right:15px;"><span style="font-weight:700; font-size: 1.1em; color: #1e293b;">${safeName}</span></label>`; 
+          });
           checkboxHtml += '</div>';
           const { value: formValues, isConfirmed } = await Swal.fire({ title: 'Бракуване', html: `Ще бракувате <b>${val} бр.</b><br>` + checkboxHtml, icon: 'warning', showCancelButton: true, confirmButtonColor: '#e74c3c', confirmButtonText: 'Да, бракувай!', cancelButtonText: 'Отказ', preConfirm: () => { let scrapped = []; document.querySelectorAll('.scrap-child-cb:checked').forEach(cb => scrapped.push(cb.value)); return scrapped; } });
           if (isConfirmed) await executeScrapLogic(taskData, val, children, formValues);
@@ -199,8 +203,8 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
             let cName = String(child['ID Компонент']).trim();
             if (!scrappedChildrenNames.includes(cName)) {
                 let multiplier = parseFloat(child['Количество']) || 1; let savedQty = val * multiplier;
-                let cRoutes = globalRoutesByDetail[cName] || []; let opToLog = "Възстановен"; 
-                if (cRoutes.length > 0) opToLog = String(cRoutes[cRoutes.length - 1]['Име на операция']).trim();
+                let cRoutes = globalRoutesByDetail[cName] || []; 
+                let opToLog = "Възстановен"; 
                 inserts.push({ "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
             }
         });
@@ -217,8 +221,8 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
                 let cName = String(child['ID Компонент']).trim();
                 if (!scrappedChildrenNames.includes(cName)) {
                     let multiplier = parseFloat(child['Количество']) || 1; let savedQty = val * multiplier;
-                    let cRoutes = globalRoutesByDetail[cName] || []; let opToLog = "Възстановен"; 
-                    if (cRoutes.length > 0) opToLog = String(cRoutes[cRoutes.length - 1]['Име на операция']).trim();
+                    let cRoutes = globalRoutesByDetail[cName] || []; 
+                    let opToLog = "Възстановен"; 
                     inserts.push({ "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
                 }
             });

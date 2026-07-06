@@ -163,7 +163,8 @@ async function loadTasks(isSilent = false) {
           });
           
           let directShipped = shippedQty[code] || 0;
-          let projected = Math.max(0, startedGross - totalScrap - consumedByParents - directShipped);
+          let recovered = completedOps[code + '_Възстановен'] || 0;
+          let projected = Math.max(0, startedGross - totalScrap - consumedByParents - directShipped) + recovered;
           
           let status = { totalScrap, consumedByParents, directShipped, projected, startedGross };
           inventoryCache[code] = status;
