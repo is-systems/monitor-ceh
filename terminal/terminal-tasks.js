@@ -189,9 +189,10 @@ async function loadTasks(isSilent = false) {
 
       let deficitBom = {};
       let blueTargets = {};
-      let planRootsForPeriod = planRoots[globalPlanId] || {};
-      Object.keys(planRootsForPeriod).forEach(root => {
-          deficitBom[root] = (deficitBom[root] || 0) + planRootsForPeriod[root];
+      Object.keys(planRoots).forEach(planId => {
+          Object.keys(planRoots[planId]).forEach(root => {
+              deficitBom[root] = (deficitBom[root] || 0) + planRoots[planId][root];
+          });
       });
 
       let allItemsSet = new Set(Object.keys(deficitBom));
