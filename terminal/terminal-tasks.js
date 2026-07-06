@@ -242,7 +242,7 @@ async function loadTasks(isSilent = false) {
               let doneQty = grossTrueDoneOps[opKey] || 0; 
               
               let opScrapRemaining = 0;
-              for (let j = idx; j < routes.length; j++) {
+              for (let j = idx + 1; j < routes.length; j++) {
                   let jOpKey = code + '_' + String(routes[j]['Име на операция']).trim();
                   opScrapRemaining += (scrappedOps[jOpKey] || 0);
               }
