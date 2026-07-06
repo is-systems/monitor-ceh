@@ -694,7 +694,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     }
     
     const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
-        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">🗺️</a>` : '';
+        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
         
     let opsHTML = '';
     let titleClass = 'title-gray';
