@@ -566,19 +566,19 @@ window.openLogisticsModal = function() {
         html = '<div style="text-align:center; padding:20px; color:#64748b;">Няма заредени планове.</div>';
     } else {
         plansList.forEach(p => {
-            html += \<div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="font-weight:bold; font-size:1.1em; margin-bottom:10px; color:#334155;">📅 План: Месец \ / \ (Общо \ детайла)</div>
+            html += `<div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-weight:bold; font-size:1.1em; margin-bottom:10px; color:#334155;">📅 План: Месец ${p.month} / ${p.year} (Общо ${p.total} детайла)</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div style="font-size:0.95em;">
-                        <div style="color:#059669; margin-bottom:4px;">🟢 Завършени: <b>\</b> бр.</div>
-                        <div style="color:#0284c7;">📦 Опаковани: <b>\</b> бр.</div>
+                        <div style="color:#059669; margin-bottom:4px;">🟢 Завършени: <b>${p.done}</b> бр.</div>
+                        <div style="color:#0284c7;">📦 Опаковани: <b>${p.packed}</b> бр.</div>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:8px;">
-                        <button class="btn-primary" \ onclick="window.massLogisticsAction('\', '\', 'Завършен', 'Опакован')" style="background:#0284c7; min-width:200px;">📦 Опаковай Завършените</button>
-                        <button class="btn-primary" \ onclick="window.massLogisticsAction('\', '\', 'Опакован', '🚚 Изпратен')" style="background:#f59e0b; min-width:200px;">🚚 Изпрати Опакованите</button>
+                        <button class="btn-primary" ${p.done === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} onclick="window.massLogisticsAction('${p.month}', '${p.year}', 'Завършен', 'Опакован')" style="background:#0284c7; min-width:200px;">📦 Опаковай Завършените</button>
+                        <button class="btn-primary" ${p.packed === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} onclick="window.massLogisticsAction('${p.month}', '${p.year}', 'Опакован', '🚚 Изпратен')" style="background:#f59e0b; min-width:200px;">🚚 Изпрати Опакованите</button>
                     </div>
                 </div>
-            </div>\;
+            </div>`;
         });
     }
 
@@ -587,7 +587,7 @@ window.openLogisticsModal = function() {
 };
 
 window.massLogisticsAction = async function(month, year, fromStatus, toStatus) {
-    const res = await Swal.fire({ title: 'Сигурни ли сте?', text: \Искате ли да промените всички детайли от статус '\' на '\' за Месец \ / \?\, icon: 'question', showCancelButton: true, confirmButtonText: 'Да, продължи', cancelButtonText: 'Отказ' });
+    const res = await Swal.fire({ title: 'Сигурни ли сте?', text: `Искате ли да промените всички детайли от статус '${fromStatus}' на '${toStatus}' за Месец ${month} / ${year}?`, icon: 'question', showCancelButton: true, confirmButtonText: 'Да, продължи', cancelButtonText: 'Отказ' });
     if (!res.isConfirmed) return;
 
     try {
@@ -600,7 +600,7 @@ window.massLogisticsAction = async function(month, year, fromStatus, toStatus) {
             
         if (error) throw error;
         
-        Swal.fire({icon: 'success', title: 'Успешно!', text: \Обновени са \ записа.\, timer: 2000, showConfirmButton: false});
+        Swal.fire({icon: 'success', title: 'Успешно!', text: `Обновени са ${data ? data.length : 0} записа.`, timer: 2000, showConfirmButton: false});
         
         document.getElementById('logisticsModalBackdrop').style.display = 'none';
         loadCurrentTableData();
