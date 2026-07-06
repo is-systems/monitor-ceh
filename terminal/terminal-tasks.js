@@ -188,10 +188,10 @@ async function loadTasks(isSilent = false) {
       };
 
       let deficitBom = {};
-      Object.keys(planRoots).forEach(planId => {
-          Object.keys(planRoots[planId]).forEach(root => {
-              deficitBom[root] = (deficitBom[root] || 0) + planRoots[planId][root];
-          });
+      let blueTargets = {};
+      let planRootsForPeriod = planRoots[globalPlanId] || {};
+      Object.keys(planRootsForPeriod).forEach(root => {
+          deficitBom[root] = (deficitBom[root] || 0) + planRootsForPeriod[root];
       });
 
       let allItemsSet = new Set(Object.keys(deficitBom));
@@ -204,10 +204,10 @@ async function loadTasks(isSilent = false) {
       // 3. Cascade deficit down the BOM
       allItemsArray.forEach(item => {
           let target = deficitBom[item] || 0;
+          blueTargets[item] = target; // Save the true demand target
+          
           let inv = getInventoryStatus(item);
           let deficit = Math.max(0, target - inv.projected);
-          
-          deficitBom[item] = deficit;
           
           if (deficit > 0) {
               let children = globalBomData.filter(b => String(b['ID Родител']).trim() === item);
@@ -224,7 +224,7 @@ async function loadTasks(isSilent = false) {
           let routes = globalRoutesByDetail[code] || []; 
           if(routes.length === 0) return;
           
-          let blueTarget = deficitBom[code] || 0;
+          let blueTarget = blueTargets[code] || 0;
           let greenTarget = bufferMap[code] || 0;
           let inv = getInventoryStatus(code);
           
