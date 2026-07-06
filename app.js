@@ -711,8 +711,11 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     
     let headerQty = 0;
     let headerScrap = 0;
-    const formatHeaderQty = (c, p) => c > p ? `${p}+${c - p}/${p}` : `${c}/${p}`;
-    const headerScrapHtml = (headerScrap > 0) ? ` <span style="color:#ef4444; font-weight:bold;">-${headerScrap}</span>` : '';
+
+    const formatHeaderQty = (c, p, scrap) => {
+        let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">-${scrap}</span>` : '';
+        return c > p ? `${p}+${c - p}${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
+    };
 
     if (node.operations && node.operations.length > 0) {
         let lastOp = node.operations[node.operations.length - 1];
@@ -736,13 +739,16 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         let len = node.operations.length;
         let allOpsDone = node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
-        const formatQty = (c, p) => c > p ? `${p}+${c - p}/${p}` : `${c}/${p}`;
-        const formatScrap = (op) => (op.scrapped && op.scrapped > 0) ? ` <span style="color:#ef4444; font-weight:bold;">-${op.scrapped}</span>` : '';
-        const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
-        const formatFuture = (op) => `<span class="op-text op-future">${op.name} | ${formatQty(0, node.planQty)}${formatScrap(op)}</span>`;
-        const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
-        const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
-        const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${formatQty(op.completed, node.planQty)}${formatScrap(op)}</span>`;
+        const formatQty = (c, p, scrap) => {
+            let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">-${scrap}</span>` : '';
+            return c > p ? `${p}+${c - p}${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
+        };
+
+        const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
+        const formatFuture = (op) => `<span class="op-text op-future">${op.name} | ${formatQty(0, node.planQty, op.scrapped)}</span>`;
+        const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
+        const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
+        const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
 
         if (allOpsDone) {
             titleClass = 'title-green';
@@ -804,7 +810,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         <div class="vsm-node" id="card_${dId}">
         <div class="vsm-header">
             <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
-            <span class="vsm-qty">| ${formatHeaderQty(headerQty, node.planQty)}${headerScrapHtml}</span>
+            <span class="vsm-qty">| ${formatHeaderQty(headerQty, node.planQty, headerScrap)}</span>
         </div>
         ${opsHTML !== '' ? opsHTML : ''}
         </div>
