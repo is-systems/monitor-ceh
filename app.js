@@ -120,7 +120,7 @@ async function initialFetch() {
 
 async function fetchDynamicData() {
     const [plansRes, reportsRes, skladRes] = await Promise.all([
-        client.from('plan').select('*').eq('Статус', 'Активен').limit(5000),
+        client.from('plan').select('*').in('Статус', ['Активен', 'Завършен', 'Опакован']).limit(5000),
         client.from('otcheti').select('*').limit(50000),
         client.from('sklad').select('*').limit(50000)
     ]);
@@ -159,8 +159,8 @@ async function loadData() {
             nodeList.forEach(node => {
                 if (!pMap[node.id]) { // Is root node
                     let allOpsDone = node.operations && node.operations.length > 0 && node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
-                    if (allOpsDone && node.planDbIds && node.planDbIds.length > 0) {
-                        plansToComplete.push(...node.planDbIds);
+                    if (allOpsDone && node.activePlanDbIds && node.activePlanDbIds.length > 0) {
+                        plansToComplete.push(...node.activePlanDbIds);
                     }
                 }
             });
@@ -255,6 +255,7 @@ function buildBOMTree(plansData, skladData) {
                 planId: row.plan_id, 
                 planMonth: pMonthStr,
                 planDbIds: [],
+                activePlanDbIds: [],
                 code: codeStr,
                 displayName: row.display_name, 
                 planQty: 0, 
@@ -270,6 +271,9 @@ function buildBOMTree(plansData, skladData) {
         mergedNodes[mergedId].planQty += (parseFloat(row.plan_qty) || 0);
         if (!mergedNodes[mergedId].planDbIds.includes(row.plan_id)) {
             mergedNodes[mergedId].planDbIds.push(row.plan_id);
+        }
+        if (pData && pData['Статус'] === 'Активен' && !mergedNodes[mergedId].activePlanDbIds.includes(row.plan_id)) {
+            mergedNodes[mergedId].activePlanDbIds.push(row.plan_id);
         }
 
         if (row.parent_code) {
