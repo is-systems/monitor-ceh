@@ -367,7 +367,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let masterData = {
         tiela: [], predni: [], zadni: [], mpr: [], statori: [], assembly: [],
         var11: [], var25: [], bearings: [],
-        small_pins: [], small_studs: [], small_rotors: [], small_spools: [], small_others: [], temp_spools: []
+        small_pins: [], small_studs: [], small_rotors: [], small_spools: [], small_others: [], temp_spools: [],
+        small_rotors_var11: [], small_rotors_var25: []
     };
 
     Object.values(mergedNodes).forEach(n => {
@@ -408,10 +409,14 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
         let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
+        let isRotorPacket = n.partType && n.partType.toLowerCase().includes("роторен пакет");
+        
         if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
         else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) n.bucket = 'predni';
         else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) n.bucket = 'zadni';
         else if (typeStr.includes("мпр")) n.bucket = 'mpr';
+        else if (isRotorPacket && typeStr.includes("11")) n.bucket = 'small_rotors_var11';
+        else if (isRotorPacket && typeStr.includes("25")) n.bucket = 'small_rotors_var25';
         else if (typeStr.includes("пакет")) n.bucket = 'small_rotors';
         else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) n.bucket = 'statori';
         else if (typeStr.includes("ротор") && typeStr.includes("11")) n.bucket = 'var11';
@@ -601,6 +606,15 @@ function drawDashboard(jsonString) {
 
             const localConns = globalConnections.filter(c => nodeIds.has(c.from) && nodeIds.has(c.to));
             localConns.forEach(c => {
+                let fromNode = nodes.find(n => n.id === c.from);
+                let toNode = nodes.find(n => n.id === c.to);
+                let isFromSpool = fromNode && fromNode.partType && fromNode.partType.trim().toLowerCase() === "макарички";
+                let isToSpool = toNode && toNode.partType && toNode.partType.trim().toLowerCase() === "макарички";
+                
+                if (isFromSpool !== isToSpool) {
+                    return; // Не ги групираме заедно, ако едното е макара, а другото не
+                }
+
                 adj[c.from].push(c.to);
                 adj[c.to].push(c.from); 
             });
@@ -626,6 +640,14 @@ function drawDashboard(jsonString) {
                     }
                     families.push(familyNodes);
                 }
+            });
+            
+            families.sort((a, b) => {
+                let aHasSpool = a.some(n => n.partType && n.partType.trim().toLowerCase() === "макарички");
+                let bHasSpool = b.some(n => n.partType && n.partType.trim().toLowerCase() === "макарички");
+                if (aHasSpool && !bHasSpool) return 1;
+                if (!aHasSpool && bHasSpool) return -1;
+                return b.length - a.length; // по-големите семейства първи
             });
             
             let planHTML = `<div class="plan-group"><div class="plan-label">ПЛАН: ${planMonth}</div>`;
@@ -656,7 +678,13 @@ function drawDashboard(jsonString) {
                 sortedLevels.forEach(lvl => {
                     let colHTML = `<div class="bom-column">`;
                     
-                    levels[lvl].forEach(node => {
+                    levels[lvl].sort((a, b) => {
+                        let aIsSpool = a.partType && a.partType.trim().toLowerCase() === "макарички";
+                        let bIsSpool = b.partType && b.partType.trim().toLowerCase() === "макарички";
+                        if (aIsSpool && !bIsSpool) return 1;
+                        if (!aIsSpool && bIsSpool) return -1;
+                        return 0;
+                    }).forEach(node => {
                         colHTML += generateNodeHTML(node, parentMap, childMap, allNodesMap);
                     });
                     colHTML += `</div>`;
@@ -691,13 +719,82 @@ function drawDashboard(jsonString) {
     renderFamilyBOMBucket(data.nodes.small_spools || [], 'w-small-spools'); 
     renderFamilyBOMBucket(data.nodes.small_others || [], 'w-small-others');
     
+    renderFamilyBOMBucket(data.nodes.small_rotors_var11 || [], 'w-temp-rotors-11');
+    renderFamilyBOMBucket(data.nodes.small_rotors_var25 || [], 'w-temp-rotors-25');
+    
     renderFamilyBOMBucket(data.nodes.statori || [], 'w-statori');
     renderFamilyBOMBucket(data.nodes.assembly || [], 'w-assembly');
 
-    const othersContainer = document.getElementById('w-small-others');
-    if (othersContainer && othersContainer.innerHTML.trim() === '') {
-        const parentDiv = othersContainer.parentElement;
-        if(parentDiv && parentDiv.classList.contains('col-lane') === false) parentDiv.style.display = 'none';
+    function appendColumn(sourceId, targetWindowId, titleText) {
+        const winContainer = document.getElementById(targetWindowId);
+        const sourceContainer = document.getElementById(sourceId);
+        if (winContainer && sourceContainer && sourceContainer.innerHTML.trim() !== '') {
+            let lastRow = null;
+            const familyRows = winContainer.querySelectorAll('.family-row');
+            if (familyRows.length > 0) {
+                lastRow = familyRows[familyRows.length - 1];
+            } else {
+                const planGroup = document.createElement('div');
+                planGroup.className = 'plan-group';
+                lastRow = document.createElement('div');
+                lastRow.className = 'family-row';
+                planGroup.appendChild(lastRow);
+                winContainer.appendChild(planGroup);
+            }
+            
+            const colClass = 'appended-' + sourceId;
+            if (!lastRow.querySelector('.' + colClass)) {
+                if (lastRow.children.length > 0) {
+                    const spacer = document.createElement('div');
+                    spacer.style.width = "40px";
+                    lastRow.appendChild(spacer);
+                }
+                    
+                    // Нова колона
+                    const newCol = document.createElement('div');
+                    newCol.className = 'bom-column ' + colClass;
+                    if (titleText) {
+                        newCol.innerHTML = `<span class="lane-title" style="margin-bottom: 8px;">${titleText}</span>`;
+                    }
+                    
+                    // Взимаме всички детайли
+                    const nodes = sourceContainer.querySelectorAll('.vsm-node');
+                    
+                    if (sourceId === 'w-small-pins' || sourceId === 'w-small-studs') {
+                        const rowWrapper = document.createElement('div');
+                        rowWrapper.style.display = 'flex';
+                        rowWrapper.style.flexDirection = 'row';
+                        rowWrapper.style.gap = '20px';
+                        nodes.forEach(n => rowWrapper.appendChild(n));
+                        newCol.appendChild(rowWrapper);
+                    } else {
+                        nodes.forEach(n => newCol.appendChild(n));
+                    }
+                    
+                    // Добавяме колоната на същия ред
+                    lastRow.appendChild(newCol);
+                    
+                    // Скриваме оригиналния контейнер (ако е видим)
+                    const lane = sourceContainer.closest('.lane');
+                    if (lane) lane.style.display = 'none';
+                }
+            }
+        }
+
+    appendColumn('w-temp-rotors-11', 'w-var11', '');
+    appendColumn('w-temp-rotors-25', 'w-var25', '');
+    appendColumn('w-small-pins', 'w-var25', 'ЩИФТОВЕ');
+    
+    appendColumn('w-small-rotors', 'w-bearings', 'ПАКЕТИ');
+    appendColumn('w-small-studs', 'w-bearings', 'ШПИЛКИ');
+    appendColumn('w-small-others', 'w-bearings', 'ДРУГИ');
+
+    const studsContainer = document.getElementById('w-small-studs');
+    if (studsContainer) {
+        const smallDetailsWindow = studsContainer.closest('.window');
+        if (smallDetailsWindow) {
+            smallDetailsWindow.style.display = 'none';
+        }
     }
 
     setTimeout(() => {
@@ -716,8 +813,8 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     let headerScrap = 0;
 
     const formatHeaderQty = (c, p, scrap) => {
-        let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">-${scrap}</span>` : '';
-        return c > p ? `${p}+${c - p}${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
+        let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">(-${scrap})</span>` : '';
+        return c > p ? `${p}(+${c - p})${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
     };
 
     if (node.operations && node.operations.length > 0) {
@@ -743,8 +840,8 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         let allOpsDone = node.operations.every(o => o.state === 'green' || o.completed >= node.planQty);
 
         const formatQty = (c, p, scrap) => {
-            let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">-${scrap}</span>` : '';
-            return c > p ? `${p}+${c - p}${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
+            let scrapStr = (scrap && scrap > 0) ? `<span style="color:#ef4444; font-weight:bold;">(-${scrap})</span>` : '';
+            return c > p ? `${p}(+${c - p})${scrapStr}/${p}` : `${c}${scrapStr}/${p}`;
         };
 
         const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
@@ -810,7 +907,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     }
 
     return `
-        <div class="vsm-node" id="card_${dId}">
+        <div class="vsm-node" id="card_${dId}" data-part-type="${node.partType || ''}">
         <div class="vsm-header">
             <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
             <span class="vsm-qty">| ${formatHeaderQty(headerQty, node.planQty, headerScrap)}</span>
@@ -861,12 +958,52 @@ function drawArrows() {
                 
                 const cpX = startX + (endX - startX) * 0.4;
                 
-                let fromLower = conn.from.toLowerCase();
-                let isSpool = fromLower.includes("макар") || fromLower.includes("мак.");
-                let strokeColor = isSpool ? "#f3f3f3" : "#475569";
-                let markerId = isSpool ? "url(#arrow-spool)" : "url(#arrow)";
-                
-                html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="3,3" marker-end="${markerId}" />`;
+                let fromType = cardChild.getAttribute('data-part-type');
+                let toType = cardParent.getAttribute('data-part-type');
+                let isFromSpool = fromType && fromType.trim().toLowerCase() === "макарички";
+                let isToSpool = toType && toType.trim().toLowerCase() === "макарички";
+                let isFromRotorPacket = fromType && fromType.trim().toLowerCase().includes("роторен пакет");
+                let isToRotorPacket = toType && toType.trim().toLowerCase().includes("роторен пакет");
+                let isFromPin = fromType && fromType.trim().toLowerCase().includes("щифт");
+                let isToPin = toType && toType.trim().toLowerCase().includes("щифт");
+
+                if ((isFromSpool && !isToSpool) || (isFromRotorPacket && !isToRotorPacket) || (isFromPin && !isToPin)) {
+                    let fromLower = conn.from.toLowerCase();
+                    let color = "#94a3b8"; // пастелно сиво (по подразбиране)
+                    
+                    if (fromLower.includes("отстъп")) color = "#60a5fa"; 
+                    else if (fromLower.includes("процеп")) color = "#f87171"; 
+                    else if (fromLower.includes("напудрена")) color = "#fb923c"; 
+                    else if (fromLower.includes("едн. чел.")) color = "#4ade80"; 
+                    else if (fromLower.includes("двуст")) color = "#c084fc"; 
+                    else if (fromLower.includes("11")) color = "#facc15"; // жълто за вар 11
+                    else if (fromLower.includes("25")) color = "#2dd4bf"; // тюркоаз за вар 25
+                    else if (fromLower.includes("мулти")) color = "#f472b6"; // розово за мулти
+                    else if (fromLower.includes("nr")) color = "#a3e635"; // светлозелено за NR
+                    else color = "#818cf8"; // пастелно индиго
+                    
+                    let shape = 'circle';
+                    if (isFromRotorPacket) shape = 'triangle';
+                    if (isFromPin) shape = 'diamond';
+                    
+                    const renderShape = (cx, cy) => {
+                        if (shape === 'circle') return `<circle cx="${cx}" cy="${cy}" r="5" fill="${color}" />`;
+                        if (shape === 'triangle') return `<polygon points="${cx},${cy-6} ${cx-5},${cy+5} ${cx+5},${cy+5}" fill="${color}" />`;
+                        if (shape === 'diamond') return `<polygon points="${cx},${cy-6} ${cx-5},${cy} ${cx},${cy+6} ${cx+5},${cy}" fill="${color}" />`;
+                        return "";
+                    };
+                    
+                    let targetOffsetY = -10;
+                    if (shape === 'triangle') targetOffsetY = -22; // По-нагоре
+                    if (shape === 'diamond') targetOffsetY = 2;   // По-надолу
+                    
+                    html += renderShape(startX + 8, startY);
+                    html += renderShape(endX - 12, endY + targetOffsetY);
+                } else {
+                    let strokeColor = "#475569";
+                    let markerId = "url(#arrow)";
+                    html += `<path d="M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-dasharray="3,3" marker-end="${markerId}" />`;
+                }
             }
         }
     });

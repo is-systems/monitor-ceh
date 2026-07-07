@@ -29,8 +29,8 @@
       
       <div class="right-zone">
         <div class="window" style="height: 100%;">
-          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">РЕЗОЛВЕРИ</div>
-          <div class="window-body" id="w-assembly"></div>
+          <div class="window-header" style="border-top: 3px solid #f43f5e; background: linear-gradient(180deg, rgba(244,63,94,0.1) 0%, transparent 100%);">СТАТОРИ И ТРАНСФОРМАТОРИ</div>
+          <div class="window-body" id="w-statori"></div>
         </div>
       </div>
     </div>
@@ -41,32 +41,30 @@
         <div class="window-body" style="padding: 12px;">
           <div class="lane"><span class="lane-title">ВАР. 11</span><div id="w-var11"></div></div>
           <div class="lane"><span class="lane-title">ВАР. 25</span><div id="w-var25"></div></div>
+          <div class="lane" style="margin-top: 24px;"><span class="lane-title">ЩИФТОВЕ</span><div id="w-small-pins"></div></div>
           <div class="lane"><span class="lane-title">ЛАГЕРНИ ВЪЗЛИ</span><div id="w-bearings"></div></div>
         </div>
       </div>
       
-      <div style="flex: 1.2; display: flex; flex-direction: column; gap: 12px;">
-        <div class="window" style="flex: 1.2;">
+      <div style="flex: 1.2; display: flex; flex-direction: row; gap: 12px;">
+        <div class="window" style="flex: 1;">
           <div class="window-header" style="border-top: 3px solid #818cf8; background: linear-gradient(180deg, rgba(129,140,248,0.1) 0%, transparent 100%);">МАЛКИ ДЕТАЙЛИ</div>
-          <div class="window-body columns-mode">
-            <div class="col-lane">
-                <div style="margin-bottom: 16px;"><span class="lane-title">ЩИФТОВЕ</span><div id="w-small-pins"></div></div>
-                <div style="margin-bottom: 16px;"><span class="lane-title">ПАКЕТИ</span><div id="w-small-rotors"></div></div>
-                <div><span class="lane-title">ДРУГИ</span><div id="w-small-others"></div></div>
-            </div>
-            <div class="col-lane">
-                <div><span class="lane-title">ШПИЛКИ</span><div id="w-small-studs"></div></div>
-            </div>
+          <div class="window-body">
+            <div style="margin-bottom: 16px;"><span class="lane-title">ШПИЛКИ</span><div id="w-small-studs"></div></div>
+            <div style="margin-bottom: 16px;"><span class="lane-title">ПАКЕТИ</span><div id="w-small-rotors"></div></div>
+            <div><span class="lane-title">ДРУГИ</span><div id="w-small-others"></div></div>
           </div>
         </div>
 
         <div class="window" style="flex: 1;">
-          <div class="window-header" style="border-top: 3px solid #f43f5e; background: linear-gradient(180deg, rgba(244,63,94,0.1) 0%, transparent 100%);">СТАТОРИ И ТРАНСФОРМАТОРИ</div>
-          <div class="window-body" id="w-statori"></div>
+          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">РЕЗОЛВЕРИ</div>
+          <div class="window-body" id="w-assembly"></div>
         </div>
       </div>
     </div>
   </div>
 
+  <div id="w-temp-rotors-11" style="display: none;"></div>
+  <div id="w-temp-rotors-25" style="display: none;"></div>
 </body>
 </html>

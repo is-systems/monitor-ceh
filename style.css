@@ -21,8 +21,8 @@ body { font-family: 'Sofia Sans', sans-serif; background-color: var(--bg-color);
 .layout-wrapper { display: flex; flex-direction: column; gap: 12px; min-height: 95vh; position: relative; z-index: 10; min-width: max-content; padding-right: 12px; padding-bottom: 20px;}
 
 .top-section { display: flex; gap: 12px; min-width: max-content; flex: 1; }
-.left-zone { display: flex; flex-direction: row; gap: 12px; min-width: max-content; flex: 4; }
-.right-zone { display: flex; flex-direction: column; min-width: 350px; flex: 1; }
+.left-zone { display: flex; flex-direction: row; gap: 12px; min-width: max-content; flex: auto; }
+.right-zone { display: flex; flex-direction: column; min-width: 350px; flex: auto; }
 
 .bottom-section { display: flex; gap: 12px; min-width: max-content; flex: 1.5; }
 
