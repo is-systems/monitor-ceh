@@ -418,7 +418,7 @@ async function saveForm(e) {
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
               
-              let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Изработено", "Служител": "СИСТЕМА (Ръчно добавен)", "Час": new Date().toISOString(), "Начален час": new Date().toISOString() };
+              let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Изработено", "Служител": "СИСТЕМА (Ръчно добавен)", "Час": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               
@@ -432,7 +432,7 @@ async function saveForm(e) {
               const diff = newQty - oldQty;
               
               if (diff !== 0) {
-                  let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Изработено", "Служител": "СИСТЕМА (Корекция наличност)", "Час": new Date().toISOString(), "Начален час": new Date().toISOString() };
+                  let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Изработено", "Служител": "СИСТЕМА (Корекция наличност)", "Час": new Date().toISOString() };
                   const { error } = await client.from('otcheti').insert([payload]); 
                   if (error) throw error; 
               }
