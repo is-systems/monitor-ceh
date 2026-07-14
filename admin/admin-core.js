@@ -269,13 +269,14 @@ function buildForm(data = null) {
       } else {
           area.innerHTML = `
             <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
-            <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
+            <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"><input type="hidden" id="inp_skladRealOp"></div>
             <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" required></div>
             <div class="form-group"><label>Буфер (Минимално количество):</label><input type="number" id="inp_skladBuffer" class="form-input" step="any" min="0" required></div>
           `;
           document.getElementById('inp_skladDetail').value = data['ID Детайл'] || '';
           document.getElementById('inp_skladOp').value = data['Операция'] || '';
+          document.getElementById('inp_skladRealOp').value = (currentTab === 'sklad_gp') ? (data['Оригинална Операция'] || data['Операция'] || '') : (data['Операция'] || '');
           document.getElementById('inp_skladOldQty').value = data['Наличност в цеха'] || 0;
           document.getElementById('inp_skladQty').value = data['Наличност в цеха'] || 0;
           document.getElementById('inp_skladBuffer').value = data['Минимално количество/Буфер'] || 0;
@@ -315,7 +316,8 @@ async function saveForm(e) {
               Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
           } else {
               const det = document.getElementById('inp_skladDetail').value;
-              const op = document.getElementById('inp_skladOp').value;
+              const realOpEl = document.getElementById('inp_skladRealOp');
+              const op = (realOpEl && realOpEl.value) ? realOpEl.value : document.getElementById('inp_skladOp').value;
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
