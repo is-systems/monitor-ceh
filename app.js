@@ -25,7 +25,7 @@ window.onload = async function() {
     
     await initialFetch();
     loadData();
-    setInterval(loadData, 30000); 
+    setInterval(loadData, 15000); 
 };
 
 function getDomId(realId) {
