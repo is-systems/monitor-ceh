@@ -128,7 +128,7 @@ async function loadTasks(isSilent = false) {
 
       globalTasks = [];
       let activePlanNames = Object.keys(planRoots).map(id => id.replace('_', ' '));
-      let globalPlanId = activePlanNames.length > 0 ? "АКТИВНИ ПЛАНОВЕ" : "БУФЕРИ";
+      let globalPlanId = activePlanNames.length > 0 ? activePlanNames.map(name => name.split(' ')[0]).join(', ') : "БУФЕРИ";
 
       // 1. Calculate Inventory Status for all items
       let inventoryCache = {};
