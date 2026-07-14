@@ -65,25 +65,6 @@ function claimCurrentTaskDOM(taskId) {
   document.getElementById('free_state_' + taskId).style.display = 'none'; document.getElementById('focus_state_' + taskId).style.display = 'block';
   window['startTime_' + taskId] = new Date().toISOString(); window.scrollTo(0,0);
   
-  let reportBtn = document.getElementById('btn_' + taskId);
-  if (reportBtn) {
-      reportBtn.disabled = true;
-      let originalText = reportBtn.innerHTML;
-      let timeLeft = 30;
-      reportBtn.innerHTML = `⏱️ ИЗЧАКАЙТЕ (${timeLeft}с)`;
-      let interval = setInterval(() => {
-          timeLeft--;
-          if (timeLeft <= 0) {
-              clearInterval(interval);
-              if (reportBtn) {
-                  reportBtn.disabled = false;
-                  reportBtn.innerHTML = originalText;
-              }
-          } else {
-              if (reportBtn) reportBtn.innerHTML = `⏱️ ИЗЧАКАЙТЕ (${timeLeft}с)`;
-          }
-      }, 1000);
-  }
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData) {
       taskData.isTaken = true;
@@ -120,6 +101,15 @@ function pauseTaskDOM(taskId) {
 }
 
 async function finishTask(taskId, btn) {
+  let startTime = window['startTime_' + taskId];
+  if (startTime) {
+      let diffSeconds = (new Date() - new Date(startTime)) / 1000;
+      if (diffSeconds < 30) {
+          Swal.fire('⏳ Твърде бързо!', 'Изминало е твърде малко време откакто започнахте. Моля, изработете детайла първо!', 'warning');
+          return;
+      }
+  }
+
   var inputElem = document.getElementById('qty_' + taskId); if (!inputElem) return; var val = parseFloat(inputElem.value);
   if(isNaN(val) || val <= 0) { Swal.fire('Грешка', 'Въведи валидна бройка!', 'error'); return; }
   let taskData = globalTasks.find(t => t.id === taskId);
