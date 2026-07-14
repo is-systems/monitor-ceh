@@ -39,7 +39,7 @@ async function loadTasks(isSilent = false) {
   try {
       const [plansRes, bomRes, routesRes, reportsRes, skladRes, nomRes, bufferRes, gpRes, wipRes] = await Promise.all([
           client.from('plan').select('*').eq('Статус', 'Активен').limit(100000), client.from('bom').select('*').limit(100000),
-          client.from('marshruti').select('*').limit(100000), client.from('otcheti').select('ID Детайл, Операция, Статус, Оператор, Дата').order('Дата', {ascending: false}).limit(1000), 
+          client.from('marshruti').select('*').limit(100000), client.from('otcheti').select('*').order('Дата', {ascending: false}).limit(2000), 
           client.from('sklad').select('*').limit(100000), client.from('Номенклатура').select('*').limit(100000),
           client.from('sklad_bufferi').select('*').limit(100000),
           client.from('computed_sklad_gp').select('*').limit(100000),
