@@ -26,7 +26,7 @@ function switchTab(tabKey) {
   const pdfBtn = document.getElementById('pdfBtn'); const logBtn = document.getElementById('logisticsBtn'); const sidebar = document.getElementById('personnelSidebar');
   
   addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
-  addBtn.style.display = (config.readOnlyTab && tabKey !== 'sklad_gp') ? 'none' : 'flex';
+  addBtn.style.display = (config.readOnlyTab && tabKey !== 'sklad_gp' && tabKey !== 'sklad_wip') ? 'none' : 'flex';
   if (pdfBtn) pdfBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
   if (logBtn) logBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
 
@@ -142,10 +142,10 @@ function renderDynamicTable(itemsToRender = null) {
   }
 
   config.fields.forEach(f => { if (f.hideOnAdd) return; const th = document.createElement('th'); th.innerText = f.label || f.name; headerRow.appendChild(th); });
-  if (!config.readOnlyTab || currentTab === 'sklad_gp') { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
+  if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
   thead.appendChild(headerRow);
   
-  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab && currentTab !== 'sklad_gp' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
+  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab && currentTab !== 'sklad_gp' && currentTab !== 'sklad_wip' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
 
   currentRenderedRows.forEach((item) => {
     const row = document.createElement('tr'); const trueIndex = globalRows.indexOf(item);
@@ -191,7 +191,7 @@ function renderDynamicTable(itemsToRender = null) {
       }
       td.innerText = val; row.appendChild(td);
     });
-      if (!config.readOnlyTab || currentTab === 'sklad_gp') {
+      if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
           const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
           tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})">✏️</button><button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})">🗑️</button>`;
           row.appendChild(tdActions);
@@ -243,7 +243,7 @@ function filterSkladDetails(val) {
 function buildForm(data = null) {
   const area = document.getElementById('formFieldsArea'); area.innerHTML = ''; const fields = tableConfigs[currentTab].fields;
   
-  if (currentTab === 'sklad_gp') {
+  if (currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
       if (!isEditMode) {
           area.innerHTML = `
             <div class="form-group" style="position:relative;">
@@ -300,7 +300,7 @@ function closeModal() { document.getElementById('modalBackdrop').style.display =
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
   
-  if (currentTab === 'sklad_gp') {
+  if (currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
       try {
           if (!isEditMode) {
               const det = document.getElementById('inp_skladDetail').value.trim();
