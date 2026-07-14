@@ -303,7 +303,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let grossCompletedOps = {};
 
     sortedReports.forEach(r => {
-        let key = String(r['ID Детайл']).trim() + '_' + String(r['Операция']).trim();
+        let key = String(r['ID Детайл']).trim().toLowerCase() + '_' + String(r['Операция']).trim().toLowerCase();
         let qty = parseFloat(r['Количество']) || 0;
         let scrap = parseFloat(r['Брак']) || 0;
         
@@ -329,13 +329,13 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let routes = staticCache.routesByDetail[code];
         if (routes.length === 0) return;
         
-        let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim();
+        let lastOpKey = String(code).trim().toLowerCase() + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
         trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
         grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
         
         for (let i = routes.length - 2; i >= 0; i--) {
-            let opKey = code + '_' + String(routes[i]['Име на операция']).trim();
-            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim();
+            let opKey = String(code).trim().toLowerCase() + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+            let nextOpKey = String(code).trim().toLowerCase() + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
             trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
             grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
         }
@@ -381,7 +381,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             let consumedByShipped = getTotalShipped(n.code);
             partRoutes.forEach(route => {
                 let opName = String(route['Име на операция']).trim();
-                let opKey = n.code + '_' + opName;
+                let opKey = String(n.code).trim().toLowerCase() + '_' + String(opName).trim().toLowerCase();
                 
                 let myGrossDone = grossTrueDoneOps[opKey] || 0;
                 let doneQty = Math.max(0, myGrossDone - consumedByShipped);
