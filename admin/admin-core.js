@@ -382,7 +382,33 @@ async function saveForm(e) {
         }
     }
 
-    if (isEditMode) { const row = globalRows[editingIndex]; const keyVal = row[config.key]; const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false}); } 
+    if (isEditMode) { 
+        const row = globalRows[editingIndex]; 
+        const keyVal = row[config.key]; 
+        if (config.table === 'computed_sklad_gp' || config.table === 'computed_sklad_wip') {
+            let oldQty = parseFloat(row['Наличност в цеха']) || 0;
+            let newQty = parseFloat(payload['Наличност в цеха']) || 0;
+            let delta = newQty - oldQty;
+            if (delta !== 0) {
+                let opName = config.table === 'computed_sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
+                let otchetiPayload = {
+                    "ID Детайл": row['ID Детайл'],
+                    "Операция": opName,
+                    "Количество": delta,
+                    "Статус": "Отчетено",
+                    "Оператор": "СИСТЕМА (Корекция наличност)",
+                    "Дата": new Date().toISOString()
+                };
+                const { error } = await client.from('otcheti').insert([otchetiPayload]);
+                if (error) throw error;
+            }
+            Swal.fire({icon: 'success', title: 'Наличността е коригирана!', timer: 1500, showConfirmButton: false});
+        } else {
+            const { error } = await client.from(config.table).update(payload).eq(config.key, keyVal); 
+            if (error) throw error; 
+            Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false}); 
+        }
+    } 
     else { const { error } = await client.from(config.table).insert([payload]); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно добавено!', timer: 1000, showConfirmButton: false}); }
     closeModal(); loadCurrentTableData();
   } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
@@ -391,12 +417,13 @@ async function saveForm(e) {
 async function deleteItem(index) {
   const config = tableConfigs[currentTab]; const row = globalRows[index]; 
   
-  if (currentTab === 'sklad_gp') {
+  if (currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
       const res = await Swal.fire({ title: 'Нулиране на наличността?', text: `Наличността за ${row['ID Детайл']} (${row['Операция']}) ще бъде зададена на 0.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Да, нулирай!', cancelButtonText: 'Отказ' });
       if (res.isConfirmed) { 
           try { 
               Swal.fire({title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
-              let payload = { "ID Детайл": row['ID Детайл'], "Операция": row['Операция'], "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
+              let opName = currentTab === 'sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
+              let payload = { "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); 
