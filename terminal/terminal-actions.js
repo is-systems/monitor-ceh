@@ -105,7 +105,7 @@ async function finishTask(taskId, btn) {
   if (startTime) {
       let diffSeconds = (new Date() - new Date(startTime)) / 1000;
       if (diffSeconds < 30) {
-          Swal.fire('⏳ Твърде бързо!', 'Изминало е твърде малко време откакто започнахте. Моля, изработете детайла първо!', 'warning');
+          Swal.fire('⏳ Твърде бързо!', '', 'warning');
           return;
       }
   }
