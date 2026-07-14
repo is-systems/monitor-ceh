@@ -105,7 +105,7 @@ async function finishTask(taskId, btn) {
   if (startTime) {
       let diffSeconds = (new Date() - new Date(startTime)) / 1000;
       if (diffSeconds < 30) {
-          Swal.fire('🏃‍♂️ Кога успя толкова бързо?', 'Моля, изработете детайла първо!', 'warning');
+          Swal.fire('⚡ Светкавица!', 'Но все пак нека наистина направим детайлите първо 😊', 'warning');
           return;
       }
   }
