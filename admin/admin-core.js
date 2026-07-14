@@ -103,137 +103,27 @@ async function loadCurrentTableData() {
           }
 
           try {
-              const [bomRes, routesRes, otchetiRes] = await Promise.all([
-                  client.from('bom').select('*').limit(100000),
-                  client.from('marshruti').select('*').limit(100000),
-                  client.from('otcheti').select('*').limit(100000)
-              ]);
-              let globalBomData = bomRes.data || [];
-              let globalRoutesByDetail = {};
-              if (routesRes.data) {
-                  routesRes.data.forEach(r => { let code = String(r['Код на детайла']).trim().toLowerCase(); if(!globalRoutesByDetail[code]) globalRoutesByDetail[code] = []; globalRoutesByDetail[code].push(r); });
-                  Object.keys(globalRoutesByDetail).forEach(code => globalRoutesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция'])));
-              }
-              
-              let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {};
-              if (otchetiRes.data) {
-                  otchetiRes.data.forEach(r => {
-                      let code = String(r['ID Детайл']).trim().toLowerCase();
-                      let op = String(r['Операция']).trim().toLowerCase();
-                      let key = code + '_' + op;
-                      let qty = parseFloat(r['Количество']) || 0;
-                      if (r['Статус'] === 'Отчетено') {
-                          completedOps[key] = (completedOps[key] || 0) + qty;
-                          if (r['Оператор'] === 'СИСТЕМА (Експедиция)') { }
-                          else if (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) { }
-                          else { grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; }
-                      }
-                      else if (r['Статус'] === 'Брак') scrappedOps[key] = (scrappedOps[key] || 0) + qty;
-                  });
-              }
-
-              let trueDoneOps = {}; let grossTrueDoneOps = {};
-              let shippedQty = {};
-              
-              Object.keys(globalRoutesByDetail).forEach(code => {
-                  let routes = globalRoutesByDetail[code];
-                  if (routes.length === 0) return;
-                  let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
-                  let localTrueLast = completedOps[lastOpKey] || 0;
-                  grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
-                  
-                  for (let i = routes.length - 2; i >= 0; i--) {
-                      let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-                      let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-                      grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-                  }
-
-                  shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - localTrueLast);
-              });
-
-              let totalShippedCache = {};
-              function getTotalShipped(item, visited = new Set()) {
-                  let lc = item.toLowerCase();
-                  if (totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
-                  if (visited.has(lc)) return 0;
-                  visited.add(lc);
-                  
-                  let directShipped = shippedQty[lc] || 0;
-                  let parents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
-                  let indirectShipped = 0;
-                  parents.forEach(p => {
-                      let parentCode = String(p['ID Родител']).trim().toLowerCase();
-                      if (parentCode !== lc) {
-                          indirectShipped += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
-                      }
-                  });
-                  totalShippedCache[lc] = directShipped + indirectShipped;
-                  return totalShippedCache[lc];
-              }
-
-              Object.keys(globalRoutesByDetail).forEach(code => {
-                  let routes = globalRoutesByDetail[code];
-                  let consumedByShipped = getTotalShipped(code);
-                  routes.forEach(route => {
-                      let opKey = code + '_' + String(route['Име на операция']).trim().toLowerCase();
-                      trueDoneOps[opKey] = Math.max(0, (grossTrueDoneOps[opKey] || 0) - consumedByShipped);
-                  });
-              });
-
-              let startedOpsCache = {};
-              let getStarted = (pCode) => {
-                  let lcCode = pCode.toLowerCase();
-                  if (startedOpsCache[lcCode] !== undefined) return startedOpsCache[lcCode];
-                  let pRoutes = globalRoutesByDetail[lcCode] || [];
-                  if (pRoutes.length > 0) {
-                      let firstOpKey = lcCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
-                      startedOpsCache[lcCode] = (grossTrueDoneOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
-                  } else { startedOpsCache[lcCode] = 0; }
-                  return startedOpsCache[lcCode];
-              };
-
               rows.forEach(r => {
                   let rawCode = String(r['ID Детайл']).trim();
                   let cCode = rawCode.toLowerCase();
-                  let rawOp = String(r['Операция']).trim();
-                  let opName = rawOp.toLowerCase();
-                  let rKey = cCode + '_' + opName;
-                  
-                  let cRoutes = globalRoutesByDetail[cCode] || [];
-                  let opIndex = cRoutes.findIndex(route => String(route['Име на операция']).trim().toLowerCase() === opName);
-                  let stockHere = 0;
-                  
-                  if (opIndex !== -1) {
-                      if (opIndex === cRoutes.length - 1) {
-                          let consumedByOthers = 0;
-                          let allParents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === cCode);
-                          allParents.forEach(p => {
-                              let pCode = String(p['ID Родител']).trim();
-                              let pMultiplier = parseFloat(p['Количество']) || 1;
-                              let pStarted = getStarted(pCode);
-                              consumedByOthers += pStarted * pMultiplier;
-                          });
-                          stockHere = Math.max(0, (trueDoneOps[rKey] || 0) - consumedByOthers);
-                      } else {
-                          let nextOpName = String(cRoutes[opIndex+1]['Име на операция']).trim().toLowerCase();
-                          let nextOpKey = cCode + '_' + nextOpName;
-                          stockHere = Math.max(0, (trueDoneOps[rKey] || 0) - ((grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0)));
-                      }
-                  } else {
-                      stockHere = Math.max(0, r['Наличност в цеха'] || 0);
-                  }
-                  
-                  r['Наличност в цеха'] = stockHere;
                   r['Минимално количество/Буфер'] = bufferMap[cCode] || 0;
               });
-
           } catch (e) {
-              console.error("Error computing sklad_gp pipeline: ", e);
-              rows.forEach(r => {
-                  let cCode = String(r['ID Детайл']).trim().toLowerCase();
-                  r['Минимално количество/Буфер'] = bufferMap[cCode] || 0;
+              console.error("Error computing buffers: ", e);
+          }
+      } else if (currentTab === 'sklad_wip') {
+          const bufferRes = await client.from('sklad_bufferi').select('*');
+          let bufferMap = {};
+          if (!bufferRes.error && bufferRes.data) {
+              bufferRes.data.forEach(b => {
+                  let bKey = String(b['ID Детайл']).trim().toLowerCase();
+                  bufferMap[bKey] = parseFloat(b['Буфер']) || 0;
               });
           }
+          rows.forEach(r => {
+              let cCode = String(r['ID Детайл']).trim().toLowerCase();
+              r['Минимално количество/Буфер'] = bufferMap[cCode] || 0;
+          });
       }
       globalRows = rows; filterTable();
   } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
