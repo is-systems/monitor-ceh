@@ -64,7 +64,26 @@ function claimCurrentTaskDOM(taskId) {
   document.querySelectorAll('.card').forEach(c => { if (c.id !== 'card_' + taskId) c.style.display = 'none'; });
   document.getElementById('free_state_' + taskId).style.display = 'none'; document.getElementById('focus_state_' + taskId).style.display = 'block';
   window['startTime_' + taskId] = new Date().toISOString(); window.scrollTo(0,0);
-
+  
+  let reportBtn = document.getElementById('btn_' + taskId);
+  if (reportBtn) {
+      reportBtn.disabled = true;
+      let originalText = reportBtn.innerHTML;
+      let timeLeft = 30;
+      reportBtn.innerHTML = `⏱️ ИЗЧАКАЙТЕ (${timeLeft}с)`;
+      let interval = setInterval(() => {
+          timeLeft--;
+          if (timeLeft <= 0) {
+              clearInterval(interval);
+              if (reportBtn) {
+                  reportBtn.disabled = false;
+                  reportBtn.innerHTML = originalText;
+              }
+          } else {
+              if (reportBtn) reportBtn.innerHTML = `⏱️ ИЗЧАКАЙТЕ (${timeLeft}с)`;
+          }
+      }, 1000);
+  }
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData) {
       taskData.isTaken = true;
