@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="bg">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IS-SYSTEMS Глобален Административен Панел</title>
+    <title>IS-SYSTEMS Р“Р»РѕР±Р°Р»РµРЅ РђРґРјРёРЅРёСЃС‚СЂР°С‚РёРІРµРЅ РџР°РЅРµР»</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="admin/admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,44 +13,44 @@
     <script src="admin/admin-pdf.js?v=2" defer></script>
     <script src="admin/admin-notif.js?v=2" defer></script>
     <script src="admin/admin-personnel.js?v=5" defer></script>
-    <script src="admin/admin-core.js?v=1.2" defer></script>
+    <script src="admin/admin-core.js?v=1.3" defer></script>
     <script src="admin/admin-resolver.js?v=2" defer></script>
   </head>
   <body>
     <div id="appContent" style="display: none;">
         <div class="navbar">
-          <div class="brand"><img src="icon.png" style="height: 32px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" onerror="this.style.display='none'"> ИС-СИСТЕМС</div>
+          <div class="brand"><img src="icon.png" style="height: 32px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" onerror="this.style.display='none'"> РРЎ-РЎРРЎРўР•РњРЎ</div>
           <div class="nav-tabs" id="tabsContainer"></div>
         </div>
 
         <div class="main-container">
           <div class="controls-row">
-            <div class="search-box"><input type="text" id="searchInput" oninput="filterTable()" placeholder="🔍 Бързо търсене в таблицата..."></div>
+            <div class="search-box"><input type="text" id="searchInput" oninput="filterTable()" placeholder="рџ”Ќ Р‘СЉСЂР·Рѕ С‚СЉСЂСЃРµРЅРµ РІ С‚Р°Р±Р»РёС†Р°С‚Р°..."></div>
             <div class="action-buttons-group">
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;" onchange="processPDF(event)">
-                <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">📥 Зареди от PDF</button>
-                <button class="btn-primary" onclick="window.open('index.html', '_blank')" style="background-color: #0284c7; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);">📺 Монитор</button>
-                <button class="btn-primary" onclick="openNotificationDialog()" style="background-color: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">📢 Известие</button>
-                <button class="btn-primary" id="logisticsBtn" onclick="openLogisticsModal()" style="display: none; background-color: #8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">📦 Логистика на План</button>
-                <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">➕ Добави Нов Запис</button>
+                <button class="btn-primary" id="pdfBtn" onclick="document.getElementById('pdfUploader').click()" style="display: none; background-color: #059669; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);">рџ“Ґ Р—Р°СЂРµРґРё РѕС‚ PDF</button>
+                <button class="btn-primary" onclick="window.open('index.html', '_blank')" style="background-color: #0284c7; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);">рџ“є РњРѕРЅРёС‚РѕСЂ</button>
+                <button class="btn-primary" onclick="openNotificationDialog()" style="background-color: #f59e0b; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">рџ“ў РР·РІРµСЃС‚РёРµ</button>
+                <button class="btn-primary" id="logisticsBtn" onclick="openLogisticsModal()" style="display: none; background-color: #8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">рџ“¦ Р›РѕРіРёСЃС‚РёРєР° РЅР° РџР»Р°РЅ</button>
+                <button class="btn-primary" id="addNewBtn" onclick="openAddModal()">вћ• Р”РѕР±Р°РІРё РќРѕРІ Р—Р°РїРёСЃ</button>
             </div>
           </div>
           
           <div class="mass-action-bar" id="massActionBar">
-             <span class="mass-action-text" id="massActionText">Маркирани: 0 записа</span>
-             <button class="btn-danger-mass" onclick="deleteSelectedItems()">🗑️ Изтрий маркираните</button>
+             <span class="mass-action-text" id="massActionText">РњР°СЂРєРёСЂР°РЅРё: 0 Р·Р°РїРёСЃР°</span>
+             <button class="btn-danger-mass" onclick="deleteSelectedItems()">рџ—‘пёЏ РР·С‚СЂРёР№ РјР°СЂРєРёСЂР°РЅРёС‚Рµ</button>
           </div>
 
           <div class="layout-wrapper">
             <div class="sidebar" id="personnelSidebar">
-                <div class="sidebar-header">📁 Лични Досиета</div>
-                <div id="sidebarLoading" style="padding: 15px; text-align: center; color: #64748b; font-size: 0.85em;">Зареждане...</div>
+                <div class="sidebar-header">рџ“Ѓ Р›РёС‡РЅРё Р”РѕСЃРёРµС‚Р°</div>
+                <div id="sidebarLoading" style="padding: 15px; text-align: center; color: #64748b; font-size: 0.85em;">Р—Р°СЂРµР¶РґР°РЅРµ...</div>
                 <ul class="sidebar-list" id="sidebarList"></ul>
             </div>
 
             <div class="table-wrapper">
                 <div class="table-container">
-                  <div id="loadingLayout">Зареждане на данни... 🔍</div>
+                  <div id="loadingLayout">Р—Р°СЂРµР¶РґР°РЅРµ РЅР° РґР°РЅРЅРё... рџ”Ќ</div>
                   <table id="mainTable" style="display: none;">
                     <thead id="tableHead"></thead>
                     <tbody id="tableBody"></tbody>
@@ -62,12 +62,12 @@
 
         <div class="modal-backdrop" id="modalBackdrop">
           <div class="modal">
-            <div class="modal-header" id="modalTitle">Редакция <button onclick="closeModal()" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;">✖</button></div>
+            <div class="modal-header" id="modalTitle">Р РµРґР°РєС†РёСЏ <button onclick="closeModal()" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;">вњ–</button></div>
             <form id="dynamicForm" onsubmit="saveForm(event)">
               <div class="dynamic-form-area" id="formFieldsArea"></div>
               <div class="modal-actions">
-                <button type="button" class="btn-secondary" onclick="closeModal()">Отказ</button>
-                <button type="submit" class="btn-primary">Запази запис</button>
+                <button type="button" class="btn-secondary" onclick="closeModal()">РћС‚РєР°Р·</button>
+                <button type="submit" class="btn-primary">Р—Р°РїР°Р·Рё Р·Р°РїРёСЃ</button>
               </div>
             </form>
           </div>
@@ -76,36 +76,36 @@
         <div class="modal-backdrop" id="folderModalBackdrop">
           <div class="modal" style="max-width: 750px;">
             <div class="modal-header">
-                <div>📁 Досие: <span id="currentWorkerName" style="color: #4338ca;"></span></div>
-                <button onclick="closeFolderModal()" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">✖</button>
+                <div>рџ“Ѓ Р”РѕСЃРёРµ: <span id="currentWorkerName" style="color: #4338ca;"></span></div>
+                <button onclick="closeFolderModal()" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">вњ–</button>
             </div>
             <div class="folder-tabs">
-                <button class="f-tab active" id="tabAttBtn" onclick="switchFolderTab('att')">⏱️ Присъствие</button>
-                <button class="f-tab" id="tabWorkBtn" onclick="switchFolderTab('work')">🛠️ Свършена Работа</button>
-                <button class="f-tab" id="tabDocsBtn" onclick="switchFolderTab('docs')">📑 Документи</button>
+                <button class="f-tab active" id="tabAttBtn" onclick="switchFolderTab('att')">вЏ±пёЏ РџСЂРёСЃСЉСЃС‚РІРёРµ</button>
+                <button class="f-tab" id="tabWorkBtn" onclick="switchFolderTab('work')">рџ› пёЏ РЎРІСЉСЂС€РµРЅР° Р Р°Р±РѕС‚Р°</button>
+                <button class="f-tab" id="tabDocsBtn" onclick="switchFolderTab('docs')">рџ“‘ Р”РѕРєСѓРјРµРЅС‚Рё</button>
             </div>
-            <div id="f-att" class="folder-content active"><table class="modal-table"><thead><tr><th>Дата и час</th><th>Действие</th><th>Локация</th><th>Бележка</th></tr></thead><tbody id="workerAttList"></tbody></table></div>
-            <div id="f-work" class="folder-content"><table class="modal-table"><thead><tr><th>Дата</th><th>Детайл</th><th>Операция</th><th>К-во</th><th>Статус</th></tr></thead><tbody id="workerWorkList"></tbody></table></div>
-            <div id="f-docs" class="folder-content"><div class="upload-area"><input type="file" id="docUploadInput" style="margin-bottom: 10px;"><button class="btn-primary" onclick="uploadWorkerDoc()" style="margin: 0 auto; padding: 8px 16px;">⬆️ Качи Файл</button></div><div id="workerDocsList" style="margin-top: 15px;">Зареждане на документи...</div></div>
+            <div id="f-att" class="folder-content active"><table class="modal-table"><thead><tr><th>Р”Р°С‚Р° Рё С‡Р°СЃ</th><th>Р”РµР№СЃС‚РІРёРµ</th><th>Р›РѕРєР°С†РёСЏ</th><th>Р‘РµР»РµР¶РєР°</th></tr></thead><tbody id="workerAttList"></tbody></table></div>
+            <div id="f-work" class="folder-content"><table class="modal-table"><thead><tr><th>Р”Р°С‚Р°</th><th>Р”РµС‚Р°Р№Р»</th><th>РћРїРµСЂР°С†РёСЏ</th><th>Рљ-РІРѕ</th><th>РЎС‚Р°С‚СѓСЃ</th></tr></thead><tbody id="workerWorkList"></tbody></table></div>
+            <div id="f-docs" class="folder-content"><div class="upload-area"><input type="file" id="docUploadInput" style="margin-bottom: 10px;"><button class="btn-primary" onclick="uploadWorkerDoc()" style="margin: 0 auto; padding: 8px 16px;">в¬†пёЏ РљР°С‡Рё Р¤Р°Р№Р»</button></div><div id="workerDocsList" style="margin-top: 15px;">Р—Р°СЂРµР¶РґР°РЅРµ РЅР° РґРѕРєСѓРјРµРЅС‚Рё...</div></div>
           </div>
         </div>
 
         <div class="modal-backdrop" id="resolverModalBackdrop">
           <div class="modal" style="max-width: 900px;">
             <div class="modal-header">
-                <div>🌳 Технологично Дърво: <span id="resolverTitle" style="color: #4338ca;"></span></div>
-                <button onclick="document.getElementById('resolverModalBackdrop').style.display='none'" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">✖</button>
+                <div>рџЊі РўРµС…РЅРѕР»РѕРіРёС‡РЅРѕ Р”СЉСЂРІРѕ: <span id="resolverTitle" style="color: #4338ca;"></span></div>
+                <button onclick="document.getElementById('resolverModalBackdrop').style.display='none'" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">вњ–</button>
             </div>
             <div id="resolverContent" style="padding: 20px; max-height: 60vh; overflow-y: auto; background: #f8fafc; border-radius: 8px; margin: 15px;">
-                Зареждане...
+                Р—Р°СЂРµР¶РґР°РЅРµ...
             </div>
           </div>
         </div>
         <div class="modal-backdrop" id="logisticsModalBackdrop">
           <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
-                <div>📦 Логистика на План</div>
-                <button onclick="document.getElementById('logisticsModalBackdrop').style.display='none'" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">✖</button>
+                <div>рџ“¦ Р›РѕРіРёСЃС‚РёРєР° РЅР° РџР»Р°РЅ</div>
+                <button onclick="document.getElementById('logisticsModalBackdrop').style.display='none'" style="border:none;background:transparent;cursor:pointer;font-size:1.2em;color:#94a3b8;">вњ–</button>
             </div>
             <div id="logisticsContent" style="padding: 20px; background: #f8fafc; border-radius: 8px; margin: 15px;">
                 <!-- Content will be generated by JS -->
