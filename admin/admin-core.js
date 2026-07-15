@@ -409,7 +409,6 @@ async function computeSkladData(isGpTab) {
             
             if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
                 rows.push({
-                    "ID План": "Общо налично",
                     "RawPlanId": "",
                     "ID Детайл": route['Код на детайла'],
                     "Име": nomNameMap[code] || route['Код на детайла'],
