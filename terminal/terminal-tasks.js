@@ -326,10 +326,10 @@ async function loadTasks(isSilent = false) {
                   blockingReasons = [...new Set(blockingReasons)];
                   let isTaken = takenOps[opKey] === true;
                   let safeIdBase = (pId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
-                  let deficit = isBuffer ? Math.max(0, opGreenTarget - doneQty) : Math.max(0, opBlueTarget - doneQty);
+                  let taskDeficit = isBuffer ? Math.max(0, opGreenTarget - doneQty) : Math.max(0, opBlueTarget - doneQty);
                   
-                  if (deficit > 0) {
-                      let targetInput = deficit;
+                  if (taskDeficit > 0) {
+                      let targetInput = taskDeficit;
                       if (hasLimit && targetInput > maxAllowed) targetInput = maxAllowed;
                       if (targetInput <= 0 && !hasLimit) targetInput = 1;
                       if (targetInput <= 0 && isBlocked) targetInput = 0;
