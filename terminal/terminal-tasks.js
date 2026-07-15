@@ -366,7 +366,13 @@ async function loadTasks(isSilent = false) {
         });
       });
       
-      globalTasks.sort((a, b) => a.opNum - b.opNum); renderTasks(globalTasks);
+      globalTasks.sort((a, b) => {
+          let aPlanWeight = a.isGreenCard ? Infinity : (groupEarliestId[a.plan_id] || 0);
+          let bPlanWeight = b.isGreenCard ? Infinity : (groupEarliestId[b.plan_id] || 0);
+          if (aPlanWeight !== bPlanWeight) return aPlanWeight - bPlanWeight;
+          return a.opNum - b.opNum;
+      });
+      renderTasks(globalTasks);
   } catch (err) { console.error(err); document.getElementById('tasksContainer').innerHTML = '<div style="text-align:center; padding: 40px; color:#ef4444; font-weight:bold;">❌ Грешка:<br>' + err.message + '</div>'; }
 }
 
