@@ -183,6 +183,7 @@ async function loadTasks(isSilent = false) {
       planIdsToProcess.push('NONE');
       
       let alreadyAllocated = {};
+      let alreadyAllocatedWarehouse = {};
       
       planIdsToProcess.forEach(pId => {
           let isBuffer = pId === 'NONE';
@@ -285,8 +286,10 @@ async function loadTasks(isSilent = false) {
                                       cFree = Math.max(0, childGrossDone - childConsumed);
                                   }
                               }
-                              let sets = Math.floor(cFree / multiplier);
-                              if (sets < minSets) { minSets = sets; blockingReasons.push(`${cCode} (${cFree} налични)`); }
+                              let usedSoFar = alreadyAllocatedWarehouse[cCode] || 0;
+                              let availableNow = Math.max(0, cFree - usedSoFar);
+                              let sets = Math.floor(availableNow / multiplier);
+                              if (sets < minSets) { minSets = sets; blockingReasons.push(`${cCode} (${availableNow} налични)`); }
                           });
                           maxAllowed = minSets;
                           if (maxAllowed === Infinity) { hasLimit = false; } 
@@ -307,6 +310,15 @@ async function loadTasks(isSilent = false) {
                       if (hasLimit && targetInput > maxAllowed) targetInput = maxAllowed;
                       if (targetInput <= 0 && !hasLimit) targetInput = 1;
                       if (targetInput <= 0 && isBlocked) targetInput = 0;
+                      
+                      if (idx === 0) {
+                          let children = globalBomData.filter(b => String(b['ID Родител']).trim().toLowerCase() === code);
+                          children.forEach(child => {
+                              let cCode = String(child['ID Компонент']).trim().toLowerCase();
+                              let multiplier = parseFloat(child['Количество']) || 1;
+                              alreadyAllocatedWarehouse[cCode] = (alreadyAllocatedWarehouse[cCode] || 0) + (targetInput * multiplier);
+                          });
+                      }
                       
                       globalTasks.push({ 
                           id: safeIdBase + (isBuffer ? '_green' : '_blue'), 
