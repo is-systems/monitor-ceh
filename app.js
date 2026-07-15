@@ -96,7 +96,7 @@ async function initialFetch() {
         });
 
         staticCache.routesData.forEach(r => {
-            let code = String(r['Код на детайла']).trim();
+            let code = String(r['Код на детайла']).trim().toLowerCase();
             if(!staticCache.routesByDetail[code]) staticCache.routesByDetail[code] = [];
             staticCache.routesByDetail[code].push(r);
         });

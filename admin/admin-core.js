@@ -101,6 +101,21 @@ async function loadCurrentTableData() {
                   r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
               });
           }
+
+      } else if (currentTab === 'otcheti') {
+          const planRes = await client.from('plan').select('id, "Вътрешно име", "Месец", "Година"');
+          if (!planRes.error && planRes.data) {
+              const planMap = {};
+              planRes.data.forEach(p => {
+                  let m = (p['Месец'] && p['Година']) ? `${p['Месец']} ${p['Година']}` : '';
+                  planMap[p.id] = m ? `${m} (${p['Вътрешно име']})` : p['Вътрешно име'];
+              });
+              rows.forEach(r => {
+                  if (r['ID План'] && planMap[r['ID План']]) {
+                      r['ID План'] = planMap[r['ID План']];
+                  }
+              });
+          }
       } else if (currentTab === 'sklad_gp') {
           rows = await computeSkladData(true);
       } else if (currentTab === 'sklad_wip') {
