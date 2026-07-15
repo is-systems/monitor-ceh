@@ -349,21 +349,44 @@ async function computeSkladData(isGpTab) {
         }
     });
     
-    let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {};
+    let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {}; let grossStartedOps = {};
     
     Object.keys(routesByDetail).forEach(code => {
         let routes = routesByDetail[code];
         routes.sort((a, b) => (parseFloat(a['№ Операция']) || 0) - (parseFloat(b['№ Операция']) || 0));
         if(routes.length === 0) return;
+        
+        for (let i = routes.length - 2; i >= 0; i--) {
+            let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+            
+            let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
+            grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+            
+            let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
+            completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
+        }
+        
         let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
         trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
         grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+        
         for(let i = routes.length - 2; i >= 0; i--) {
             let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
             let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-            trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-            grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+            
+            let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
+            if (bucket < 0) bucket = 0;
+            grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
+            
+            let trueBucket = (completedOps[opKey] || 0) - (completedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
+            if (trueBucket < 0) trueBucket = 0;
+            trueDoneOps[opKey] = (trueDoneOps[nextOpKey] || 0) + trueBucket;
         }
+        
+        let firstOpKey = code + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
+        grossStartedOps[firstOpKey] = (grossCompletedOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+        
         shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
     });
     
@@ -381,7 +404,7 @@ async function computeSkladData(isGpTab) {
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
                     let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = grossTrueDoneOps[firstOpKey] || 0;
+                    parentConsumed = grossStartedOps[firstOpKey] || 0;
                 } else {
                     parentConsumed = getTotalShipped(parentCode, new Set(visited));
                 }
