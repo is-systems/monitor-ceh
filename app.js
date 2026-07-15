@@ -215,7 +215,7 @@ function buildBOMTree(plansData, skladData) {
             let nomEntry = staticCache.nomMap[currentCodeLower] || {};
             let children = staticCache.bomChildrenMap[currentCodeLower] || [];
             
-            let isRawMaterial = (children.length === 0) && (!staticCache.routesByDetail[currentCode]);
+            let isRawMaterial = (children.length === 0) && (!staticCache.routesByDetail[currentCodeLower]);
             if (isRawMaterial && !isRootLevel) return;
 
             activeNodes.push({
@@ -384,7 +384,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let nodes = nodesByCode[code];
         nodes.sort((a, b) => (parseInt(a.planId) || 0) - (parseInt(b.planId) || 0));
         
-        let partRoutes = staticCache.routesByDetail[code] || [];
+        let partRoutes = staticCache.routesByDetail[code.toLowerCase()] || [];
         let consumedByShipped = getTotalShipped(code);
         
         nodes.forEach(n => {
