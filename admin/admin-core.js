@@ -406,13 +406,17 @@ async function computeSkladData(isGpTab) {
                 }
             }
             
-            if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
+            let dbg = '';
+            if (code === 'ф17') {
+                dbg = ` (MGD: ${myGrossDone}, CBS: ${consumedByShipped}, D: ${doneQty}, STK: ${availableStock})`;
+            }
+            if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1) || code === 'ф17') {
                 rows.push({
                     "ID План": "Общо налично",
                     "RawPlanId": "",
                     "ID Детайл": route['Код на детайла'],
                     "Име": nomNameMap[code] || route['Код на детайла'],
-                    "Операция": opName,
+                    "Операция": opName + dbg,
                     "Оригинална Операция": opName,
                     "Наличност в цеха": availableStock,
                     "Минимално количество/Буфер": bufferMap[code] || 0
