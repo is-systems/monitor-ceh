@@ -294,14 +294,30 @@ function openAddModal() { isEditMode = false; editingIndex = null; document.getE
 function openEditModal(index) { isEditMode = true; editingIndex = index; document.getElementById('modalTitle').innerHTML = '✏️ Редакция: ' + tableConfigs[currentTab].label.replace(/[^а-яА-Я ]/g, '').trim(); buildForm(globalRows[index]); document.getElementById('modalBackdrop').style.display = 'flex'; }
 function closeModal() { document.getElementById('modalBackdrop').style.display = 'none'; }
 
+async function fetchAll(table, orderCol) {
+    let allData = [];
+    let from = 0;
+    const step = 1000;
+    while(true) {
+        let query = client.from(table).select('*').range(from, from + step - 1);
+        if (orderCol) query = query.order(orderCol, {ascending: true});
+        let { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < step) break;
+        from += step;
+    }
+    return { data: allData };
+}
+
 async function computeSkladData(isGpTab) {
     const [reportsRes, marshrutiRes, bomRes, nomRes, bufferRes, plansRes] = await Promise.all([
-        client.from('otcheti').select('*').limit(100000),
-        client.from('marshruti').select('*').limit(100000).order('№ Операция', {ascending: true}),
-        client.from('bom').select('*').limit(100000),
-        client.from('Номенклатура').select('*').limit(100000),
-        client.from('sklad_bufferi').select('*').limit(100000),
-        client.from('plan').select('*').limit(100000)
+        fetchAll('otcheti'),
+        fetchAll('marshruti', '№ Операция'),
+        fetchAll('bom'),
+        fetchAll('Номенклатура'),
+        fetchAll('sklad_bufferi'),
+        fetchAll('plan')
     ]);
     
     let routesByDetail = {};

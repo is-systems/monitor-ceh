@@ -69,6 +69,22 @@ document.addEventListener('click', function() {
     document.querySelectorAll('.vsm-tooltip').forEach(t => t.style.display = 'none');
 });
 
+async function fetchAll(table, orderCol) {
+    let allData = [];
+    let from = 0;
+    const step = 1000;
+    while(true) {
+        let query = client.from(table).select('*').range(from, from + step - 1);
+        if (orderCol) query = query.order(orderCol, {ascending: true});
+        let { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < step) break;
+        from += step;
+    }
+    return { data: allData };
+}
+
 // --- DATA FETCHING ---
 async function initialFetch() {
     const loader = document.getElementById('loading');
@@ -80,9 +96,9 @@ async function initialFetch() {
     
     try {
         const [bomRes, routesRes, nomRes] = await Promise.all([
-            client.from('bom').select('*').limit(50000),
-            client.from('marshruti').select('*').limit(50000),
-            client.from('Номенклатура').select('*').limit(50000)
+            fetchAll('bom'),
+            fetchAll('marshruti'),
+            fetchAll('Номенклатура')
         ]);
 
         if (bomRes.error) throw bomRes.error;
@@ -119,20 +135,25 @@ async function initialFetch() {
 }
 
 async function fetchDynamicData() {
+    let plansQuery = client.from('plan').select('*').in('Статус', ['Активен', 'Завършен', 'Опакован']);
+    
     const [plansRes, reportsRes, skladRes] = await Promise.all([
-        client.from('plan').select('*').in('Статус', ['Активен', 'Завършен', 'Опакован']).limit(5000),
-        client.from('otcheti').select('*').limit(50000),
-        client.from('sklad').select('*').limit(50000)
+        fetchAll('plan'), // I will just fetch all plans for now and filter in JS, or keep plansQuery
+        fetchAll('otcheti'),
+        fetchAll('sklad')
     ]);
 
-    if (plansRes.error) throw plansRes.error;
+    // Better: keep plan limited since it's filtered, but if plan can grow > 1000, we should fetchAll and filter
+    let activePlans = (plansRes.data || []).filter(p => ['Активен', 'Завършен', 'Опакован'].includes(p['Статус']));
     
     return {
-        plansData: plansRes.data || [],
+        plansData: activePlans,
         reportsData: reportsRes.data || [],
         skladData: skladRes.data || []
     };
 }
+
+// (already returned)
 
 // --- MAIN PROCESS ---
 async function loadData() {
