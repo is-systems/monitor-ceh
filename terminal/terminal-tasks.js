@@ -89,7 +89,10 @@ async function loadTasks(isSilent = false) {
           let rootItem = String(plan['Вътрешно име']).trim(); 
           let targetQty = parseFloat(plan['Целево количество']) || 0;
           let monthYear = (plan['Месец'] && plan['Година']) ? (plan['Месец'] + ' ' + plan['Година']) : '';
-          planNames[planId] = monthYear ? `${monthYear} (${plan['Вътрешно име']})` : plan['Вътрешно име'];
+          
+          let groupKey = monthYear || planId; 
+          
+          planNames[groupKey] = monthYear ? monthYear : plan['Вътрешно име'];
           
           if (nomRes.data) {
               let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === rootItem);
@@ -97,8 +100,8 @@ async function loadTasks(isSilent = false) {
           }
           rootItem = rootItem.toLowerCase();
 
-          if(!planRoots[planId]) planRoots[planId] = {};
-          planRoots[planId][rootItem] = (planRoots[planId][rootItem] || 0) + targetQty;
+          if(!planRoots[groupKey]) planRoots[groupKey] = {};
+          planRoots[groupKey][rootItem] = (planRoots[groupKey][rootItem] || 0) + targetQty;
       });
 
       let completedOps = {};
