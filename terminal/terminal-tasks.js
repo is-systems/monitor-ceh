@@ -66,10 +66,9 @@ async function loadTasks(isSilent = false) {
 
       let takenOps = {}; 
       reportsRes.data.forEach(r => {
-          let planIdStr = r['ID План'] ? String(r['ID План']).trim() : 'NONE';
           let code = String(r['ID Детайл']).trim().toLowerCase();
           let op = String(r['Операция']).trim().toLowerCase();
-          let key = planIdStr + '_' + code + '_' + op; 
+          let key = code + '_' + op; 
           
           if (r['Статус'] === 'Брак' || r['Статус'] === 'Отчетено' || r['Статус'] === 'Прекъсната') {
               if (String(r['Оператор']).trim() === currentOperator.trim() && takenOps[key] === undefined) takenOps[key] = false;
