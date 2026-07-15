@@ -143,10 +143,9 @@ async function loadTasks(isSilent = false) {
       });
 
       let totalShippedCache = {};
-      function getTotalShipped(pId, item, visited = new Set()) {
+      function getTotalShipped(item, visited = new Set()) {
           let lc = item.toLowerCase();
-          let cacheKey = pId + '_' + lc;
-          if (totalShippedCache[cacheKey] !== undefined) return totalShippedCache[cacheKey];
+          if (totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
           if (visited.has(lc)) return 0;
           visited.add(lc);
           
@@ -156,12 +155,12 @@ async function loadTasks(isSilent = false) {
           parents.forEach(p => {
               let parentCode = String(p['ID Родител']).trim().toLowerCase();
               if (parentCode !== lc) {
-                  indirectShipped += getTotalShipped(pId, parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
+                  indirectShipped += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
               }
           });
           
-          totalShippedCache[cacheKey] = directShipped + indirectShipped;
-          return totalShippedCache[cacheKey];
+          totalShippedCache[lc] = directShipped + indirectShipped;
+          return totalShippedCache[lc];
       }
 
       let depths = {};
@@ -262,7 +261,7 @@ async function loadTasks(isSilent = false) {
                   if (idx > 0) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
-                      let prevOpKey = pId + '_' + code + '_' + prevOpName;
+                      let prevOpKey = code + '_' + prevOpName;
                       let prevDoneQty = Math.max(0, (grossTrueDoneOps[prevOpKey] || 0) - consumedByShipped);
                       maxAllowed = Math.max(0, prevDoneQty - doneQty);
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
@@ -281,9 +280,9 @@ async function loadTasks(isSilent = false) {
                               } else {
                                   let childRoutes = globalRoutesByDetail[cCode];
                                   if (childRoutes && childRoutes.length > 0) {
-                                      let childLastOpKey = pId + '_' + cCode + '_' + String(childRoutes[childRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                                      let childLastOpKey = cCode + '_' + String(childRoutes[childRoutes.length-1]['Име на операция']).trim().toLowerCase();
                                       let childGrossDone = grossTrueDoneOps[childLastOpKey] || 0;
-                                      let childConsumed = getTotalShipped(pId, cCode);
+                                      let childConsumed = getTotalShipped(cCode);
                                       cFree = Math.max(0, childGrossDone - childConsumed);
                                   }
                               }
