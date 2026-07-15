@@ -297,18 +297,17 @@ async function loadTasks(isSilent = false) {
                               let cCode = String(child['ID Компонент']).trim().toLowerCase(); 
                               let multiplier = parseFloat(child['Количество']) || 1;
                               let isPurchased = !(globalRoutesByDetail[cCode] && globalRoutesByDetail[cCode].length > 0);
-                              let cFree = 0;
-                              if (isPurchased) {
-                                  cFree = getSkladQty(cCode);
-                              } else {
+                              let childConsumed = getTotalShipped(cCode);
+                              let childGrossDone = 0;
+                              if (!isPurchased) {
                                   let childRoutes = globalRoutesByDetail[cCode];
                                   if (childRoutes && childRoutes.length > 0) {
                                       let childLastOpKey = cCode + '_' + String(childRoutes[childRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                                      let childGrossDone = grossTrueDoneOps[childLastOpKey] || 0;
-                                      let childConsumed = getTotalShipped(cCode);
-                                      cFree = Math.max(0, childGrossDone - childConsumed);
+                                      childGrossDone = grossTrueDoneOps[childLastOpKey] || 0;
                                   }
                               }
+                              let whStock = getSkladQty(cCode);
+                              let cFree = Math.max(0, (childGrossDone + whStock) - childConsumed);
                               let usedSoFar = alreadyAllocatedWarehouse[cCode] || 0;
                               let availableNow = Math.max(0, cFree - usedSoFar);
                               let sets = Math.floor(availableNow / multiplier);
