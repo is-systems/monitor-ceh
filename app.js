@@ -303,19 +303,19 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let grossCompletedOps = {};
 
     sortedReports.forEach(r => {
-        let planIdStr = r['ID План'] ? String(r['ID План']).trim() : 'NONE';
-        let key = planIdStr + '_' + String(r['ID Детайл']).trim().toLowerCase() + '_' + String(r['Операция']).trim().toLowerCase();
+        let code = String(r['ID Детайл']).trim().toLowerCase();
+        let op = String(r['Операция']).trim().toLowerCase();
+        let key = code + '_' + op;
         let qty = parseFloat(r['Количество']) || 0;
-        let scrap = parseFloat(r['Брак']) || 0;
         
         if (r['Статус'] === 'Брак') {
             scrappedOps[key] = (scrappedOps[key] || 0) + qty;
         } 
         else if (r['Статус'] === 'Отчетено') {
             completedOps[key] = (completedOps[key] || 0) + qty;
-            if (r['Оператор'] === 'СИСТЕМА (Експедиция)') { }
-            else if (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) { }
-            else { grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; }
+            if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+                grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
+            }
             opStatusMap[key] = 'Отчетено';
         } else if (r['Статус'] !== 'Брак') {
             opStatusMap[key] = r['Статус']; 
@@ -326,52 +326,42 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let grossTrueDoneOps = {};
     let shippedQty = {};
 
-    let uniquePlanIds = new Set();
-    sortedReports.forEach(r => {
-        if (r['ID План']) uniquePlanIds.add(String(r['ID План']).trim());
-    });
-    uniquePlanIds.add('NONE');
-
-    uniquePlanIds.forEach(pId => {
-        Object.keys(staticCache.routesByDetail).forEach(code => {
-            let routes = staticCache.routesByDetail[code];
+    Object.keys(staticCache.routesByDetail).forEach(code => {
+        let routes = staticCache.routesByDetail[code];
         if (routes.length === 0) return;
         
-            let lastOpKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
-            trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
-            grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
-            
-            for (let i = routes.length - 2; i >= 0; i--) {
-                let opKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-                let nextOpKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-                trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-                grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-            }
-
-            shippedQty[pId + '_' + code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
-        });
+        let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
+        trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+        grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+        
+        for (let i = routes.length - 2; i >= 0; i--) {
+            let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+            trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+            grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+        }
+        shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
     });
 
     let totalShippedCache = {};
-    function getTotalShipped(pId, item, visited = new Set()) {
+    function getTotalShipped(item, visited = new Set()) {
         let lc = item.toLowerCase();
-        let cacheKey = pId + '_' + lc;
-        if (totalShippedCache[cacheKey] !== undefined) return totalShippedCache[cacheKey];
+        if (totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
         if (visited.has(lc)) return 0;
         visited.add(lc);
         
-        let directShipped = shippedQty[cacheKey] || 0;
+        let directShipped = shippedQty[lc] || 0;
         let parents = staticCache.bomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
         let indirectShipped = 0;
         parents.forEach(p => {
             let parentCode = String(p['ID Родител']).trim().toLowerCase();
             if (parentCode !== lc) {
-                indirectShipped += getTotalShipped(pId, parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
+                indirectShipped += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
             }
         });
         
-        totalShippedCache[cacheKey] = directShipped + indirectShipped;
-        return totalShippedCache[cacheKey];
+        totalShippedCache[lc] = directShipped + indirectShipped;
+        return totalShippedCache[lc];
     }
 
     let masterData = {
@@ -381,38 +371,65 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         small_rotors_var11: [], small_rotors_var25: []
     };
 
+    let nodesByCode = {};
     Object.values(mergedNodes).forEach(n => {
-        let partRoutes = staticCache.routesByDetail[n.code] || [];
-        
-        let pIdStr = String(n.planId).trim();
-        let recovered = completedOps[pIdStr + '_' + n.code + '_Възстановен'] || 0;
-        n.warehouseQty += recovered;
+        if (!nodesByCode[n.code]) nodesByCode[n.code] = [];
+        nodesByCode[n.code].push(n);
+    });
 
-        if (partRoutes.length > 0) {
-            let consumedByShipped = getTotalShipped(pIdStr, n.code);
-            partRoutes.forEach(route => {
-                let opName = String(route['Име на операция']).trim();
-                let opKey = pIdStr + '_' + String(n.code).trim().toLowerCase() + '_' + String(opName).trim().toLowerCase();
+    let alreadyAllocated = {};
+    let alreadyAllocatedWarehouse = {};
+
+    Object.keys(nodesByCode).forEach(code => {
+        let nodes = nodesByCode[code];
+        nodes.sort((a, b) => (parseInt(a.planId) || 0) - (parseInt(b.planId) || 0));
+        
+        let partRoutes = staticCache.routesByDetail[code] || [];
+        let consumedByShipped = getTotalShipped(code);
+        
+        nodes.forEach(n => {
+            let recovered = completedOps[code + '_възстановен'] || 0;
+            
+            if (partRoutes.length > 0) {
+                partRoutes.forEach(route => {
+                    let opName = String(route['Име на операция']).trim();
+                    let opKey = String(n.code).trim().toLowerCase() + '_' + opName.toLowerCase();
+                    
+                    let globalGross = grossTrueDoneOps[opKey] || 0;
+                    let globalNet = Math.max(0, globalGross - consumedByShipped);
+                    
+                    let usedSoFar = alreadyAllocated[opKey] || 0;
+                    let availableForThisNode = Math.max(0, globalNet - usedSoFar);
+                    let doneQty = Math.min(n.planQty, availableForThisNode);
+                    
+                    alreadyAllocated[opKey] = usedSoFar + doneQty;
+                    
+                    let opState = 'gray';
+                    let latestStatus = opStatusMap[opKey];
+                    if (doneQty >= n.planQty) opState = 'green';
+                    else if (doneQty > 0) opState = 'blue';
+                    else if (latestStatus === 'Започната') opState = 'blue_0';
+                    
+                    let scrapped = scrappedOps[opKey] || 0;
+                    n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: 0 }); 
+                });
+            } else {
+                let globalWarehouse = n.warehouseQty + recovered;
+                let usedSoFar = alreadyAllocatedWarehouse[n.code] || 0;
+                let availableForThisNode = Math.max(0, globalWarehouse - usedSoFar);
+                let doneQty = Math.min(n.planQty, availableForThisNode);
+                alreadyAllocatedWarehouse[n.code] = usedSoFar + doneQty;
                 
-                let myGrossDone = grossTrueDoneOps[opKey] || 0;
-                let doneQty = Math.max(0, myGrossDone - consumedByShipped);
-                let latestStatus = opStatusMap[opKey];
-                
-                let opState = 'gray';
-                if (doneQty >= n.planQty) opState = 'green';
-                else if (doneQty > 0) opState = 'blue'; 
-                else if (latestStatus === 'Започната') opState = 'blue_0'; 
-                
-                let scrapped = scrappedOps[opKey] || 0;
-                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrapped });
-            });
-        } else {
-            n.operations.push({ 
-                name: n.warehouseQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
-                completed: n.warehouseQty || 0,
-                state: n.warehouseQty >= n.planQty ? 'green' : 'gray'
-            });
-        }
+                n.operations.push({ 
+                    name: doneQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
+                    completed: doneQty,
+                    state: doneQty >= n.planQty ? 'green' : 'gray'
+                });
+            }
+        });
+    });
+
+    Object.values(mergedNodes).forEach(n => {
 
         let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
         

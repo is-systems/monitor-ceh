@@ -106,48 +106,40 @@ async function loadTasks(isSilent = false) {
       let scrappedOps = {};
       let grossCompletedOps = {};
 
-      let sortedReports = [...reportsRes.data].sort((a, b) => new Date(a['Време Старт'] || a['Дата']).getTime() - new Date(b['Време Старт'] || b['Дата']).getTime());
+      let sortedReports = reportsRes.data.map(r => {
+          r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
+          return r;
+      }).sort((a,b) => a._ts - b._ts);
 
       sortedReports.forEach(r => {
-          let planIdStr = r['ID План'] ? String(r['ID План']).trim() : 'NONE';
-          let key = planIdStr + '_' + String(r['ID Детайл']).trim().toLowerCase() + '_' + String(r['Операция']).trim().toLowerCase();
+          let code = String(r['ID Детайл']).trim().toLowerCase();
+          let op = String(r['Операция']).trim().toLowerCase();
+          let key = code + '_' + op;
           let qty = parseFloat(r['Количество']) || 0;
           
-          if (r['Статус'] === 'Брак') {
-              scrappedOps[key] = (scrappedOps[key] || 0) + qty;
-          } 
-          else if (r['Статус'] === 'Отчетено') {
-              completedOps[key] = (completedOps[key] || 0) + qty;
-              if (r['Оператор'] === 'СИСТЕМА (Експедиция)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { }
-              else { grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; }
+          if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
+          else if (r['Статус'] === 'Отчетено') { 
+              completedOps[key] = (completedOps[key]||0) + qty; 
+              if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+                  grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
+              }
           }
       });
 
-      let trueDoneOps = {};
-      let grossTrueDoneOps = {};
-      let shippedQty = {};
-
-      let uniquePlanIds = new Set(Object.keys(planRoots));
-      uniquePlanIds.add('NONE');
-
-      uniquePlanIds.forEach(pId => {
-          Object.keys(globalRoutesByDetail).forEach(code => {
-              let routes = globalRoutesByDetail[code];
-              if (routes.length === 0) return;
-              
-              let lastOpKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
-              trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
-              grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
-              
-              for (let i = routes.length - 2; i >= 0; i--) {
-                  let opKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-                  let nextOpKey = pId + '_' + String(code).trim().toLowerCase() + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-                  trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-                  grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-              }
-
-              shippedQty[pId + '_' + code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
-          });
+      let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {};
+      
+      Object.keys(globalRoutesByDetail).forEach(code => {
+          let routes = globalRoutesByDetail[code]; if(routes.length===0) return;
+          let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
+          trueDoneOps[lastOpKey] = completedOps[lastOpKey]||0;
+          grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey]||0;
+          for (let i = routes.length-2; i >= 0; i--) {
+              let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+              let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+              trueDoneOps[opKey] = Math.max(completedOps[opKey]||0, (grossTrueDoneOps[nextOpKey]||0) + (scrappedOps[nextOpKey]||0));
+              grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey]||0, (grossTrueDoneOps[nextOpKey]||0) + (scrappedOps[nextOpKey]||0));
+          }
+          shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey]||0) - (trueDoneOps[lastOpKey]||0));
       });
 
       let totalShippedCache = {};
@@ -158,7 +150,7 @@ async function loadTasks(isSilent = false) {
           if (visited.has(lc)) return 0;
           visited.add(lc);
           
-          let directShipped = shippedQty[cacheKey] || 0;
+          let directShipped = shippedQty[lc] || 0;
           let parents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
           let indirectShipped = 0;
           parents.forEach(p => {
@@ -189,7 +181,10 @@ async function loadTasks(isSilent = false) {
 
       globalTasks = [];
 
-      let planIdsToProcess = Array.from(uniquePlanIds);
+      let planIdsToProcess = Object.keys(planRoots).sort((a,b) => parseInt(a) - parseInt(b));
+      planIdsToProcess.push('NONE');
+      
+      let alreadyAllocated = {};
       
       planIdsToProcess.forEach(pId => {
           let isBuffer = pId === 'NONE';
@@ -238,16 +233,24 @@ async function loadTasks(isSilent = false) {
 
               if (opBlueTarget <= 0 && opGreenTarget <= 0) return;
               
-              let consumedByShipped = getTotalShipped(pId, code);
+              let consumedByShipped = getTotalShipped(code);
 
               routes.forEach((route, idx) => {
                   let displayOpName = String(route['Име на операция']).trim();
                   let opName = displayOpName.toLowerCase(); 
-                  let opKey = pId + '_' + code + '_' + opName;
+                  let opKey = code + '_' + opName;
                   let displayName = String(route['Код на детайла']).trim();
                   
-                  let myGrossDone = grossTrueDoneOps[opKey] || 0;
-                  let doneQty = Math.max(0, myGrossDone - consumedByShipped);
+                  let globalGross = grossTrueDoneOps[opKey] || 0;
+                  let globalNet = Math.max(0, globalGross - consumedByShipped);
+                  
+                  let usedSoFar = alreadyAllocated[opKey] || 0;
+                  let availableForThisPlan = Math.max(0, globalNet - usedSoFar);
+                  
+                  let planTarget = Math.max(opBlueTarget, opGreenTarget);
+                  let doneQty = Math.min(planTarget, availableForThisPlan);
+                  
+                  alreadyAllocated[opKey] = usedSoFar + doneQty;
                   
                   if (isBuffer) {
                       if (doneQty >= opGreenTarget) return;

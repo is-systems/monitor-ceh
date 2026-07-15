@@ -226,8 +226,6 @@ function buildForm(data = null) {
   
   if (currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
       if (!isEditMode) {
-          let plansDropdownHtml = `<option value="">Общ Буфер (Склад)</option>`;
-          globalActivePlansForDropdown.forEach(p => { plansDropdownHtml += `<option value="${p.id}">План: ${p.id} (${p['Вътрешно име']})</option>`; });
           area.innerHTML = `
             <div class="form-group" style="position:relative;">
                 <label>ID Детайл (Код):</label>
@@ -238,7 +236,6 @@ function buildForm(data = null) {
                     required autocomplete="off">
                 <div id="skladDetailDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #cbd5e1; border-radius:4px; z-index:1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"></div>
             </div>
-            <div class="form-group"><label>Целеви План:</label><select id="inp_skladPlanId" class="form-input">${plansDropdownHtml}</select></div>
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
             <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
           `;
@@ -251,18 +248,14 @@ function buildForm(data = null) {
               });
           }
       } else {
-          let plansDropdownHtml = `<option value="">Общ Буфер (Склад)</option>`;
-          globalActivePlansForDropdown.forEach(p => { plansDropdownHtml += `<option value="${p.id}">План: ${p.id} (${p['Вътрешно име']})</option>`; });
           area.innerHTML = `
             <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
-            <div class="form-group"><label>Целеви План:</label><select id="inp_skladPlanId" class="form-input">${plansDropdownHtml}</select></div>
             <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"><input type="hidden" id="inp_skladRealOp"></div>
             <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" required></div>
             <div class="form-group"><label>Буфер (Минимално количество):</label><input type="number" id="inp_skladBuffer" class="form-input" step="any" min="0" required></div>
           `;
           document.getElementById('inp_skladDetail').value = data['ID Детайл'] || '';
-          document.getElementById('inp_skladPlanId').value = data['RawPlanId'] || '';
           document.getElementById('inp_skladOp').value = data['Операция'] || '';
           document.getElementById('inp_skladRealOp').value = (currentTab === 'sklad_gp') ? (data['Оригинална Операция'] || data['Операция'] || '') : (data['Операция'] || '');
           document.getElementById('inp_skladOldQty').value = data['Наличност в цеха'] || 0;
@@ -310,11 +303,10 @@ async function computeSkladData(isGpTab) {
         return r;
     }).sort((a,b) => a._ts - b._ts);
     
-    let uniquePlanIds = new Set();
     sortedReports.forEach(r => {
-        let pId = r['ID План'] ? String(r['ID План']).trim() : 'NONE';
-        uniquePlanIds.add(pId);
-        let key = pId + '_' + String(r['ID Детайл']).trim().toLowerCase() + '_' + String(r['Операция']).trim().toLowerCase();
+        let code = String(r['ID Детайл']).trim().toLowerCase();
+        let op = String(r['Операция']).trim().toLowerCase();
+        let key = code + '_' + op;
         let qty = parseFloat(r['Количество']) || 0;
         
         if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
@@ -325,39 +317,36 @@ async function computeSkladData(isGpTab) {
             }
         }
     });
-    uniquePlanIds.add('NONE');
     
     let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {};
     
-    uniquePlanIds.forEach(pId => {
-        Object.keys(routesByDetail).forEach(code => {
-            let routes = routesByDetail[code];
-            if(routes.length === 0) return;
-            let lastOpKey = pId + '_' + code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
-            trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
-            grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
-            for(let i = routes.length - 2; i >= 0; i--) {
-                let opKey = pId + '_' + code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-                let nextOpKey = pId + '_' + code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-                trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-                grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
-            }
-            shippedQty[pId + '_' + code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
-        });
+    Object.keys(routesByDetail).forEach(code => {
+        let routes = routesByDetail[code];
+        if(routes.length === 0) return;
+        let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
+        trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+        grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+        for(let i = routes.length - 2; i >= 0; i--) {
+            let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+            trueDoneOps[opKey] = Math.max(completedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+            grossTrueDoneOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, (grossTrueDoneOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0));
+        }
+        shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
     });
     
     let totalShippedCache = {};
-    function getTotalShipped(pId, item, visited = new Set()) {
-        let lc = item.toLowerCase(); let cacheKey = pId + '_' + lc;
-        if(totalShippedCache[cacheKey] !== undefined) return totalShippedCache[cacheKey];
+    function getTotalShipped(item, visited = new Set()) {
+        let lc = item.toLowerCase();
+        if(totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
         if(visited.has(lc)) return 0; visited.add(lc);
-        let direct = shippedQty[cacheKey] || 0; let indirect = 0;
+        let direct = shippedQty[lc] || 0; let indirect = 0;
         let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
         parents.forEach(p => {
             let parentCode = String(p['ID Родител']).trim().toLowerCase();
-            if(parentCode !== lc) indirect += getTotalShipped(pId, parentCode, new Set(visited)) * (parseFloat(p['Количество'])||1);
+            if(parentCode !== lc) indirect += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество'])||1);
         });
-        totalShippedCache[cacheKey] = direct + indirect; return totalShippedCache[cacheKey];
+        totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
     }
     
     let bufferMap = {}; (bufferRes.data || []).forEach(b => { bufferMap[String(b['ID Детайл']).trim().toLowerCase()] = parseFloat(b['Буфер']) || 0; });
@@ -365,41 +354,39 @@ async function computeSkladData(isGpTab) {
     let planNames = {}; (plansRes.data || []).forEach(p => { planNames[String(p.id).trim()] = p['Вътрешно име'] || p.id; });
     
     let rows = [];
-    uniquePlanIds.forEach(pId => {
-        Object.keys(routesByDetail).forEach(code => {
-            let routes = routesByDetail[code];
-            if(routes.length === 0) return;
-            let consumedByShipped = getTotalShipped(pId, code);
-            routes.forEach((route, idx) => {
-                let opName = String(route['Име на операция']).trim();
-                let opKey = pId + '_' + code + '_' + opName.toLowerCase();
-                let myGrossDone = grossTrueDoneOps[opKey] || 0;
-                let doneQty = Math.max(0, myGrossDone - consumedByShipped);
-                
-                let availableStock = 0;
-                if (idx === routes.length - 1) {
-                    if (isGpTab) availableStock = doneQty;
-                } else {
-                    if (!isGpTab) {
-                        let nextOpKey = pId + '_' + code + '_' + String(routes[idx+1]['Име на операция']).trim().toLowerCase();
-                        let nextOpDone = grossTrueDoneOps[nextOpKey] || 0;
-                        availableStock = Math.max(0, doneQty - nextOpDone);
-                    }
+    Object.keys(routesByDetail).forEach(code => {
+        let routes = routesByDetail[code];
+        if(routes.length === 0) return;
+        let consumedByShipped = getTotalShipped(code);
+        routes.forEach((route, idx) => {
+            let opName = String(route['Име на операция']).trim();
+            let opKey = code + '_' + opName.toLowerCase();
+            let myGrossDone = grossTrueDoneOps[opKey] || 0;
+            let doneQty = Math.max(0, myGrossDone - consumedByShipped);
+            
+            let availableStock = 0;
+            if (idx === routes.length - 1) {
+                if (isGpTab) availableStock = doneQty;
+            } else {
+                if (!isGpTab) {
+                    let nextOpKey = code + '_' + String(routes[idx+1]['Име на операция']).trim().toLowerCase();
+                    let nextOpDone = grossTrueDoneOps[nextOpKey] || 0;
+                    availableStock = Math.max(0, doneQty - nextOpDone);
                 }
-                
-                if (availableStock > 0 || (pId === 'NONE' && bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
-                    rows.push({
-                        "ID План": pId === 'NONE' ? "Общ Буфер (Склад)" : `План ${pId} (${planNames[pId] || ''})`,
-                        "RawPlanId": pId === 'NONE' ? "" : pId,
-                        "ID Детайл": route['Код на детайла'],
-                        "Име": nomNameMap[code] || route['Код на детайла'],
-                        "Операция": opName,
-                        "Оригинална Операция": opName,
-                        "Наличност в цеха": availableStock,
-                        "Минимално количество/Буфер": bufferMap[code] || 0
-                    });
-                }
-            });
+            }
+            
+            if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
+                rows.push({
+                    "ID План": "Общо налично",
+                    "RawPlanId": "",
+                    "ID Детайл": route['Код на детайла'],
+                    "Име": nomNameMap[code] || route['Код на детайла'],
+                    "Операция": opName,
+                    "Оригинална Операция": opName,
+                    "Наличност в цеха": availableStock,
+                    "Минимално количество/Буфер": bufferMap[code] || 0
+                });
+            }
         });
     });
     return rows;
@@ -414,10 +401,9 @@ async function saveForm(e) {
               const det = document.getElementById('inp_skladDetail').value.trim();
               const op = document.getElementById('inp_skladOp').value.trim();
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
-              const planIdVal = document.getElementById('inp_skladPlanId').value || null;
               if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
               
-              let payload = { "ID План": planIdVal, "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
+              let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               
@@ -429,11 +415,10 @@ async function saveForm(e) {
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
-              const planIdVal = document.getElementById('inp_skladPlanId').value || null;
               const diff = newQty - oldQty;
               
               if (diff !== 0) {
-                  let payload = { "ID План": planIdVal, "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
+                  let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
                   const { error } = await client.from('otcheti').insert([payload]); 
                   if (error) throw error; 
               }
@@ -487,8 +472,7 @@ async function saveForm(e) {
             }
             
             Swal.fire({title: 'Изписване от склад...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-            let planIdVal = isEditMode ? (globalRows[editingIndex]['RawPlanId'] === 'NONE' ? null : globalRows[editingIndex]['RawPlanId']) : null;
-            let otchetiPayload = { "ID План": planIdVal, "ID Детайл": detailID, "Операция": selectedOp, "Количество": -qtyToDeduct, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Експедиция)", "Дата": new Date().toISOString() };
+            let otchetiPayload = { "ID План": null, "ID Детайл": detailID, "Операция": selectedOp, "Количество": -qtyToDeduct, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Експедиция)", "Дата": new Date().toISOString() };
             const { error: otchetiErr } = await client.from('otcheti').insert([otchetiPayload]);
             if (otchetiErr) throw otchetiErr;
         }
@@ -537,8 +521,7 @@ async function deleteItem(index) {
           try { 
               Swal.fire({title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
               let opName = currentTab === 'sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
-              let planIdVal = row['RawPlanId'] === 'NONE' ? null : row['RawPlanId'];
-              let payload = { "ID План": planIdVal, "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
+              let payload = { "ID План": null, "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); 
