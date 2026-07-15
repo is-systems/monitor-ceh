@@ -313,7 +313,7 @@ async function fetchAll(table, orderCol) {
 async function computeSkladData(isGpTab) {
     const [reportsRes, marshrutiRes, bomRes, nomRes, bufferRes, plansRes] = await Promise.all([
         fetchAll('otcheti'),
-        fetchAll('marshruti', '№ Операция'),
+        fetchAll('marshruti'), // NO ORDER COL - causes PostgreSQL offset data loss
         fetchAll('bom'),
         fetchAll('Номенклатура'),
         fetchAll('sklad_bufferi'),
@@ -353,6 +353,7 @@ async function computeSkladData(isGpTab) {
     
     Object.keys(routesByDetail).forEach(code => {
         let routes = routesByDetail[code];
+        routes.sort((a, b) => (parseFloat(a['№ Операция']) || 0) - (parseFloat(b['№ Операция']) || 0));
         if(routes.length === 0) return;
         let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
         trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
