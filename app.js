@@ -459,6 +459,41 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         });
     });
 
+    // --- SECOND PASS: Add back consumed quantities within the same plan ---
+    let nodeMap = {};
+    Object.keys(nodesByCode).forEach(code => {
+        nodesByCode[code].forEach(n => nodeMap[n.id] = n);
+    });
+    
+    let changed = true;
+    let addedToChild = {};
+    while(changed) {
+        changed = false;
+        connections.forEach(c => {
+            let parent = nodeMap[c.to];
+            let child = nodeMap[c.from];
+            if (parent && child && parent.operations && parent.operations.length > 0) {
+                let firstOp = parent.operations[0];
+                let currentConsumed = firstOp.completed * (c.multiplier || 1);
+                let prevConsumed = addedToChild[c.from + '_' + c.to] || 0;
+                
+                if (currentConsumed > prevConsumed) {
+                    let diff = currentConsumed - prevConsumed;
+                    addedToChild[c.from + '_' + c.to] = currentConsumed;
+                    
+                    if (child.operations && child.operations.length > 0) {
+                        child.operations.forEach(op => {
+                            op.completed += diff;
+                            if (op.completed >= child.planQty) op.state = 'green';
+                            else if (op.completed > 0) op.state = 'blue';
+                        });
+                    }
+                    changed = true;
+                }
+            }
+        });
+    }
+
     Object.values(mergedNodes).forEach(n => {
 
         let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
