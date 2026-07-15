@@ -400,99 +400,115 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         small_rotors_var11: [], small_rotors_var25: []
     };
 
+    // 1. Group nodes by code
     let nodesByCode = {};
     Object.values(mergedNodes).forEach(n => {
         if (!nodesByCode[n.code]) nodesByCode[n.code] = [];
         nodesByCode[n.code].push(n);
     });
 
-    let alreadyAllocated = {};
-    let alreadyAllocatedWarehouse = {};
-
+    let isLastNodeMap = {};
     Object.keys(nodesByCode).forEach(code => {
         let nodes = nodesByCode[code];
         nodes.sort((a, b) => (parseInt(a.planId) || 0) - (parseInt(b.planId) || 0));
-        
-        let partRoutes = staticCache.routesByDetail[code.toLowerCase()] || [];
-        let consumedByShipped = getTotalShipped(code);
-        
-        nodes.forEach((n, nodeIdx) => {
-            let isLastNode = (nodeIdx === nodes.length - 1);
-            let recovered = completedOps[code + '_възстановен'] || 0;
-            
-            if (partRoutes.length > 0) {
-                partRoutes.forEach(route => {
-                    let opName = String(route['Име на операция']).trim();
-                    let opKey = String(n.code).trim().toLowerCase() + '_' + opName.toLowerCase();
-                    
-                    let globalGross = grossTrueDoneOps[opKey] || 0;
-                    let globalNet = Math.max(0, globalGross - consumedByShipped);
-                    
-                    let usedSoFar = alreadyAllocated[opKey] || 0;
-                    let availableForThisNode = Math.max(0, globalNet - usedSoFar);
-                    let doneQty = isLastNode ? availableForThisNode : Math.min(n.planQty, availableForThisNode);
-                    
-                    alreadyAllocated[opKey] = usedSoFar + doneQty;
-                    
-                    let opState = 'gray';
-                    let latestStatus = opStatusMap[opKey];
-                    if (doneQty >= n.planQty) opState = 'green';
-                    else if (doneQty > 0) opState = 'blue';
-                    else if (latestStatus === 'Започната') opState = 'blue_0';
-                    
-                    let scrapped = scrappedOps[opKey] || 0;
-                    n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: 0 }); 
-                });
-            } else {
-                let globalWarehouse = n.warehouseQty + recovered;
-                let usedSoFar = alreadyAllocatedWarehouse[n.code] || 0;
-                let availableForThisNode = Math.max(0, globalWarehouse - usedSoFar);
-                let doneQty = isLastNode ? availableForThisNode : Math.min(n.planQty, availableForThisNode);
-                alreadyAllocatedWarehouse[n.code] = usedSoFar + doneQty;
-                
-                n.operations.push({ 
-                    name: doneQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
-                    completed: doneQty,
-                    state: doneQty >= n.planQty ? 'green' : 'gray'
-                });
-            }
-        });
+        isLastNodeMap[nodes[nodes.length - 1].id] = true;
     });
 
-    // --- SECOND PASS: Add back consumed quantities within the same plan ---
-    let nodeMap = {};
-    Object.keys(nodesByCode).forEach(code => {
-        nodesByCode[code].forEach(n => nodeMap[n.id] = n);
+    // 2. Build graph and calculate levels
+    const childrenMap = {};
+    Object.values(mergedNodes).forEach(n => childrenMap[n.id] = []);
+    connections.forEach(c => {
+        if (childrenMap[c.to]) childrenMap[c.to].push(c.from);
     });
     
-    let changed = true;
-    let addedToChild = {};
-    while(changed) {
-        changed = false;
-        connections.forEach(c => {
-            let parent = nodeMap[c.to];
-            let child = nodeMap[c.from];
-            if (parent && child && parent.operations && parent.operations.length > 0) {
-                let firstOp = parent.operations[0];
-                let currentConsumed = firstOp.completed * (c.multiplier || 1);
-                let prevConsumed = addedToChild[c.from + '_' + c.to] || 0;
+    const calculatedLevels = {};
+    const visitedForLevel = new Set();
+    Object.values(mergedNodes).forEach(n => {
+        getBottomUpLevel(n.id, childrenMap, calculatedLevels, visitedForLevel);
+    });
+
+    // 3. Sort nodes TOP-DOWN
+    let allNodes = Object.values(mergedNodes);
+    allNodes.sort((a, b) => {
+        let lvlDiff = (calculatedLevels[b.id] || 0) - (calculatedLevels[a.id] || 0);
+        if (lvlDiff !== 0) return lvlDiff;
+        return (parseInt(a.planId) || 0) - (parseInt(b.planId) || 0);
+    });
+
+    allNodes.forEach(n => n.consumedByParents = 0);
+    let alreadyAllocated = {};
+    let alreadyAllocatedWarehouse = {};
+
+    let getMultiplier = (childCode, parentCode) => {
+        let pNameLower = parentCode.toLowerCase();
+        let cNameLower = childCode.toLowerCase();
+        let bomLines = staticCache.bomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === cNameLower && String(b['ID Детайл']).trim().toLowerCase() === pNameLower);
+        let m = 0;
+        bomLines.forEach(bl => m += (parseFloat(bl['Количество']) || 1));
+        return m || 1;
+    };
+
+    allNodes.forEach(n => {
+        let isLastNode = isLastNodeMap[n.id];
+        let code = n.code;
+        let partRoutes = staticCache.routesByDetail[code.toLowerCase()] || [];
+        let consumedByShipped = getTotalShipped(code);
+        let finalDoneQtyForChildren = 0; 
+        
+        let deficit = Math.max(0, n.planQty - n.consumedByParents);
+
+        if (partRoutes.length > 0) {
+            partRoutes.forEach((route, idx) => {
+                let opName = String(route['Име на операция']).trim();
+                let opKey = code.toLowerCase() + '_' + opName.toLowerCase();
                 
-                if (currentConsumed > prevConsumed) {
-                    let diff = currentConsumed - prevConsumed;
-                    addedToChild[c.from + '_' + c.to] = currentConsumed;
-                    
-                    if (child.operations && child.operations.length > 0) {
-                        child.operations.forEach(op => {
-                            op.completed += diff;
-                            if (op.completed >= child.planQty) op.state = 'green';
-                            else if (op.completed > 0) op.state = 'blue';
-                        });
-                    }
-                    changed = true;
-                }
+                let globalGross = grossTrueDoneOps[opKey] || 0;
+                let globalNet = Math.max(0, globalGross - consumedByShipped);
+                
+                let usedSoFar = alreadyAllocated[opKey] || 0;
+                let availableForThisNode = Math.max(0, globalNet - usedSoFar);
+                
+                let allocatedFromWh = isLastNode ? availableForThisNode : Math.min(deficit, availableForThisNode);
+                let doneQty = n.consumedByParents + allocatedFromWh;
+                
+                alreadyAllocated[opKey] = usedSoFar + allocatedFromWh;
+                
+                let opState = 'gray';
+                let latestStatus = opStatusMap[opKey];
+                if (doneQty >= n.planQty) opState = 'green';
+                else if (doneQty > 0) opState = 'blue';
+                else if (latestStatus === 'Започната') opState = 'blue_0';
+                
+                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: 0 }); 
+                
+                if (idx === 0) finalDoneQtyForChildren = doneQty; 
+            });
+        } else {
+            let globalWarehouse = n.warehouseQty + (completedOps[code + '_възстановен'] || 0);
+            let usedSoFar = alreadyAllocatedWarehouse[code] || 0;
+            let availableForThisNode = Math.max(0, globalWarehouse - usedSoFar);
+            
+            let allocatedFromWh = isLastNode ? availableForThisNode : Math.min(deficit, availableForThisNode);
+            let doneQty = n.consumedByParents + allocatedFromWh;
+            
+            alreadyAllocatedWarehouse[code] = usedSoFar + allocatedFromWh;
+            
+            n.operations.push({ 
+                name: doneQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
+                completed: doneQty,
+                state: doneQty >= n.planQty ? 'green' : 'gray'
+            });
+            finalDoneQtyForChildren = doneQty;
+        }
+
+        childrenMap[n.id].forEach(childId => {
+            let childNode = mergedNodes[childId];
+            if (childNode) {
+                let mult = getMultiplier(childNode.code, n.code);
+                childNode.consumedByParents += finalDoneQtyForChildren * mult;
             }
         });
-    }
+    });
 
     Object.values(mergedNodes).forEach(n => {
 
