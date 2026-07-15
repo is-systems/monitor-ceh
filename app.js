@@ -387,7 +387,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let partRoutes = staticCache.routesByDetail[code.toLowerCase()] || [];
         let consumedByShipped = getTotalShipped(code);
         
-        nodes.forEach(n => {
+        nodes.forEach((n, nodeIdx) => {
+            let isLastNode = (nodeIdx === nodes.length - 1);
             let recovered = completedOps[code + '_възстановен'] || 0;
             
             if (partRoutes.length > 0) {
@@ -400,7 +401,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                     
                     let usedSoFar = alreadyAllocated[opKey] || 0;
                     let availableForThisNode = Math.max(0, globalNet - usedSoFar);
-                    let doneQty = Math.min(n.planQty, availableForThisNode);
+                    let doneQty = isLastNode ? availableForThisNode : Math.min(n.planQty, availableForThisNode);
                     
                     alreadyAllocated[opKey] = usedSoFar + doneQty;
                     
@@ -417,7 +418,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let globalWarehouse = n.warehouseQty + recovered;
                 let usedSoFar = alreadyAllocatedWarehouse[n.code] || 0;
                 let availableForThisNode = Math.max(0, globalWarehouse - usedSoFar);
-                let doneQty = Math.min(n.planQty, availableForThisNode);
+                let doneQty = isLastNode ? availableForThisNode : Math.min(n.planQty, availableForThisNode);
                 alreadyAllocatedWarehouse[n.code] = usedSoFar + doneQty;
                 
                 n.operations.push({ 
