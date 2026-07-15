@@ -236,6 +236,9 @@ async function loadTasks(isSilent = false) {
                   });
               }
           });
+          
+          let consumedByParents = {};
+          allItemsArray.forEach(item => { consumedByParents[item] = 0; });
 
           allItemsArray.forEach((code, nodeIndex) => {
               let routes = globalRoutesByDetail[code] || []; 
@@ -243,35 +246,39 @@ async function loadTasks(isSilent = false) {
               
               let blueTarget = isBuffer ? 0 : (blueTargets[code] || 0);
               let greenTarget = isBuffer ? (bufferMap[code] || 0) : 0;
-              let opBlueTarget = blueTarget;
-              let opGreenTarget = greenTarget;
-
-              if (opBlueTarget <= 0 && opGreenTarget <= 0) return;
-              
-              let consumedByShipped = getTotalShipped(code);
-
-              routes.forEach((route, idx) => {
-                  let displayOpName = String(route['Име на операция']).trim();
-                  let opName = displayOpName.toLowerCase(); 
-                  let opKey = code + '_' + opName;
-                  let displayName = String(route['Код на детайла']).trim();
+                  let opBlueTarget = blueTarget;
+                  let opGreenTarget = greenTarget;
+    
+                  if (opBlueTarget <= 0 && opGreenTarget <= 0) return;
                   
-                  let globalGross = grossTrueDoneOps[opKey] || 0;
-                  let globalNet = Math.max(0, globalGross - consumedByShipped);
-                  
-                  let usedSoFar = alreadyAllocated[opKey] || 0;
-                  let availableForThisPlan = Math.max(0, globalNet - usedSoFar);
-                  
-                  let planTarget = Math.max(opBlueTarget, opGreenTarget);
-                  let doneQty = Math.min(planTarget, availableForThisPlan);
-                  
-                  alreadyAllocated[opKey] = usedSoFar + doneQty;
-                  
-                  if (isBuffer) {
-                      if (doneQty >= opGreenTarget) return;
-                  } else {
-                      if (doneQty >= opBlueTarget) return;
-                  }
+                  let consumedByShipped = getTotalShipped(code);
+                  let finalDoneQtyForChildren = 0;
+    
+                  routes.forEach((route, idx) => {
+                      let displayOpName = String(route['Име на операция']).trim();
+                      let opName = displayOpName.toLowerCase(); 
+                      let opKey = code + '_' + opName;
+                      let displayName = String(route['Код на детайла']).trim();
+                      
+                      let globalGross = grossTrueDoneOps[opKey] || 0;
+                      let globalNet = Math.max(0, globalGross - consumedByShipped);
+                      
+                      let usedSoFar = alreadyAllocated[opKey] || 0;
+                      let availableForThisPlan = Math.max(0, globalNet - usedSoFar);
+                      
+                      let planTarget = Math.max(opBlueTarget, opGreenTarget);
+                      let deficit = Math.max(0, planTarget - consumedByParents[code]);
+                      let allocatedFromWh = Math.min(deficit, availableForThisPlan);
+                      let doneQty = consumedByParents[code] + allocatedFromWh;
+                      
+                      alreadyAllocated[opKey] = usedSoFar + allocatedFromWh;
+                      if (idx === 0) finalDoneQtyForChildren = doneQty;
+                      
+                      if (isBuffer) {
+                          if (doneQty >= opGreenTarget) return;
+                      } else {
+                          if (doneQty >= opBlueTarget) return;
+                      }
                   
                   let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; 
                   if (idx > 0) {
@@ -327,29 +334,36 @@ async function loadTasks(isSilent = false) {
                       if (targetInput <= 0 && !hasLimit) targetInput = 1;
                       if (targetInput <= 0 && isBlocked) targetInput = 0;
                       
-                      if (idx === 0) {
-                          let children = globalBomData.filter(b => String(b['ID Родител']).trim().toLowerCase() === code);
-                          children.forEach(child => {
-                              let cCode = String(child['ID Компонент']).trim().toLowerCase();
-                              let multiplier = parseFloat(child['Количество']) || 1;
-                              alreadyAllocatedWarehouse[cCode] = (alreadyAllocatedWarehouse[cCode] || 0) + (targetInput * multiplier);
-                          });
-                      }
-                      
-                      globalTasks.push({ 
-                          id: safeIdBase + (isBuffer ? '_green' : '_blue'), 
-                          plan_id: isBuffer ? null : pId, 
-                          plan_name: isBuffer ? "БУФЕРИ" : (planNames[pId] || pId),
-                          name: displayName, internalName: namesMap[code] || '', op: displayOpName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", 
-                          machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], 
-                          type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", 
-                          defaultQty: targetInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, 
-                          totalNeed: isBuffer ? opGreenTarget : opBlueTarget, pureQty: isBuffer ? opGreenTarget : opBlueTarget, 
-                          totalDone: doneQty, totalScrapped: 0, isTaken: isTaken, isGreenCard: isBuffer 
-                      });
-                  }
-              });
-          });
+                    if (idx === 0) {
+                        let children = globalBomData.filter(b => String(b['ID Родител']).trim().toLowerCase() === code);
+                        children.forEach(child => {
+                            let cCode = String(child['ID Компонент']).trim().toLowerCase();
+                            let multiplier = parseFloat(child['Количество']) || 1;
+                            alreadyAllocatedWarehouse[cCode] = (alreadyAllocatedWarehouse[cCode] || 0) + (targetInput * multiplier);
+                        });
+                    }
+                    
+                    globalTasks.push({ 
+                        id: safeIdBase + (isBuffer ? '_green' : '_blue'), 
+                        plan_id: isBuffer ? null : pId, 
+                        plan_name: isBuffer ? "БУФЕРИ" : (planNames[pId] || pId),
+                        name: displayName, internalName: namesMap[code] || '', op: displayOpName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", 
+                        machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], 
+                        type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", 
+                        defaultQty: targetInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, 
+                        totalNeed: isBuffer ? opGreenTarget : opBlueTarget, pureQty: isBuffer ? opGreenTarget : opBlueTarget, 
+                        totalDone: doneQty, totalScrapped: 0, isTaken: isTaken, isGreenCard: isBuffer 
+                    });
+                }
+            });
+            
+            let children = globalBomData.filter(b => String(b['ID Родител']).trim().toLowerCase() === code);
+            children.forEach(c => {
+                let cCode = String(c['ID Компонент']).trim().toLowerCase(); 
+                let multiplier = parseFloat(c['Количество']) || 1;
+                consumedByParents[cCode] = (consumedByParents[cCode] || 0) + (finalDoneQtyForChildren * multiplier);
+            });
+        });
       });
       
       globalTasks.sort((a, b) => a.opNum - b.opNum); renderTasks(globalTasks);
