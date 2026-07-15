@@ -8,7 +8,14 @@ window.onload = () => {
     } else { document.getElementById('appContent').style.display = 'block'; initializeApp(); }
 };
 
-function initializeApp() { buildNavbar(); loadCurrentTableData(); runInvisibleAutoCheckout(); }
+let globalActivePlansForDropdown = [];
+
+function initializeApp() { 
+    client.from('plan').select('id, Вътрешно име').in('Статус', ['Активен']).then(res => {
+        if (res.data) globalActivePlansForDropdown = res.data;
+    });
+    buildNavbar(); loadCurrentTableData(); runInvisibleAutoCheckout(); 
+}
 
 function buildNavbar() {
   const container = document.getElementById('tabsContainer'); container.innerHTML = '';
@@ -245,6 +252,8 @@ function buildForm(data = null) {
   
   if (currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
       if (!isEditMode) {
+          let plansDropdownHtml = `<option value="">Общ Буфер (Склад)</option>`;
+          globalActivePlansForDropdown.forEach(p => { plansDropdownHtml += `<option value="${p.id}">План: ${p.id} (${p['Вътрешно име']})</option>`; });
           area.innerHTML = `
             <div class="form-group" style="position:relative;">
                 <label>ID Детайл (Код):</label>
@@ -255,6 +264,7 @@ function buildForm(data = null) {
                     required autocomplete="off">
                 <div id="skladDetailDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #cbd5e1; border-radius:4px; z-index:1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"></div>
             </div>
+            <div class="form-group"><label>Целеви План:</label><select id="inp_skladPlanId" class="form-input">${plansDropdownHtml}</select></div>
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
             <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
           `;
@@ -267,8 +277,11 @@ function buildForm(data = null) {
               });
           }
       } else {
+          let plansDropdownHtml = `<option value="">Общ Буфер (Склад)</option>`;
+          globalActivePlansForDropdown.forEach(p => { plansDropdownHtml += `<option value="${p.id}">План: ${p.id} (${p['Вътрешно име']})</option>`; });
           area.innerHTML = `
             <div class="form-group"><label>ID Детайл (Код):</label><input type="text" id="inp_skladDetail" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
+            <div class="form-group"><label>Целеви План:</label><select id="inp_skladPlanId" class="form-input">${plansDropdownHtml}</select></div>
             <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"><input type="hidden" id="inp_skladRealOp"></div>
             <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" required></div>
@@ -307,9 +320,10 @@ async function saveForm(e) {
               const det = document.getElementById('inp_skladDetail').value.trim();
               const op = document.getElementById('inp_skladOp').value.trim();
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
+              const planIdVal = document.getElementById('inp_skladPlanId').value || null;
               if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
               
-              let payload = { "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
+              let payload = { "ID План": planIdVal, "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               
@@ -321,10 +335,11 @@ async function saveForm(e) {
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
+              const planIdVal = document.getElementById('inp_skladPlanId').value || null;
               const diff = newQty - oldQty;
               
               if (diff !== 0) {
-                  let payload = { "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
+                  let payload = { "ID План": planIdVal, "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
                   const { error } = await client.from('otcheti').insert([payload]); 
                   if (error) throw error; 
               }
