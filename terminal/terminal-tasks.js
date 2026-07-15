@@ -83,6 +83,7 @@ async function loadTasks(isSilent = false) {
 
       let planRoots = {}; 
       let planNames = {};
+      let groupEarliestId = {};
       plansRes.data.forEach(plan => {
           if (String(plan['Статус']).trim() === 'Изпратен') return;
           let planId = String(plan.id).trim(); 
@@ -91,6 +92,10 @@ async function loadTasks(isSilent = false) {
           let monthYear = (plan['Месец'] && plan['Година']) ? (plan['Месец'] + ' ' + plan['Година']) : '';
           
           let groupKey = monthYear || planId; 
+          
+          if (!groupEarliestId[groupKey] || parseInt(planId) < groupEarliestId[groupKey]) {
+              groupEarliestId[groupKey] = parseInt(planId);
+          }
           
           planNames[groupKey] = monthYear ? monthYear : plan['Вътрешно име'];
           
@@ -190,7 +195,7 @@ async function loadTasks(isSilent = false) {
 
       globalTasks = [];
 
-      let planIdsToProcess = Object.keys(planRoots).sort((a,b) => parseInt(a) - parseInt(b));
+      let planIdsToProcess = Object.keys(planRoots).sort((a,b) => (groupEarliestId[a] || 0) - (groupEarliestId[b] || 0));
       planIdsToProcess.push('NONE');
       
       let alreadyAllocated = {};
