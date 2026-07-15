@@ -351,7 +351,8 @@ async function loadTasks(isSilent = false) {
                         type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", 
                         defaultQty: targetInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, 
                         totalNeed: isBuffer ? opGreenTarget : opBlueTarget, pureQty: isBuffer ? opGreenTarget : opBlueTarget, 
-                        totalDone: doneQty, totalScrapped: 0, isTaken: isTaken, isGreenCard: isBuffer 
+                        totalDone: doneQty, totalScrapped: 0, isTaken: isTaken, isGreenCard: isBuffer,
+                        globalGrossAtLoad: globalGross, globalScrapAtLoad: (scrappedOps[opKey] || 0)
                     });
                 }
             });

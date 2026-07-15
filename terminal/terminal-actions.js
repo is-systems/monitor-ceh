@@ -121,12 +121,20 @@ async function finishTask(taskId, btn) {
       btn.disabled = true; btn.innerHTML = "ЗАПИС..."; Swal.fire({ title: 'Проверка и Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
       try {
           if (taskData.hasLimit) {
-              const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
+              const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество, Оператор, Статус').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
               if (repErr) throw repErr;
               let currentConsumed = 0;
-              currentReports.forEach(r => { currentConsumed += (parseFloat(r['Количество']) || 0); });
+              currentReports.forEach(r => { 
+                  let qty = parseFloat(r['Количество']) || 0;
+                  if (r['Статус'] === 'Брак') { currentConsumed += qty; }
+                  else if (r['Статус'] === 'Отчетено') {
+                      if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+                          currentConsumed += qty; 
+                      }
+                  }
+              });
               
-              let originalConsumed = (taskData.totalDone || 0) + (taskData.totalScrapped || 0);
+              let originalConsumed = (taskData.globalGrossAtLoad || 0) + (taskData.globalScrapAtLoad || 0);
               let diff = currentConsumed - originalConsumed;
               let realMaxAllowed = taskData.maxAllowed - diff;
               
@@ -188,12 +196,20 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
     Swal.fire({ title: 'Проверка и Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
     try {
         if (taskData.hasLimit) {
-            const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
+            const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество, Оператор, Статус').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
             if (repErr) throw repErr;
             let currentConsumed = 0;
-            currentReports.forEach(r => { currentConsumed += (parseFloat(r['Количество']) || 0); });
+            currentReports.forEach(r => { 
+                let qty = parseFloat(r['Количество']) || 0;
+                if (r['Статус'] === 'Брак') { currentConsumed += qty; }
+                else if (r['Статус'] === 'Отчетено') {
+                    if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+                        currentConsumed += qty; 
+                    }
+                }
+            });
             
-            let originalConsumed = (taskData.totalDone || 0) + (taskData.totalScrapped || 0);
+            let originalConsumed = (taskData.globalGrossAtLoad || 0) + (taskData.globalScrapAtLoad || 0);
             let diff = currentConsumed - originalConsumed;
             let realMaxAllowed = taskData.maxAllowed - diff;
             
