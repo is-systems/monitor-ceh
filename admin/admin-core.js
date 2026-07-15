@@ -170,7 +170,7 @@ function renderDynamicTable(itemsToRender = null) {
           row.appendChild(td); return;
       }
 
-      if ((f.name === 'Време' || f.name === 'Дата') && val) { try { td.innerHTML = `<b>${new Date(val).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
+      if ((f.name === 'Време' || f.name === 'Дата') && val) { try { let pVal = val; if (!pVal.endsWith('Z') && !pVal.includes('+')) pVal += 'Z'; td.innerHTML = `<b>${new Date(pVal).toLocaleString('bg-BG')}</b>`; } catch(e) { td.innerText = val; } row.appendChild(td); return; }
       if (currentTab === 'chekiraniya' && f.name === 'Действие') {
           if (val === 'Влизане') td.innerHTML = `<span style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🟢 ${val}</span>`;
           else if (val === 'Излизане') td.innerHTML = `<span style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:12px; font-weight:800; font-size:0.9em;">🔴 ${val}</span>`;
