@@ -277,6 +277,7 @@ async function loadTasks(isSilent = false) {
                   
                   let consumedByShipped = getTotalShipped(code);
                   let finalDoneQtyForChildren = 0;
+                  let planOpDoneQty = [];
     
                   routes.forEach((route, idx) => {
                       let displayOpName = String(route['Име на операция']).trim();
@@ -298,6 +299,8 @@ async function loadTasks(isSilent = false) {
                       alreadyAllocated[opKey] = usedSoFar + allocatedFromWh;
                       if (idx === 0) finalDoneQtyForChildren = doneQty;
                       
+                      planOpDoneQty[idx] = doneQty;
+                      
                       if (isBuffer) {
                           if (doneQty >= opGreenTarget) return;
                       } else {
@@ -308,8 +311,7 @@ async function loadTasks(isSilent = false) {
                   if (idx > 0) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
-                      let prevOpKey = code + '_' + prevOpName;
-                      let prevDoneQty = Math.max(0, (grossTrueDoneOps[prevOpKey] || 0) - consumedByShipped);
+                      let prevDoneQty = planOpDoneQty[idx - 1] || 0;
                       maxAllowed = Math.max(0, prevDoneQty - doneQty);
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
                   } else {
