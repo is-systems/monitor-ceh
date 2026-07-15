@@ -40,7 +40,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0
 .detail-code { font-size: 0.9em; font-weight: 700; color: #94a3b8; }
 .route-flow { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 700; font-size: 0.9em; }
 .op-active { color: #2563eb; display: flex; align-items: center; gap: 4px; font-size: 1.05em; }
-.op-pending { color: #94a3b8; font-size: 0.85em; font-weight: 500; }
+.op-pending { color: #94a3b8; }
 .route-arrow { color: #cbd5e1; font-size: 0.8em; }
 input[type="number"] { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; text-align: center; font-size: 1.3em; font-weight: bold; box-sizing: border-box; }
 input[type="number"]:focus { border-color: #3b82f6; outline: none; }
