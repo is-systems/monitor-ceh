@@ -297,11 +297,11 @@ function closeModal() { document.getElementById('modalBackdrop').style.display =
 async function computeSkladData(isGpTab) {
     const [reportsRes, marshrutiRes, bomRes, nomRes, bufferRes, plansRes] = await Promise.all([
         client.from('otcheti').select('*').limit(100000),
-        client.from('marshruti').select('*').order('№ Операция', {ascending: true}),
-        client.from('bom').select('*'),
-        client.from('Номенклатура').select('*'),
-        client.from('sklad_bufferi').select('*'),
-        client.from('plan').select('*')
+        client.from('marshruti').select('*').limit(100000).order('№ Операция', {ascending: true}),
+        client.from('bom').select('*').limit(100000),
+        client.from('Номенклатура').select('*').limit(100000),
+        client.from('sklad_bufferi').select('*').limit(100000),
+        client.from('plan').select('*').limit(100000)
     ]);
     
     let routesByDetail = {};
