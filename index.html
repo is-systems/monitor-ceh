@@ -1,18 +1,18 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bg">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Р–РёРІ РњРѕРЅРёС‚РѕСЂ РЅР° РџСЂРѕРёР·РІРѕРґСЃС‚РІРѕС‚Рѕ</title>
+  <title>Жив Монитор на Производството</title>
   <link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;600;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=4">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=19" defer></script>
+  <script src="app.js?v=18" defer></script>
 </head>
 <body>
 
   <div id="loading">
-    <div>РЎРіР»РѕР±СЏРІР°РЅРµ РЅР° VSM РїРѕС‚РѕРєР°... вљ™пёЏ</div>
+    <div>Сглобяване на VSM потока... ⚙️</div>
     <div id="error-box"></div>
   </div>
   
@@ -21,15 +21,15 @@
   <div class="layout-wrapper">
     <div class="top-section">
       <div class="left-zone">
-        <div class="window"><div class="window-header" style="border-top: 3px solid #ef4444; background: linear-gradient(180deg, rgba(239,68,68,0.1) 0%, transparent 100%);">РўР•Р›Рђ</div><div class="window-body" id="w-tiela"></div></div>
-        <div class="window"><div class="window-header" style="border-top: 3px solid #fb923c; background: linear-gradient(180deg, rgba(251,146,60,0.1) 0%, transparent 100%);">РџР Р•Р”РќР РљРђРџРђР¦Р</div><div class="window-body" id="w-predni"></div></div>
-        <div class="window"><div class="window-header" style="border-top: 3px solid #c084fc; background: linear-gradient(180deg, rgba(192,132,252,0.1) 0%, transparent 100%);">Р—РђР”РќР РљРђРџРђР¦Р</div><div class="window-body" id="w-zadni"></div></div>
-        <div class="window"><div class="window-header" style="border-top: 3px solid #fb7185; background: linear-gradient(180deg, rgba(251,113,133,0.1) 0%, transparent 100%);">РњРџР </div><div class="window-body" id="w-mpr"></div></div>
+        <div class="window"><div class="window-header" style="border-top: 3px solid #ef4444; background: linear-gradient(180deg, rgba(239,68,68,0.1) 0%, transparent 100%);">ТЕЛА</div><div class="window-body" id="w-tiela"></div></div>
+        <div class="window"><div class="window-header" style="border-top: 3px solid #fb923c; background: linear-gradient(180deg, rgba(251,146,60,0.1) 0%, transparent 100%);">ПРЕДНИ КАПАЦИ</div><div class="window-body" id="w-predni"></div></div>
+        <div class="window"><div class="window-header" style="border-top: 3px solid #c084fc; background: linear-gradient(180deg, rgba(192,132,252,0.1) 0%, transparent 100%);">ЗАДНИ КАПАЦИ</div><div class="window-body" id="w-zadni"></div></div>
+        <div class="window"><div class="window-header" style="border-top: 3px solid #fb7185; background: linear-gradient(180deg, rgba(251,113,133,0.1) 0%, transparent 100%);">МПР</div><div class="window-body" id="w-mpr"></div></div>
       </div>
       
       <div class="right-zone">
         <div class="window" style="height: 100%;">
-          <div class="window-header" style="border-top: 3px solid #f43f5e; background: linear-gradient(180deg, rgba(244,63,94,0.1) 0%, transparent 100%);">РЎРўРђРўРћР Р Р РўР РђРќРЎР¤РћР РњРђРўРћР Р</div>
+          <div class="window-header" style="border-top: 3px solid #f43f5e; background: linear-gradient(180deg, rgba(244,63,94,0.1) 0%, transparent 100%);">СТАТОРИ И ТРАНСФОРМАТОРИ</div>
           <div class="window-body" id="w-statori"></div>
         </div>
       </div>
@@ -37,27 +37,27 @@
     
     <div class="bottom-section">
       <div class="window" style="flex: 2.2;">
-        <div class="window-header" style="border-top: 3px solid #94a3b8; background: linear-gradient(180deg, rgba(148,163,184,0.1) 0%, transparent 100%);">Р РћРўРћР Р - Р’РђР›РћР’Р• - Р›РђР“Р•Р РќР Р’РЄР—Р›Р</div>
+        <div class="window-header" style="border-top: 3px solid #94a3b8; background: linear-gradient(180deg, rgba(148,163,184,0.1) 0%, transparent 100%);">РОТОРИ - ВАЛОВЕ - ЛАГЕРНИ ВЪЗЛИ</div>
         <div class="window-body" style="padding: 12px;">
-          <div class="lane"><span class="lane-title">Р’РђР . 11</span><div id="w-var11"></div></div>
-          <div class="lane"><span class="lane-title">Р’РђР . 25</span><div id="w-var25"></div></div>
-          <div class="lane" style="margin-top: 24px;"><span class="lane-title">Р©РР¤РўРћР’Р•</span><div id="w-small-pins"></div></div>
-          <div class="lane"><span class="lane-title">Р›РђР“Р•Р РќР Р’РЄР—Р›Р</span><div id="w-bearings"></div></div>
+          <div class="lane"><span class="lane-title">ВАР. 11</span><div id="w-var11"></div></div>
+          <div class="lane"><span class="lane-title">ВАР. 25</span><div id="w-var25"></div></div>
+          <div class="lane" style="margin-top: 24px;"><span class="lane-title">ЩИФТОВЕ</span><div id="w-small-pins"></div></div>
+          <div class="lane"><span class="lane-title">ЛАГЕРНИ ВЪЗЛИ</span><div id="w-bearings"></div></div>
         </div>
       </div>
       
       <div style="flex: 1.2; display: flex; flex-direction: row; gap: 12px;">
         <div class="window" style="flex: 1;">
-          <div class="window-header" style="border-top: 3px solid #818cf8; background: linear-gradient(180deg, rgba(129,140,248,0.1) 0%, transparent 100%);">РњРђР›РљР Р”Р•РўРђР™Р›Р</div>
+          <div class="window-header" style="border-top: 3px solid #818cf8; background: linear-gradient(180deg, rgba(129,140,248,0.1) 0%, transparent 100%);">МАЛКИ ДЕТАЙЛИ</div>
           <div class="window-body">
-            <div style="margin-bottom: 16px;"><span class="lane-title">РЁРџРР›РљР</span><div id="w-small-studs"></div></div>
-            <div style="margin-bottom: 16px;"><span class="lane-title">РџРђРљР•РўР</span><div id="w-small-rotors"></div></div>
-            <div><span class="lane-title">Р”Р РЈР“Р</span><div id="w-small-others"></div></div>
+            <div style="margin-bottom: 16px;"><span class="lane-title">ШПИЛКИ</span><div id="w-small-studs"></div></div>
+            <div style="margin-bottom: 16px;"><span class="lane-title">ПАКЕТИ</span><div id="w-small-rotors"></div></div>
+            <div><span class="lane-title">ДРУГИ</span><div id="w-small-others"></div></div>
           </div>
         </div>
 
         <div class="window" style="flex: 1;">
-          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">Р Р•Р—РћР›Р’Р•Р Р</div>
+          <div class="window-header" style="border-top: 3px solid #f8fafc; background: linear-gradient(180deg, rgba(248,250,252,0.1) 0%, transparent 100%);">РЕЗОЛВЕРИ</div>
           <div class="window-body" id="w-assembly"></div>
         </div>
       </div>
