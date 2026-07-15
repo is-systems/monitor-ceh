@@ -377,7 +377,15 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         parents.forEach(p => {
             let parentCode = String(p['ID Родител']).trim().toLowerCase();
             if (parentCode !== lc) {
-                indirectShipped += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество']) || 1);
+                let parentRoutes = staticCache.routesByDetail[parentCode];
+                let parentConsumed = 0;
+                if (parentRoutes && parentRoutes.length > 0) {
+                    let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
+                    parentConsumed = grossTrueDoneOps[firstOpKey] || 0;
+                } else {
+                    parentConsumed = getTotalShipped(parentCode, new Set(visited));
+                }
+                indirectShipped += parentConsumed * (parseFloat(p['Количество']) || 1);
             }
         });
         

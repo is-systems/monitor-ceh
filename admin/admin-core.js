@@ -376,7 +376,17 @@ async function computeSkladData(isGpTab) {
         let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
         parents.forEach(p => {
             let parentCode = String(p['ID Родител']).trim().toLowerCase();
-            if(parentCode !== lc) indirect += getTotalShipped(parentCode, new Set(visited)) * (parseFloat(p['Количество'])||1);
+            if(parentCode !== lc) {
+                let parentRoutes = routesByDetail[parentCode];
+                let parentConsumed = 0;
+                if (parentRoutes && parentRoutes.length > 0) {
+                    let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
+                    parentConsumed = grossTrueDoneOps[firstOpKey] || 0;
+                } else {
+                    parentConsumed = getTotalShipped(parentCode, new Set(visited));
+                }
+                indirect += parentConsumed * (parseFloat(p['Количество'])||1);
+            }
         });
         totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
     }
