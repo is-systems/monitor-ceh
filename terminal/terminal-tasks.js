@@ -89,7 +89,8 @@ async function loadTasks(isSilent = false) {
           let planId = String(plan.id).trim(); 
           let rootItem = String(plan['Вътрешно име']).trim(); 
           let targetQty = parseFloat(plan['Целево количество']) || 0;
-          planNames[planId] = plan['Вътрешно име'] || (plan['Месец'] + ' ' + plan['Година']);
+          let monthYear = (plan['Месец'] && plan['Година']) ? (plan['Месец'] + ' ' + plan['Година']) : '';
+          planNames[planId] = monthYear ? `${monthYear} (${plan['Вътрешно име']})` : plan['Вътрешно име'];
           
           if (nomRes.data) {
               let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === rootItem);
