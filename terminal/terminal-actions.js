@@ -418,18 +418,7 @@ function appendMaterialConsumptionInserts(taskData, val, startedAt, insertsArray
         }
     }
 
-    if (String(taskData.name).includes("Роторен")) {
-        insertsArray.push({
-            "ID План": "DEBUG-BOM",
-            "ID Детайл": "N:" + normName + " CLen:" + debugChildrenLen + " RLen:" + cRoutes.length + " LOp:" + isLastOp,
-            "Оператор": "СИСТЕМА (Дъгбаг)",
-            "Количество": 1,
-            "Операция": "DEBUG",
-            "Статус": "Отчетено",
-            "Дата": new Date().toISOString(),
-            "Време Старт": startedAt
-        });
-    }
+    // Debug info removed as issue is resolved
 }
 
 async function executeSkladUpdates(insertsArray) {
