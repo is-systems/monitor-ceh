@@ -320,7 +320,10 @@ async function loadTasks(isSilent = false) {
                       }
                       let explicitNet = Math.max(0, explicitGross - totalExplicitSubsequentScrap);
                       
-                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitNet - consumedByParents[code]);
+                      let explicitUnconsumed = Math.max(0, explicitNet - consumedByParents[code]);
+                      explicitUnconsumed = Math.min(explicitUnconsumed, availableForThisPlan);
+                      
+                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitUnconsumed);
                       if (doneQty < 0) doneQty = 0;
                       
                       alreadyAllocated[opKey] = usedSoFar + Math.max(allocatedFromWh, explicitNet);
@@ -339,9 +342,7 @@ async function loadTasks(isSilent = false) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
                       let prevDoneQty = planOpDoneQty[idx - 1] || 0;
-                      let planKey = isBuffer ? opKey : (opKey + '_' + pId);
-                      let currentScrap = explicitPlanScrapped[planKey] || 0;
-                      maxAllowed = Math.max(0, prevDoneQty - doneQty - currentScrap);
+                      maxAllowed = Math.max(0, prevDoneQty - doneQty);
                       displayMaxAllowed = maxAllowed;
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
                   } else {
