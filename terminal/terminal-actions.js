@@ -62,31 +62,14 @@ function addLogToHistory(type, qty, taskId) {
 async function validateRealTimeStock(taskData, val) {
     if (!taskData.hasLimit) return { ok: true };
     
-    const [skladRes, otchetiRes] = await Promise.all([
-        client.from('sklad').select('*'),
-        client.from('otcheti').select('*')
-    ]);
-    if (skladRes.error || otchetiRes.error) return { ok: true }; 
-
-    let oldTasks = globalTasks;
-    let oldSklad = globalSkladData;
-    let oldOtcheti = globalOtchetiData;
-
-    globalSkladData = skladRes.data || [];
-    globalOtchetiData = otchetiRes.data || [];
-    
-    globalOtchetiData.sort((a,b) => {
-        return new Date(a['Време Старт'] || a['Дата']).getTime() - new Date(b['Време Старт'] || b['Дата']).getTime();
-    });
-
-    buildTasksData(globalPlanData);
+    try {
+        await loadTasks(true);
+    } catch (err) {
+        console.error("Грешка при фонова валидация:", err);
+    }
 
     let updatedTask = globalTasks.find(x => x.id === taskData.id);
     let allowedNow = updatedTask ? updatedTask.realMaxAllowed : 0;
-
-    globalTasks = oldTasks;
-    globalSkladData = oldSklad;
-    globalOtchetiData = oldOtcheti;
 
     if (val > allowedNow) {
         return { ok: false, maxAllowed: allowedNow };
