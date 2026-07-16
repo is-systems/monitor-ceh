@@ -118,6 +118,7 @@ async function loadTasks(isSilent = false) {
       let grossCompletedOps = {};
       let explicitPlanGrossCompleted = {};
       let explicitPlanScrapped = {};
+      let savedQty = {};
 
       let sortedReports = reportsRes.data.map(r => {
           r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
@@ -139,8 +140,11 @@ async function loadTasks(isSilent = false) {
               if (pId) explicitPlanScrapped[planKey] = (explicitPlanScrapped[planKey] || 0) + qty;
           } 
           else if (r['Статус'] === 'Отчетено') { 
+              if (op === 'възстановен') {
+                  savedQty[code] = (savedQty[code] || 0) + qty;
+              }
               completedOps[key] = (completedOps[key]||0) + qty; 
-              if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+              if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
                   grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
                   if (pId) explicitPlanGrossCompleted[planKey] = (explicitPlanGrossCompleted[planKey] || 0) + qty;
               }
@@ -300,7 +304,7 @@ async function loadTasks(isSilent = false) {
                       let displayName = String(route['Код на детайла']).trim();
                       
                       let globalGross = grossTrueDoneOps[opKey] || 0;
-                      let globalNet = Math.max(0, globalGross - consumedByShipped);
+                      let globalNet = Math.max(0, globalGross + (savedQty[code] || 0) - consumedByShipped);
                       
                       let usedSoFar = alreadyAllocated[opKey] || 0;
                       let availableForThisPlan = Math.max(0, globalNet - usedSoFar);
@@ -365,7 +369,7 @@ async function loadTasks(isSilent = false) {
                                   }
                               }
                               let whStock = getSkladQty(cCode);
-                              let cFree = Math.max(0, (childGrossDone + whStock) - childConsumed);
+                              let cFree = Math.max(0, (childGrossDone + (savedQty[cCode] || 0) + whStock) - childConsumed);
                               let usedSoFar = alreadyAllocatedWarehouse[cCode] || 0;
                               let availableNow = Math.max(0, cFree - usedSoFar);
                               let sets = Math.floor(availableNow / multiplier);

@@ -413,22 +413,41 @@ function appendMaterialConsumptionInserts(taskData, val, startedAt, insertsArray
 
 async function executeSkladUpdates(insertsArray) {
     if (!navigator.onLine) return;
-    let consumedMaterials = insertsArray.filter(ins => ins['Оператор'] === 'СИСТЕМА (Изписан материал)');
-    if (consumedMaterials.length === 0) return;
+    let relevantMaterials = insertsArray.filter(ins => ins['Оператор'] === 'СИСТЕМА (Изписан материал)' || ins['Оператор'] === 'СИСТЕМА (Спасен)');
+    if (relevantMaterials.length === 0) return;
     try {
         const { data: allSklad } = await client.from('sklad').select('Изразходено, Остатък, "ID Детайл"');
         if (!allSklad) return;
-        for (let ins of consumedMaterials) {
+        
+        let updates = {};
+        for (let ins of relevantMaterials) {
             let normChild = _norm(ins['ID Детайл']);
-            let resData = allSklad.find(s => _norm(s['ID Детайл']) === normChild);
-            if (resData) {
-                let newConsumed = (parseFloat(resData['Изразходено']) || 0) + parseFloat(ins['Количество']);
-                let newRem = (parseFloat(resData['Остатък']) || 0) - parseFloat(ins['Количество']);
-                await client.from('sklad').update({
-                    'Изразходено': newConsumed,
-                    'Остатък': newRem
-                }).eq('ID Детайл', resData['ID Детайл']);
+            if (!updates[normChild]) {
+                let resData = allSklad.find(s => _norm(s['ID Детайл']) === normChild);
+                if (resData) {
+                    updates[normChild] = {
+                        'ID Детайл': resData['ID Детайл'],
+                        'Изразходено': parseFloat(resData['Изразходено']) || 0,
+                        'Остатък': parseFloat(resData['Остатък']) || 0
+                    };
+                }
             }
+            if (updates[normChild]) {
+                if (ins['Оператор'] === 'СИСТЕМА (Изписан материал)') {
+                    updates[normChild]['Изразходено'] += parseFloat(ins['Количество']);
+                    updates[normChild]['Остатък'] -= parseFloat(ins['Количество']);
+                } else if (ins['Оператор'] === 'СИСТЕМА (Спасен)') {
+                    updates[normChild]['Изразходено'] -= parseFloat(ins['Количество']);
+                    updates[normChild]['Остатък'] += parseFloat(ins['Количество']);
+                }
+            }
+        }
+        
+        for (let key in updates) {
+            await client.from('sklad').update({
+                'Изразходено': updates[key]['Изразходено'],
+                'Остатък': updates[key]['Остатък']
+            }).eq('ID Детайл', updates[key]['ID Детайл']);
         }
     } catch (e) {
         console.error("Грешка при изписване от склад:", e);

@@ -331,10 +331,12 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let scrappedOps = {};
     let grossCompletedOps = {};
 
+    let savedQty = {};
+    
     sortedReports.forEach(r => {
         let code = String(r['ID Детайл']).trim().toLowerCase();
         let op = String(r['Операция']).trim().toLowerCase();
-        let key = code + '_' + op;
+        let key = code + '_' + String(r['Операция']).trim().toLowerCase();
         let qty = parseFloat(r['Количество']) || 0;
         
         if (r['Статус'] === 'Брак') {
@@ -347,8 +349,11 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             }
         } 
         else if (r['Статус'] === 'Отчетено') {
+            if (op === 'възстановен') {
+                savedQty[code] = (savedQty[code] || 0) + qty;
+            }
             completedOps[key] = (completedOps[key] || 0) + qty;
-            if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
+            if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
                 grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
             }
             opStatusMap[key] = 'Отчетено';
@@ -378,8 +383,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         }
         
         let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
-        trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
-        grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+        trueDoneOps[lastOpKey] = (completedOps[lastOpKey] || 0) + (savedQty[code] || 0);
+        grossTrueDoneOps[lastOpKey] = (grossCompletedOps[lastOpKey] || 0) + (savedQty[code] || 0);
         
         for (let i = routes.length - 2; i >= 0; i--) {
             let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
