@@ -82,6 +82,7 @@ async function loadTasks(isSilent = false) {
       let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
       let planRoots = {}; 
+      let planNames = {};
       let groupEarliestId = {};
       let planNameToId = {};
       plansRes.data.forEach(plan => {
