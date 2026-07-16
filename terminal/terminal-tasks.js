@@ -350,11 +350,11 @@ async function loadTasks(isSilent = false) {
                       }
                   }
 
+                  let isTaken = takenOps[opKey] === true;
                   if (maxAllowed < 0) maxAllowed = 0; let isBlocked = hasLimit && maxAllowed <= 0; let machineName = route['Машина'] || '';
-                  if (currentMachine && currentMachine.trim() !== "") { let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim()); let match = selectedMachines.some(m => machineName.toLowerCase().includes(m)); if (!match) return; }
+                  if (currentMachine && currentMachine.trim() !== "" && !isTaken) { let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim()); let match = selectedMachines.some(m => machineName.toLowerCase().includes(m)); if (!match) return; }
 
                   blockingReasons = [...new Set(blockingReasons)];
-                  let isTaken = takenOps[opKey] === true;
                   let safeIdBase = (pId + '_' + code + '_n' + nodeIndex + '_op' + idx).replace(/[^a-zA-Z0-9а-яА-Я_]/g, '_');
                   let taskDeficit = isBuffer ? Math.max(0, opGreenTarget - doneQty) : Math.max(0, opBlueTarget - doneQty);
                   
@@ -414,7 +414,7 @@ function renderTasks(tasks) {
   let hasBlueCards = tasks.some(t => !t.isGreenCard);
   let visibleTasks = tasks;
   if (hasBlueCards) {
-      visibleTasks = tasks.filter(t => !t.isGreenCard);
+      visibleTasks = tasks.filter(t => !t.isGreenCard || t.isTaken);
   }
 
   let filteredTasks = visibleTasks;
