@@ -82,8 +82,8 @@ async function loadTasks(isSilent = false) {
       let getSkladQty = (code) => { let c = code.toLowerCase(); let item = skladData.find(s => String(s['ID Детайл']).trim().toLowerCase() === c); return item ? (parseFloat(item['Остатък']) || 0) : 0; };
 
       let planRoots = {}; 
-      let planNames = {};
       let groupEarliestId = {};
+      let planNameToId = {};
       plansRes.data.forEach(plan => {
           if (String(plan['Статус']).trim() === 'Изпратен') return;
           let planId = String(plan.id).trim(); 
@@ -96,6 +96,9 @@ async function loadTasks(isSilent = false) {
           if (!groupEarliestId[groupKey] || parseInt(planId) < groupEarliestId[groupKey]) {
               groupEarliestId[groupKey] = parseInt(planId);
           }
+          
+          if (plan['Вътрешно име']) planNameToId[String(plan['Вътрешно име']).trim()] = planId;
+          planNameToId[planId] = planId;
           
           planNames[groupKey] = monthYear ? monthYear : plan['Вътрешно име'];
           
@@ -112,6 +115,7 @@ async function loadTasks(isSilent = false) {
       let completedOps = {};
       let scrappedOps = {};
       let grossCompletedOps = {};
+      let explicitPlanGrossCompleted = {};
 
       let sortedReports = reportsRes.data.map(r => {
           r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
@@ -124,11 +128,16 @@ async function loadTasks(isSilent = false) {
           let key = code + '_' + op;
           let qty = parseFloat(r['Количество']) || 0;
           
+          let rawPId = String(r['ID План'] || '').trim();
+          let pId = planNameToId[rawPId] || rawPId;
+          let planKey = pId ? (key + '_' + pId) : key;
+          
           if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
           else if (r['Статус'] === 'Отчетено') { 
               completedOps[key] = (completedOps[key]||0) + qty; 
               if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
                   grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
+                  if (pId) explicitPlanGrossCompleted[planKey] = (explicitPlanGrossCompleted[planKey] || 0) + qty;
               }
           }
       });
@@ -294,9 +303,13 @@ async function loadTasks(isSilent = false) {
                       let planTarget = Math.max(opBlueTarget, opGreenTarget);
                       let deficit = Math.max(0, planTarget - consumedByParents[code]);
                       let allocatedFromWh = Math.min(deficit, availableForThisPlan);
-                      let doneQty = consumedByParents[code] + allocatedFromWh;
                       
-                      alreadyAllocated[opKey] = usedSoFar + allocatedFromWh;
+                      let planKey = isBuffer ? opKey : (opKey + '_' + pId);
+                      let explicitGross = explicitPlanGrossCompleted[planKey] || 0;
+                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitGross - consumedByParents[code]);
+                      if (doneQty < 0) doneQty = 0;
+                      
+                      alreadyAllocated[opKey] = usedSoFar + Math.max(allocatedFromWh, explicitGross);
                       if (idx === 0) finalDoneQtyForChildren = doneQty;
                       
                       planOpDoneQty[idx] = doneQty;
