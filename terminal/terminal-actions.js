@@ -148,8 +148,13 @@ async function finishTask(taskId, btn) {
 
           let startedAt = window['startTime_' + taskId] || new Date().toISOString();
           let inserts = [{ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
+          
+          if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
+
           const { error } = await client.from('otcheti').insert(inserts);
           if(error) throw error;
+          
+          if (typeof executeSkladUpdates === 'function') await executeSkladUpdates(inserts);
           
           addLogToHistory('ГОТОВО', val, taskId); activeTaskId = null; 
           Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
@@ -157,6 +162,9 @@ async function finishTask(taskId, btn) {
           if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('fetch')) {
               let startedAt = window['startTime_' + taskId] || new Date().toISOString();
               let inserts = [{ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
+              
+              if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
+              
               if (taskData.hasLimit) { taskData.maxAllowed -= val; if (taskData.maxAllowed < 0) taskData.maxAllowed = 0; }
               saveToOfflineQueue(inserts, taskId, 'Отчетени: ' + val + ' бр.');
           } else {
@@ -234,8 +242,12 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
             }
         });
 
+        if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
+
         const { error } = await client.from('otcheti').insert(inserts);
         if (error) throw error; 
+        
+        if (typeof executeSkladUpdates === 'function') await executeSkladUpdates(inserts);
         
         addLogToHistory('БРАК', val, taskData.id); Swal.close(); activeTaskId = null; loadTasks(); 
     } catch(err) { 
@@ -251,6 +263,9 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
                     inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
                 }
             });
+            
+            if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
+            
             if (taskData.hasLimit) { taskData.maxAllowed -= val; if (taskData.maxAllowed < 0) taskData.maxAllowed = 0; }
             saveToOfflineQueue(inserts, taskData.id, 'БРАК: ' + val + ' бр.');
         } else {
@@ -329,6 +344,7 @@ async function syncOfflineReports() {
                 const { error: insErr } = await client.from('otcheti').insert(item.inserts);
                 if (insErr) throw insErr;
                 hasSynced = true;
+                if (typeof executeSkladUpdates === 'function') await executeSkladUpdates(item.inserts);
             } catch (err) {
                 console.error("Грешка при офлайн синхронизация", err);
                 success = false;
@@ -348,3 +364,90 @@ async function syncOfflineReports() {
 
 window.addEventListener('online', syncOfflineReports);
 setTimeout(syncOfflineReports, 2000);
+
+// --- MATERIAL DEDUCTION LOGIC ---
+function _norm(name) {
+    let n = String(name || '').trim().toLowerCase();
+    n = n.replace(/пакет/g, 'пак');
+    n = n.replace(/\./g, '');
+    n = n.replace(/\s+/g, '');
+    const map = {'a':'а', 'e':'е', 'o':'о', 'p':'р', 'c':'с', 'x':'х', 'y':'у'};
+    for (let k in map) {
+        n = n.split(k).join(map[k]);
+    }
+    return n;
+}
+
+function appendMaterialConsumptionInserts(taskData, val, startedAt, insertsArray) {
+    let normName = _norm(taskData.name);
+    let lcName = String(taskData.name).trim().toLowerCase();
+    let cRoutes = globalRoutesByDetail[lcName] || globalRoutesByDetail[Object.keys(globalRoutesByDetail).find(k => _norm(k) === normName)] || [];
+    let isLastOp = false;
+    
+    if (cRoutes.length > 0) {
+        let lastOp = cRoutes[cRoutes.length - 1];
+        if (_norm(lastOp['Име на операция']) === _norm(taskData.op)) {
+            isLastOp = true;
+        }
+    } else {
+        isLastOp = true;
+    }
+
+    let debugChildrenLen = -1;
+
+    if (isLastOp) {
+        let children = globalBomData.filter(b => _norm(b['ID Родител']) === normName);
+        debugChildrenLen = children.length;
+        for (let child of children) {
+            let childName = String(child['ID Компонент']).trim();
+            let multiplier = parseFloat(child['Количество']) || 1;
+            let consumedQty = val * multiplier;
+            
+            if (!insertsArray.find(i => i['ID Детайл'] === childName && i['Оператор'] === "СИСТЕМА (Изписан материал)")) {
+                insertsArray.push({
+                    "ID План": taskData.plan_id,
+                    "ID Детайл": childName,
+                    "Оператор": "СИСТЕМА (Изписан материал)",
+                    "Количество": consumedQty,
+                    "Операция": "Вложен в " + taskData.name,
+                    "Статус": "Отчетено",
+                    "Дата": new Date().toISOString(),
+                    "Време Старт": startedAt
+                });
+            }
+        }
+    }
+
+    if (String(taskData.name).includes("Роторен")) {
+        insertsArray.push({
+            "ID План": "DEBUG-BOM",
+            "ID Детайл": "N:" + normName + " CLen:" + debugChildrenLen + " RLen:" + cRoutes.length + " LOp:" + isLastOp,
+            "Оператор": "СИСТЕМА (Дъгбаг)",
+            "Количество": 1,
+            "Операция": "DEBUG",
+            "Статус": "Отчетено",
+            "Дата": new Date().toISOString(),
+            "Време Старт": startedAt
+        });
+    }
+}
+
+async function executeSkladUpdates(insertsArray) {
+    if (!navigator.onLine) return;
+    let consumedMaterials = insertsArray.filter(ins => ins['Оператор'] === 'СИСТЕМА (Изписан материал)');
+    if (consumedMaterials.length === 0) return;
+    try {
+        const { data: allSklad } = await client.from('sklad').select('Изразходено, "ID Детайл"');
+        if (!allSklad) return;
+        for (let ins of consumedMaterials) {
+            let normChild = _norm(ins['ID Детайл']);
+            let resData = allSklad.find(s => _norm(s['ID Детайл']) === normChild);
+            if (resData) {
+                let newConsumed = (parseFloat(resData['Изразходено']) || 0) + parseFloat(ins['Количество']);
+                await client.from('sklad').update({'Изразходено': newConsumed}).eq('ID Детайл', resData['ID Детайл']);
+            }
+        }
+    } catch (e) {
+        console.error("Грешка при изписване от склад:", e);
+    }
+}
