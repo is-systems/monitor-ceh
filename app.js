@@ -168,7 +168,7 @@ async function loadData() {
         }
 
         const { mergedNodes, connections, explicitPlanItems } = buildBOMTree(dynamicData.plansData, dynamicData.skladData);
-        const masterData = categorizeParts(mergedNodes, dynamicData.reportsData, explicitPlanItems, connections);
+        const masterData = categorizeParts(mergedNodes, dynamicData.reportsData, explicitPlanItems, connections, dynamicData.plansData);
 
         drawDashboard(JSON.stringify({ nodes: masterData, connections: connections }));
 
@@ -310,7 +310,15 @@ function buildBOMTree(plansData, skladData) {
     return { mergedNodes, connections, explicitPlanItems };
 }
 
-function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connections) {
+function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connections, plansData) {
+    let planNameToId = {};
+    if (plansData) {
+        plansData.forEach(p => {
+            if (p['Вътрешно име']) planNameToId[String(p['Вътрешно име']).trim()] = String(p.id);
+            planNameToId[String(p.id)] = String(p.id);
+        });
+    }
+
     let completedOps = {};
     let opStatusMap = {}; 
     
@@ -331,7 +339,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         
         if (r['Статус'] === 'Брак') {
             scrappedOps[key] = (scrappedOps[key] || 0) + qty;
-            let pId = String(r['ID План'] || '').trim();
+            let rawPId = String(r['ID План'] || '').trim();
+            let pId = planNameToId[rawPId] || rawPId;
             if (pId) {
                 let planKey = key + '_' + pId;
                 scrappedOps[planKey] = (scrappedOps[planKey] || 0) + qty;
