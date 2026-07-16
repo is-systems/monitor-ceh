@@ -331,6 +331,11 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         
         if (r['Статус'] === 'Брак') {
             scrappedOps[key] = (scrappedOps[key] || 0) + qty;
+            let pId = String(r['ID План'] || '').trim();
+            if (pId) {
+                let planKey = key + '_' + pId;
+                scrappedOps[planKey] = (scrappedOps[planKey] || 0) + qty;
+            }
         } 
         else if (r['Статус'] === 'Отчетено') {
             completedOps[key] = (completedOps[key] || 0) + qty;
@@ -501,7 +506,10 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 else if (doneQty > 0) opState = 'blue';
                 else if (latestStatus === 'Започната') opState = 'blue_0';
                 
-                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrappedOps[opKey] || 0 }); 
+                let pIdStr = String(n.planId || '').trim();
+                let planOpKey = pIdStr ? (opKey + '_' + pIdStr) : opKey;
+                
+                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrappedOps[planOpKey] || 0 }); 
                 
                 if (idx === 0) finalDoneQtyForChildren = doneQty; 
             });

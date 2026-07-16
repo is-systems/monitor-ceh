@@ -307,18 +307,20 @@ async function loadTasks(isSilent = false) {
                           if (doneQty >= opBlueTarget) return;
                       }
                   
-                  let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; 
+                  let maxAllowed = 0; let hasLimit = true; let blockingReasons = []; let displayMaxAllowed = 0;
                   if (idx > 0) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
                       let prevDoneQty = planOpDoneQty[idx - 1] || 0;
                       maxAllowed = Math.max(0, prevDoneQty - doneQty);
+                      displayMaxAllowed = maxAllowed;
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
                   } else {
                       let children = globalBomData.filter(b => String(b['ID Родител']).trim().toLowerCase() === code);
-                      if (children.length === 0) { hasLimit = false; maxAllowed = Infinity; } 
+                      if (children.length === 0) { hasLimit = false; maxAllowed = Infinity; displayMaxAllowed = Infinity; } 
                       else {
                           let minSets = Infinity;
+                          let rawMinSets = Infinity;
                           children.forEach(child => {
                               let cCode = String(child['ID Компонент']).trim().toLowerCase(); 
                               let multiplier = parseFloat(child['Количество']) || 1;
@@ -337,9 +339,12 @@ async function loadTasks(isSilent = false) {
                               let usedSoFar = alreadyAllocatedWarehouse[cCode] || 0;
                               let availableNow = Math.max(0, cFree - usedSoFar);
                               let sets = Math.floor(availableNow / multiplier);
+                              let rawSets = Math.floor(cFree / multiplier);
                               if (sets < minSets) { minSets = sets; blockingReasons.push(`${cCode} (${availableNow} налични)`); }
+                              if (rawSets < rawMinSets) { rawMinSets = rawSets; }
                           });
                           maxAllowed = minSets;
+                          displayMaxAllowed = rawMinSets;
                           if (maxAllowed === Infinity) { hasLimit = false; } 
                           if (maxAllowed <= 0 && blockingReasons.length > 0) blockingReasons.push(`Липсващи компоненти`);
                       }
@@ -375,7 +380,7 @@ async function loadTasks(isSilent = false) {
                         name: displayName, internalName: namesMap[code] || '', op: displayOpName, opNum: parseInt(route['№ Операция']) || 0, next_op: idx < routes.length - 1 ? String(routes[idx+1]['Име на операция']).trim() : "Готово", 
                         machine: machineName, drawing_link: route['Линк към чертеж'], sop_link: route['Линк към СОП'], desc: route['Описание'], 
                         type: idx === routes.length - 1 ? "ЗЕЛЕНА" : "СИНЯ", 
-                        defaultQty: targetInput, maxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, 
+                        defaultQty: targetInput, maxAllowed: displayMaxAllowed, realMaxAllowed: maxAllowed, hasLimit: hasLimit, isBlocked: isBlocked, blockingReasons: blockingReasons, 
                         totalNeed: isBuffer ? opGreenTarget : opBlueTarget, pureQty: isBuffer ? opGreenTarget : opBlueTarget, 
                         totalDone: doneQty, totalScrapped: 0, isTaken: isTaken, isGreenCard: isBuffer,
                         globalGrossAtLoad: globalGross, globalScrapAtLoad: (scrappedOps[opKey] || 0)

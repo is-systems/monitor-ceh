@@ -59,6 +59,41 @@ function addLogToHistory(type, qty, taskId) {
    localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name }); if (localHistoryData.length > 6) localHistoryData.pop(); updateHistoryUI();
 }
 
+async function validateRealTimeStock(taskData, val) {
+    if (!taskData.hasLimit) return { ok: true };
+    
+    const [skladRes, otchetiRes] = await Promise.all([
+        client.from('sklad').select('*'),
+        client.from('otcheti').select('*')
+    ]);
+    if (skladRes.error || otchetiRes.error) return { ok: true }; 
+
+    let oldTasks = globalTasks;
+    let oldSklad = globalSkladData;
+    let oldOtcheti = globalOtchetiData;
+
+    globalSkladData = skladRes.data || [];
+    globalOtchetiData = otchetiRes.data || [];
+    
+    globalOtchetiData.sort((a,b) => {
+        return new Date(a['Време Старт'] || a['Дата']).getTime() - new Date(b['Време Старт'] || b['Дата']).getTime();
+    });
+
+    buildTasksData(globalPlanData);
+
+    let updatedTask = globalTasks.find(x => x.id === taskData.id);
+    let allowedNow = updatedTask ? updatedTask.realMaxAllowed : 0;
+
+    globalTasks = oldTasks;
+    globalSkladData = oldSklad;
+    globalOtchetiData = oldOtcheti;
+
+    if (val > allowedNow) {
+        return { ok: false, maxAllowed: allowedNow };
+    }
+    return { ok: true, maxAllowed: allowedNow };
+}
+
 function claimCurrentTaskDOM(taskId) {
   if (navigator.vibrate) navigator.vibrate(50); activeTaskId = taskId; 
   document.querySelectorAll('.card').forEach(c => { if (c.id !== 'card_' + taskId) c.style.display = 'none'; });
@@ -121,28 +156,14 @@ async function finishTask(taskId, btn) {
       btn.disabled = true; btn.innerHTML = "ЗАПИС..."; Swal.fire({ title: 'Проверка и Отчитане...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
       try {
           if (taskData.hasLimit) {
-              const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество, Оператор, Статус').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
-              if (repErr) throw repErr;
-              let currentConsumed = 0;
-              currentReports.forEach(r => { 
-                  let qty = parseFloat(r['Количество']) || 0;
-                  if (r['Статус'] === 'Брак') { currentConsumed += qty; }
-                  else if (r['Статус'] === 'Отчетено') {
-                      if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
-                          currentConsumed += qty; 
-                      }
+              let validation = await validateRealTimeStock(taskData, val);
+              if (!validation.ok) {
+                  if (validation.maxAllowed <= 0) {
+                      await forceCancelTask(taskId, taskData, "Някой друг вече е отчел всички бройки. Задачата се приключва автоматично.");
+                      return;
+                  } else {
+                      throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${validation.maxAllowed} бр.`);
                   }
-              });
-              
-              let originalConsumed = (taskData.globalGrossAtLoad || 0) + (taskData.globalScrapAtLoad || 0);
-              let diff = currentConsumed - originalConsumed;
-              let realMaxAllowed = taskData.maxAllowed - diff;
-              
-              if (realMaxAllowed <= 0) {
-                  await forceCancelTask(taskId, taskData, "Някой друг вече е отчел всички бройки. Задачата се приключва автоматично.");
-                  return;
-              } else if (val > realMaxAllowed) {
-                  throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${realMaxAllowed} бр.`);
               }
           }
 
@@ -204,28 +225,14 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
     Swal.fire({ title: 'Проверка и Отразяване на брака...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
     try {
         if (taskData.hasLimit) {
-            const { data: currentReports, error: repErr } = await client.from('otcheti').select('Количество, Оператор, Статус').eq('ID Детайл', taskData.name).eq('Операция', taskData.op).in('Статус', ['Отчетено', 'Брак']);
-            if (repErr) throw repErr;
-            let currentConsumed = 0;
-            currentReports.forEach(r => { 
-                let qty = parseFloat(r['Количество']) || 0;
-                if (r['Статус'] === 'Брак') { currentConsumed += qty; }
-                else if (r['Статус'] === 'Отчетено') {
-                    if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
-                        currentConsumed += qty; 
-                    }
+            let validation = await validateRealTimeStock(taskData, val);
+            if (!validation.ok) {
+                if (validation.maxAllowed <= 0) {
+                    await forceCancelTask(taskData.id, taskData, "Някой друг вече е отчел всички бройки. Задачата се приключва автоматично.");
+                    return;
+                } else {
+                    throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${validation.maxAllowed} бр.`);
                 }
-            });
-            
-            let originalConsumed = (taskData.globalGrossAtLoad || 0) + (taskData.globalScrapAtLoad || 0);
-            let diff = currentConsumed - originalConsumed;
-            let realMaxAllowed = taskData.maxAllowed - diff;
-            
-            if (realMaxAllowed <= 0) {
-                await forceCancelTask(taskData.id, taskData, "Някой друг вече е отчел всички бройки. Задачата се приключва автоматично.");
-                return;
-            } else if (val > realMaxAllowed) {
-                throw new Error(`Невъзможно! Докато вие работехте, друг е отчел бройки. Оставащ наличен материал за тази операция: ${realMaxAllowed} бр.`);
             }
         }
 
