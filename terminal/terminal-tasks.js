@@ -117,6 +117,7 @@ async function loadTasks(isSilent = false) {
       let scrappedOps = {};
       let grossCompletedOps = {};
       let explicitPlanGrossCompleted = {};
+      let explicitPlanScrapped = {};
 
       let sortedReports = reportsRes.data.map(r => {
           r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
@@ -133,7 +134,10 @@ async function loadTasks(isSilent = false) {
           let pId = planNameToId[rawPId] || rawPId;
           let planKey = pId ? (key + '_' + pId) : key;
           
-          if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
+          if (r['Статус'] === 'Брак') { 
+              scrappedOps[key] = (scrappedOps[key]||0) + qty; 
+              if (pId) explicitPlanScrapped[planKey] = (explicitPlanScrapped[planKey] || 0) + qty;
+          } 
           else if (r['Статус'] === 'Отчетено') { 
               completedOps[key] = (completedOps[key]||0) + qty; 
               if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) { 
@@ -307,10 +311,19 @@ async function loadTasks(isSilent = false) {
                       
                       let planKey = isBuffer ? opKey : (opKey + '_' + pId);
                       let explicitGross = explicitPlanGrossCompleted[planKey] || 0;
-                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitGross - consumedByParents[code]);
+                      
+                      let totalExplicitSubsequentScrap = 0;
+                      for (let j = idx + 1; j < routes.length; j++) {
+                          let nextOpKey = code + '_' + String(routes[j]['Име на операция']).trim().toLowerCase();
+                          let nextPlanKey = isBuffer ? nextOpKey : (nextOpKey + '_' + pId);
+                          totalExplicitSubsequentScrap += (explicitPlanScrapped[nextPlanKey] || 0);
+                      }
+                      let explicitNet = Math.max(0, explicitGross - totalExplicitSubsequentScrap);
+                      
+                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitNet - consumedByParents[code]);
                       if (doneQty < 0) doneQty = 0;
                       
-                      alreadyAllocated[opKey] = usedSoFar + Math.max(allocatedFromWh, explicitGross);
+                      alreadyAllocated[opKey] = usedSoFar + Math.max(allocatedFromWh, explicitNet);
                       if (idx === 0) finalDoneQtyForChildren = doneQty;
                       
                       planOpDoneQty[idx] = doneQty;
@@ -326,7 +339,9 @@ async function loadTasks(isSilent = false) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
                       let prevDoneQty = planOpDoneQty[idx - 1] || 0;
-                      maxAllowed = Math.max(0, prevDoneQty - doneQty);
+                      let planKey = isBuffer ? opKey : (opKey + '_' + pId);
+                      let currentScrap = explicitPlanScrapped[planKey] || 0;
+                      maxAllowed = Math.max(0, prevDoneQty - doneQty - currentScrap);
                       displayMaxAllowed = maxAllowed;
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
                   } else {
