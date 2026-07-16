@@ -122,7 +122,7 @@ async function finishTask(taskId, btn) {
   let startTime = window['startTime_' + taskId];
   if (startTime) {
       let diffSeconds = (new Date() - new Date(startTime)) / 1000;
-      if (diffSeconds < 30) {
+      if (diffSeconds < 5) {
           Swal.fire('⚡ Светкавица!', 'Но все пак нека наистина направим детайлите първо 😊', 'warning');
           return;
       }
