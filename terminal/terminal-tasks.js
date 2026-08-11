@@ -207,8 +207,8 @@ async function loadTasks(isSilent = false) {
                   let parentRoutes = globalRoutesByDetail[parentCode];
                   let parentConsumed = 0;
                   if (parentRoutes && parentRoutes.length > 0) {
-                      let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
-                      parentConsumed = grossStartedOps[firstOpKey] || 0;
+                      let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                      parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
                   } else {
                       parentConsumed = getTotalShipped(parentCode, new Set(visited));
                   }
@@ -244,6 +244,7 @@ async function loadTasks(isSilent = false) {
       let alreadyAllocatedWarehouse = {};
       
       planIdsToProcess.forEach(pId => {
+          let tempAllocatedWarehouse = {};
           let isBuffer = pId === 'NONE';
           let deficitBom = {};
           
@@ -403,7 +404,7 @@ async function loadTasks(isSilent = false) {
                         children.forEach(child => {
                             let cCode = String(child['ID Компонент']).trim().toLowerCase();
                             let multiplier = parseFloat(child['Количество']) || 1;
-                            alreadyAllocatedWarehouse[cCode] = (alreadyAllocatedWarehouse[cCode] || 0) + (targetInput * multiplier);
+                            tempAllocatedWarehouse[cCode] = (tempAllocatedWarehouse[cCode] || 0) + (targetInput * multiplier);
                         });
                     }
                     
@@ -428,6 +429,9 @@ async function loadTasks(isSilent = false) {
                 let multiplier = parseFloat(c['Количество']) || 1;
                 consumedByParents[cCode] = (consumedByParents[cCode] || 0) + (finalDoneQtyForChildren * multiplier);
             });
+        });
+        Object.keys(tempAllocatedWarehouse).forEach(k => {
+            alreadyAllocatedWarehouse[k] = (alreadyAllocatedWarehouse[k] || 0) + tempAllocatedWarehouse[k];
         });
       });
       

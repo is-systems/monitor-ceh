@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Проверка на минуси (Само за четене)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
+        #log { margin-top: 20px; padding: 10px; background: white; border: 1px solid #ccc; height: 500px; overflow-y: auto; font-family: monospace; }
+        .minus-row { color: #dc2626; font-weight: bold; font-size: 1.1em; }
+        .ok-row { color: #16a34a; }
+        button { padding: 10px 20px; font-size: 16px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Проверка на наличности (Минуси) - Само за четене</h1>
+    <p>Този скрипт зарежда данните от отчетите и маршрутните карти, и изчислява дали има детайли с отрицателна складова наличност (минуси), породени от отчетени родителски детайли.</p>
+    
+    <button id="btnCheck" onclick="runCheck()">Стартирай проверка</button>
+    
+    <div id="log"></div>
+
+    <script>
+        function log(msg, isMinus = false, isOk = false) {
+            let el = document.getElementById('log');
+            let div = document.createElement('div');
+            div.innerText = msg;
+            if (isMinus) div.className = 'minus-row';
+            if (isOk) div.className = 'ok-row';
+            el.appendChild(div);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        async function runCheck() {
+            const btn = document.getElementById('btnCheck');
+            btn.disabled = true;
+            btn.innerText = 'Зареждане...';
+            document.getElementById('log').innerHTML = '';
+            
+            log('Свързване с базата...');
+            
+            const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+            const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            try {
+                log('Изтегляне на BOM...');
+                let {data: bomData} = await client.from('bom').select('*');
+                let bom = bomData || [];
+                
+                log('Изтегляне на Маршрутни карти...');
+                let {data: routesData} = await client.from('маршрутни_карти').select('*');
+                
+                log('Изтегляне на Отчети...');
+                let allOtcheti = [];
+                let step = 1000;
+                let from = 0;
+                while (true) {
+                    let {data, error} = await client.from('otcheti').select('*').range(from, from + step - 1);
+                    if (error) throw error;
+                    if (!data || data.length === 0) break;
+                    allOtcheti = allOtcheti.concat(data);
+                    from += step;
+                }
+                
+                log('Обработка на маршрутните карти...');
+                let routesByDetail = {};
+                if(routesData) {
+                    routesData.forEach(r => {
+                        let code = String(r['Код на детайла']||'').trim().toLowerCase();
+                        if(!routesByDetail[code]) routesByDetail[code] = [];
+                        routesByDetail[code].push(r);
+                    });
+                }
+                Object.keys(routesByDetail).forEach(c => {
+                    routesByDetail[c].sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
+                });
+                
+                log('Изчисляване на отчетени операции...');
+                let completedOps = {};
+                let grossCompletedOps = {};
+                let scrappedOps = {};
+                let savedQty = {};
+                
+                let sortedReports = allOtcheti.sort((a, b) => new Date(a['Време Край'] || a.created_at) - new Date(b['Време Край'] || b.created_at));
+                
+                sortedReports.forEach(r => {
+                    let code = String(r['ID Детайл']).trim().toLowerCase();
+                    let op = String(r['Операция']).trim().toLowerCase();
+                    let key = code + '_' + op;
+                    let qty = parseFloat(r['Количество']) || 0;
+                    
+                    if (r['Статус'] === 'Брак') {
+                        scrappedOps[key] = (scrappedOps[key] || 0) + qty;
+                    } 
+                    else if (r['Статус'] === 'Отчетено') {
+                        if (op === 'възстановен') savedQty[code] = (savedQty[code] || 0) + qty;
+                        completedOps[key] = (completedOps[key] || 0) + qty;
+                        if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                            grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
+                        }
+                    }
+                });
+                
+                let trueDoneOps = {};
+                let grossTrueDoneOps = {};
+                let shippedQty = {};
+                let grossStartedOps = {}; 
+                
+                Object.keys(routesByDetail).forEach(code => {
+                    let routes = routesByDetail[code];
+                    if(routes.length === 0) return;
+                    
+                    for (let i = routes.length - 2; i >= 0; i--) {
+                        let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                        let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                        let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
+                        grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+                        let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
+                        completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
+                    }
+                    
+                    let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
+                    trueDoneOps[lastOpKey] = (completedOps[lastOpKey] || 0) + (savedQty[code] || 0);
+                    grossTrueDoneOps[lastOpKey] = (grossCompletedOps[lastOpKey] || 0) + (savedQty[code] || 0);
+                    
+                    for (let i = routes.length - 2; i >= 0; i--) {
+                        let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                        let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                        let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
+                        if (bucket < 0) bucket = 0;
+                        grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
+                        let trueBucket = (completedOps[opKey] || 0) - (completedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
+                        if (trueBucket < 0) trueBucket = 0;
+                        trueDoneOps[opKey] = (trueDoneOps[nextOpKey] || 0) + trueBucket;
+                    }
+                    
+                    let firstOpKey = code + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
+                    grossStartedOps[firstOpKey] = (grossCompletedOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
+                    
+                    shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
+                });
+                
+                let totalShippedCache = {};
+                function getTotalShipped(item, visited = new Set()) {
+                    let lc = item.toLowerCase();
+                    if(totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
+                    if(visited.has(lc)) return 0; visited.add(lc);
+                    let direct = shippedQty[lc] || 0; let indirect = 0;
+                    let parents = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
+                    parents.forEach(p => {
+                        let parentCode = String(p['ID Родител']).trim().toLowerCase();
+                        if(parentCode !== lc) {
+                            let parentRoutes = routesByDetail[parentCode];
+                            let parentConsumed = 0;
+                            if (parentRoutes && parentRoutes.length > 0) {
+                                let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
+                                parentConsumed = grossStartedOps[firstOpKey] || 0;
+                            } else {
+                                parentConsumed = getTotalShipped(parentCode, new Set(visited));
+                            }
+                            indirect += parentConsumed * (parseFloat(p['Количество'])||1);
+                        }
+                    });
+                    totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
+                }
+                
+                log('Изчисляване на дефицитите...');
+                
+                let minusesFound = 0;
+                Object.keys(routesByDetail).forEach(code => {
+                    let routes = routesByDetail[code];
+                    if(routes.length === 0) return;
+                    let consumedByShipped = getTotalShipped(code);
+                    
+                    let lastRoute = routes[routes.length - 1];
+                    let opName = String(lastRoute['Име на операция']).trim();
+                    let opKey = code + '_' + opName.toLowerCase();
+                    let myGrossDone = grossTrueDoneOps[opKey] || 0;
+                    
+                    if (myGrossDone < consumedByShipped) {
+                        let deficit = consumedByShipped - myGrossDone;
+                        log(`Намерен дефицит за ${String(lastRoute['Код на детайла']).trim()}: -${deficit} бр.`, true);
+                        minusesFound++;
+                    }
+                });
+                
+                if (minusesFound === 0) {
+                    log('✅ Всичко е точно, няма липсващи полуфабрикати.', false, true);
+                } else {
+                    log(`Общо намерени минуси: ${minusesFound} детайла.`);
+                }
+                
+                btn.innerText = 'Провери отново';
+                btn.disabled = false;
+                
+            } catch(e) {
+                log('Грешка: ' + e.message, true);
+                btn.innerText = 'Провери отново';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

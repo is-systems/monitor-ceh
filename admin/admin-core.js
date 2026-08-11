@@ -273,8 +273,8 @@ function buildForm(data = null) {
           document.getElementById('inp_skladDetail').value = data['ID Детайл'] || '';
           document.getElementById('inp_skladOp').value = data['Операция'] || '';
           document.getElementById('inp_skladRealOp').value = (currentTab === 'sklad_gp') ? (data['Оригинална Операция'] || data['Операция'] || '') : (data['Операция'] || '');
-          document.getElementById('inp_skladOldQty').value = data['Наличност в цеха'] || 0;
-          document.getElementById('inp_skladQty').value = data['Наличност в цеха'] || 0;
+          document.getElementById('inp_skladOldQty').value = data['Общо'] || 0;
+          document.getElementById('inp_skladQty').value = data['Общо'] || 0;
           document.getElementById('inp_skladBuffer').value = data['Минимално количество/Буфер'] || 0;
       }
       return;
@@ -468,8 +468,8 @@ async function computeSkladData(isGpTab) {
                 let parentRoutes = routesByDetail[parentCode];
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
-                    let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = grossStartedOps[firstOpKey] || 0;
+                    let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                    parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
                 } else {
                     parentConsumed = getTotalShipped(parentCode, new Set(visited));
                 }
@@ -505,6 +505,32 @@ async function computeSkladData(isGpTab) {
                 }
             }
             
+            let reservedSum = 0;
+            let reservedDetails = [];
+            let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === code);
+            parents.forEach(p => {
+                let pCode = String(p['ID Родител']).trim().toLowerCase();
+                if (pCode !== code) {
+                    let pRoutes = routesByDetail[pCode];
+                    if (pRoutes && pRoutes.length > 0) {
+                        let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
+                        let lastOpKey = pCode + '_' + String(pRoutes[pRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                        let pStarted = grossStartedOps[firstOpKey] || 0;
+                        let pFinished = grossTrueDoneOps[lastOpKey] || 0;
+                        let pReserved = pStarted - pFinished;
+                        if (pReserved > 0) {
+                            let mult = parseFloat(p['Количество']) || 1;
+                            let actualReserved = pReserved * mult;
+                            reservedSum += actualReserved;
+                            let pName = nomNameMap[pCode] || pCode;
+                            reservedDetails.push(`${actualReserved} бр. за ${pName}`);
+                        }
+                    }
+                }
+            });
+            let reservedStr = reservedSum > 0 ? `${reservedSum} (${reservedDetails.join(', ')})` : "0";
+            let freeStock = Math.max(0, availableStock - reservedSum);
+            
             if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
                 rows.push({
                     "RawPlanId": "",
@@ -512,7 +538,9 @@ async function computeSkladData(isGpTab) {
                     "Име": nomNameMap[code] || route['Код на детайла'],
                     "Операция": opName,
                     "Оригинална Операция": opName,
-                    "Наличност в цеха": availableStock,
+                    "Общо": availableStock,
+                    "Запазени": reservedStr,
+                    "Свободни": freeStock,
                     "Минимално количество/Буфер": bufferMap[code] || 0
                 });
             }
@@ -611,8 +639,8 @@ async function saveForm(e) {
         const row = globalRows[editingIndex]; 
         const keyVal = row[config.key]; 
         if (config.table === 'computed_sklad_gp' || config.table === 'computed_sklad_wip') {
-            let oldQty = parseFloat(row['Наличност в цеха']) || 0;
-            let newQty = parseFloat(payload['Наличност в цеха']) || 0;
+            let oldQty = parseFloat(row['Общо']) || 0;
+            let newQty = parseFloat(payload['Общо']) || 0;
             let delta = newQty - oldQty;
             if (delta !== 0) {
                 let opName = config.table === 'computed_sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
@@ -650,7 +678,7 @@ async function deleteItem(index) {
           try { 
               Swal.fire({title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
               let opName = currentTab === 'sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
-              let payload = { "ID План": null, "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Наличност в цеха']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
+              let payload = { "ID План": null, "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Общо']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
               const { error } = await client.from('otcheti').insert([payload]); 
               if (error) throw error; 
               Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); 

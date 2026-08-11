@@ -487,8 +487,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let parentRoutes = staticCache.routesByDetail[parentCode];
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
-                    let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = grossStartedOps[firstOpKey] || 0;
+                    let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                    parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
                 } else {
                     parentConsumed = getTotalShipped(parentCode, new Set(visited));
                 }
