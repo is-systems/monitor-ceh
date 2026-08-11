@@ -335,38 +335,64 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     
     let virtualReports = [];
     
-    function addVirtualDescendants(parentCode, parentQty) {
-        let children = (staticCache.bomData || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === parentCode);
+    function fullyCompleteVirtual(detailCode, qty) {
+        let rts = staticCache.routesByDetail[detailCode] || [];
+        rts.forEach(r => {
+            virtualReports.push({
+                'ID Детайл': detailCode,
+                'Операция': String(r['Име на операция']).trim(),
+                'Количество': qty,
+                'Оператор': 'СИСТЕМА (Виртуална корекция)',
+                'Статус': 'Отчетено',
+                'ID План': 'КОРЕКЦИЯ',
+                'Време Старт': new Date().toISOString()
+            });
+        });
+        
+        let children = (staticCache.bomData || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
         children.forEach(child => {
             let childCode = String(child['ID Компонент']).trim().toLowerCase();
             let mult = parseFloat(child['Количество']) || 1;
-            let childQty = parentQty * mult;
-            
-            let cRoutes = staticCache.routesByDetail[childCode] || [];
-            if (cRoutes.length > 0) {
-                let lastOp = String(cRoutes[cRoutes.length - 1]['Име на операция']).trim();
-                
+            fullyCompleteVirtual(childCode, qty * mult);
+        });
+    }
+
+    function compensateManualReport(detailCode, opName, qty) {
+        let rts = staticCache.routesByDetail[detailCode] || [];
+        let sortedRts = rts.slice().sort((a, b) => (parseFloat(a['№ Операция']) || 0) - (parseFloat(b['№ Операция']) || 0));
+        
+        let opIndex = sortedRts.findIndex(r => String(r['Име на операция']).trim().toLowerCase() === opName.toLowerCase());
+        
+        if (opIndex > 0) {
+            for (let i = 0; i < opIndex; i++) {
                 virtualReports.push({
-                    'ID Детайл': childCode,
-                    'Операция': lastOp,
-                    'Количество': childQty,
+                    'ID Детайл': detailCode,
+                    'Операция': String(sortedRts[i]['Име на операция']).trim(),
+                    'Количество': qty,
                     'Оператор': 'СИСТЕМА (Виртуална корекция)',
                     'Статус': 'Отчетено',
-                    'ID План': 'КОРЕКЦИЯ'
+                    'ID План': 'КОРЕКЦИЯ',
+                    'Време Старт': new Date().toISOString()
                 });
             }
-            
-            addVirtualDescendants(childCode, childQty);
+        }
+        
+        let children = (staticCache.bomData || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
+        children.forEach(child => {
+            let childCode = String(child['ID Компонент']).trim().toLowerCase();
+            let mult = parseFloat(child['Количество']) || 1;
+            fullyCompleteVirtual(childCode, qty * mult);
         });
     }
 
     sortedReports.forEach(r => {
-        let isManual = r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || r['Оператор'] === 'СИСТЕМА (Корекция наличност)';
+        let isManual = r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || r['Оператор'] === 'СИСТЕМА (Корекция наличност)' || r['Оператор'] === 'СИСТЕМА (Корекция+)';
         if (isManual && r['Статус'] === 'Отчетено') {
             let code = String(r['ID Детайл']).trim().toLowerCase();
+            let op = String(r['Операция']).trim().toLowerCase();
             let qty = parseFloat(r['Количество']) || 0;
             if (qty !== 0) {
-                addVirtualDescendants(code, qty);
+                compensateManualReport(code, op, qty);
             }
         }
     });
