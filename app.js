@@ -336,7 +336,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let virtualReports = [];
     
     function addVirtualDescendants(parentCode, parentQty) {
-        let children = staticCache.bom.filter(b => String(b['ID Родител']).trim().toLowerCase() === parentCode);
+        let children = (staticCache.bomData || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === parentCode);
         children.forEach(child => {
             let childCode = String(child['ID Компонент']).trim().toLowerCase();
             let mult = parseFloat(child['Количество']) || 1;
