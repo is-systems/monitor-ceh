@@ -334,7 +334,44 @@ async function computeSkladData(isGpTab) {
         return r;
     }).sort((a,b) => a._ts - b._ts);
     
+    let virtualReports = [];
+    function addVirtualDescendants(parentCode, parentQty) {
+        let children = (bomRes.data || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === parentCode);
+        children.forEach(child => {
+            let childCode = String(child['ID Компонент']).trim().toLowerCase();
+            let mult = parseFloat(child['Количество']) || 1;
+            let childQty = parentQty * mult;
+            
+            let cRoutes = routesByDetail[childCode] || [];
+            if (cRoutes.length > 0) {
+                let lastOp = String(cRoutes[cRoutes.length - 1]['Име на операция']).trim();
+                virtualReports.push({
+                    'ID Детайл': childCode,
+                    'Операция': lastOp,
+                    'Количество': childQty,
+                    'Оператор': 'СИСТЕМА (Виртуална корекция)',
+                    'Статус': 'Отчетено',
+                    'ID План': 'КОРЕКЦИЯ'
+                });
+            }
+            addVirtualDescendants(childCode, childQty);
+        });
+    }
+    
     sortedReports.forEach(r => {
+        let isManual = r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || r['Оператор'] === 'СИСТЕМА (Корекция наличност)' || r['Оператор'] === 'СИСТЕМА (Корекция+)';
+        if (isManual && r['Статус'] === 'Отчетено') {
+            let code = String(r['ID Детайл']).trim().toLowerCase();
+            let qty = parseFloat(r['Количество']) || 0;
+            if (qty !== 0) {
+                addVirtualDescendants(code, qty);
+            }
+        }
+    });
+    
+    let allCombinedReports = sortedReports.concat(virtualReports);
+    
+    allCombinedReports.forEach(r => {
         let code = String(r['ID Детайл']).trim().toLowerCase();
         let op = String(r['Операция']).trim().toLowerCase();
         let key = code + '_' + op;
