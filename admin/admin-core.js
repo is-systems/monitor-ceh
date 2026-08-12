@@ -334,48 +334,6 @@ async function computeSkladData(isGpTab) {
         return r;
     }).sort((a,b) => a._ts - b._ts);
     
-    let virtualReports = [];
-    function fullyCompleteVirtual(detailCode, qty) {
-        let rts = routesByDetail[detailCode] || [];
-        rts.forEach(r => {
-            virtualReports.push({
-                'ID Детайл': detailCode,
-                'Операция': String(r['Име на операция']).trim(),
-                'Количество': qty,
-                'Оператор': 'СИСТЕМА (Виртуална корекция)',
-                'Статус': 'Отчетено',
-                'ID План': 'КОРЕКЦИЯ',
-                'Време Старт': new Date().toISOString()
-            });
-        });
-        
-        let children = (bomRes.data || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
-        children.forEach(child => {
-            let childCode = String(child['ID Компонент']).trim().toLowerCase();
-            let mult = parseFloat(child['Количество']) || 1;
-            fullyCompleteVirtual(childCode, qty * mult);
-        });
-    }
-
-    function compensateManualReport(detailCode, opName, qty) {
-        let rts = routesByDetail[detailCode] || [];
-        let sortedRts = rts.slice().sort((a, b) => (parseFloat(a['№ Операция']) || 0) - (parseFloat(b['№ Операция']) || 0));
-        
-        let opIndex = sortedRts.findIndex(r => String(r['Име на операция']).trim().toLowerCase() === opName.toLowerCase());
-        
-        if (opIndex > 0) {
-            for (let i = 0; i < opIndex; i++) {
-                virtualReports.push({
-                    'ID Детайл': detailCode,
-                    'Операция': String(sortedRts[i]['Име на операция']).trim(),
-                    'Количество': qty,
-                    'Оператор': 'СИСТЕМА (Виртуална корекция)',
-                    'Статус': 'Отчетено',
-                    'ID План': 'КОРЕКЦИЯ',
-                    'Време Старт': new Date().toISOString()
-                });
-            }
-        }
         
         let children = (bomRes.data || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
         children.forEach(child => {
@@ -397,7 +355,7 @@ async function computeSkladData(isGpTab) {
         }
     });
     
-    let allCombinedReports = sortedReports.concat(virtualReports);
+    let allCombinedReports = sortedReports;
     
     allCombinedReports.forEach(r => {
         let code = String(r['ID Детайл']).trim().toLowerCase();
@@ -507,27 +465,40 @@ async function computeSkladData(isGpTab) {
             
             let reservedSum = 0;
             let reservedDetails = [];
-            let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === code);
-            parents.forEach(p => {
-                let pCode = String(p['ID Родител']).trim().toLowerCase();
-                if (pCode !== code) {
-                    let pRoutes = routesByDetail[pCode];
-                    if (pRoutes && pRoutes.length > 0) {
-                        let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
-                        let lastOpKey = pCode + '_' + String(pRoutes[pRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                        let pStarted = grossStartedOps[firstOpKey] || 0;
-                        let pFinished = grossTrueDoneOps[lastOpKey] || 0;
-                        let pReserved = pStarted - pFinished;
-                        if (pReserved > 0) {
+            
+            // Parents only consume fully finished pieces (from the last operation)
+            if (idx === routes.length - 1) {
+                let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === code);
+                parents.forEach(p => {
+                    let pCode = String(p['ID Родител']).trim().toLowerCase();
+                    if (pCode !== code) {
+                        let pRoutes = routesByDetail[pCode];
+                        if (pRoutes && pRoutes.length > 0) {
+                            let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
+                            let lastOpKey = pCode + '_' + String(pRoutes[pRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                            let pStarted = grossStartedOps[firstOpKey] || 0;
+                            let pFinished = grossTrueDoneOps[lastOpKey] || 0;
+                            
+                            let pReserved = pStarted - pFinished;
+                            
+                            // If it's a finished good, we must also account for fully shipped parents
                             let mult = parseFloat(p['Количество']) || 1;
+                            
+                            // To know total consumed by this parent over all time:
+                            // The parent started `pStarted` pieces, so it consumed `pStarted * mult` pieces.
+                            // But wait! Is `Запазени` meant to be total historical consumption, or just current reservation?
+                            // Based on the user's expectation, a finished parent should NOT hold "reserved" pieces!
+                            // "Запазени" should ONLY be pieces that the parent has started but NOT finished!
                             let actualReserved = pReserved * mult;
-                            reservedSum += actualReserved;
-                            let pName = nomNameMap[pCode] || pCode;
-                            reservedDetails.push(`${actualReserved} бр. за ${pName}`);
+                            if (actualReserved > 0) {
+                                reservedSum += actualReserved;
+                                let pName = nomNameMap[pCode] || pCode;
+                                reservedDetails.push(`${actualReserved} бр. за ${pName}`);
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
             let reservedStr = reservedSum > 0 ? `${reservedSum} (${reservedDetails.join(', ')})` : "0";
             let freeStock = Math.max(0, availableStock - reservedSum);
             
