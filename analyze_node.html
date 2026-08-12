@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html><body><pre id="out"></pre>
+<script>
+    const log = (msg) => document.getElementById('out').innerText += msg + '\n';
+    console.log = log;
+
+    const url = 'https://zdythzcgcjxwbxufunuh.supabase.co/rest/v1';
+    const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+    const headers = { 'apikey': key, 'Authorization': 'Bearer ' + key };
+
+    async function fetchAll(endpoint) {
+        let all = []; let offset = 0;
+        while(true) {
+            let res = await fetch(`${url}/${endpoint}?select=*&limit=1000&offset=${offset}`, {headers});
+            let data = await res.json();
+            if(data.length === 0) break;
+            all = all.concat(data);
+            offset += 1000;
+        }
+        return all;
+    }
+
+    async function run() {
+        try {
+            let [bom, routesData, allOtcheti] = await Promise.all([
+                fetchAll('bom'),
+                fetchAll('marshruti'),
+                fetchAll('otcheti')
+            ]);
+            
+            let routesByDetail = {};
+            routesData.forEach(r => {
+                let code = String(r['Код на детайла']).trim().toLowerCase();
+                if(!routesByDetail[code]) routesByDetail[code] = [];
+                routesByDetail[code].push(r);
+            });
+            Object.keys(routesByDetail).forEach(code => {
+                routesByDetail[code].sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
+            });
+
+            let completedOps = {};
+            let grossCompletedOps = {};
+            
+            allOtcheti.forEach(r => {
+                let code = String(r['ID Детайл']).trim().toLowerCase();
+                let op = String(r['Операция']).trim().toLowerCase();
+                let qty = parseFloat(r['Количество']) || 0;
+                let key = code + '_' + op;
+                if(r['Статус'] === 'Отчетено') {
+                    completedOps[key] = (completedOps[key] || 0) + qty;
+                    if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                        grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
+                    }
+                }
+            });
+
+            let trueDoneOps = {};
+            let grossTrueDoneOps = {};
+            let shippedQty = {};
+            let grossStartedOps = {};
+
+            Object.keys(routesByDetail).forEach(code => {
+                let routes = routesByDetail[code];
+                for (let i = routes.length - 2; i >= 0; i--) {
+                    let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                    let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                    grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, grossCompletedOps[nextOpKey] || 0);
+                    completedOps[opKey] = Math.max(completedOps[opKey] || 0, completedOps[nextOpKey] || 0);
+                }
+                
+                let lastOpKey = code + '_' + String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
+                trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
+                grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+                
+                for (let i = routes.length - 2; i >= 0; i--) {
+                    let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                    let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                    let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0);
+                    if (bucket < 0) bucket = 0;
+                    grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
+                }
+                
+                let firstOpKey = code + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
+                grossStartedOps[firstOpKey] = grossCompletedOps[firstOpKey] || 0;
+                shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
+            });
+
+            let totalShippedCache = {};
+            function getTotalShipped(item) {
+                let lc = item.toLowerCase();
+                if(totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
+                let direct = shippedQty[lc] || 0; let indirect = 0;
+                let parents = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
+                parents.forEach(p => {
+                    let parentCode = String(p['ID Родител']).trim().toLowerCase();
+                    if(parentCode !== lc) {
+                        let parentRoutes = routesByDetail[parentCode];
+                        let parentConsumed = 0;
+                        if (parentRoutes && parentRoutes.length > 0) {
+                            let firstOpKey = parentCode + '_' + String(parentRoutes[0]['Име на операция']).trim().toLowerCase();
+                            parentConsumed = grossStartedOps[firstOpKey] || 0;
+                        } else {
+                            parentConsumed = getTotalShipped(parentCode);
+                        }
+                        indirect += parentConsumed * (parseFloat(p['Количество'])||1);
+                    }
+                });
+                totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
+            }
+
+            let code = "статорен пак. вар. 11";
+            let routes = routesByDetail[code];
+            let consumed = getTotalShipped(code);
+            
+            console.log("=== " + code + " ===");
+            console.log("Consumed by Shipped: " + consumed);
+            routes.forEach(r => {
+                let op = String(r['Име на операция']).trim();
+                let opKey = code + '_' + op.toLowerCase();
+                let gg = grossTrueDoneOps[opKey] || 0;
+                console.log("Op: " + op + " | Gross: " + gg + " | Net: " + Math.max(0, gg - consumed));
+            });
+
+            console.log("\nPARENT CONSUMPTIONS:");
+            let parents = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === code);
+            parents.forEach(p => {
+                let pCode = String(p['ID Родител']).trim().toLowerCase();
+                let pRoutes = routesByDetail[pCode];
+                if (pRoutes) {
+                    let firstOp = pRoutes[0]['Име на операция'].trim().toLowerCase();
+                    console.log(pCode + " (started " + firstOp + ") -> " + (grossStartedOps[pCode+'_'+firstOp]||0));
+                }
+            });
+        } catch(e) {
+            console.log("ERROR: " + e.stack);
+        }
+    }
+    run();
+</script></body></html>

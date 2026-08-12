@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+    <div id="out" style="font-family: monospace; white-space: pre-wrap;"></div>
+    <script>
+        const url = 'https://zdythzcgcjxwbxufunuh.supabase.co/rest/v1';
+        const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+        const headers = { 'apikey': key, 'Authorization': 'Bearer ' + key };
+        
+        async function run() {
+            let res = await fetch(url + '/plan?select=*', {headers});
+            let plans = await res.json();
+            
+            let myPlans = plans.filter(p => String(p['Детайл']).trim().toLowerCase() === 'статорен пак. вар. 11' || String(p['Родител']).trim().toLowerCase() === 'статорен пак. вар. 11');
+            
+            let out = document.getElementById('out');
+            out.innerHTML = "Намерени планове за 'Статорен пак. вар. 11':\n\n";
+            myPlans.forEach(p => {
+                out.innerHTML += JSON.stringify(p, null, 2) + "\n";
+            });
+            
+            out.innerHTML += "\n--- ГОТОВО ---";
+        }
+        run();
+    </script>
+</body>
+</html>

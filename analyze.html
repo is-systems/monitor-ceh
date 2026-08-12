@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Анализ на БОМ и Отчети</title>
+    <style>
+        body { font-family: monospace; background: #111; color: #0f0; padding: 20px; font-size: 14px; }
+        h1 { color: #fff; }
+        .form-group { margin-bottom: 15px; }
+        label { display: inline-block; width: 250px; color: #ddd;}
+        input { padding: 5px; font-family: monospace; width: 250px; background: #333; color: #0f0; border: 1px solid #555; }
+        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 3px; font-weight: bold; margin-left: 254px; }
+        button:hover { background: #0056b3; }
+        #out { margin-top: 30px; border-top: 1px dashed #555; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Детайлен лог на изчисленията</h1>
+    <div class="form-group">
+        <label>Родител (напр. 1/4" (R3)#): </label>
+        <input type="text" id="parentInput" value='1/4" (R3)#'>
+    </div>
+    <div class="form-group">
+        <label>Дете (напр. 1/4"): </label>
+        <input type="text" id="childInput" value='1/4"'>
+    </div>
+    <button onclick="startAnalysis()">Анализирай</button>
+
+    <div id="out"></div>
+
+    <script>
+        const url = 'https://zdythzcgcjxwbxufunuh.supabase.co/rest/v1';
+        const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+        const headers = { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' };
+        
+        async function fetchAll(endpoint) {
+            let all = []; let offset = 0;
+            while(true) {
+                let res = await fetch(`${url}/${endpoint}?select=*&limit=1000&offset=${offset}`, {headers});
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status} on endpoint ${endpoint}`);
+                let data = await res.json();
+                if(!Array.isArray(data)) throw new Error("Expected array but got: " + JSON.stringify(data));
+                if(data.length === 0) break;
+                all = all.concat(data);
+                offset += 1000;
+            }
+            return all;
+        }
+
+        function log(msg) {
+            document.getElementById('out').innerHTML += msg + "<br>";
+        }
+
+        async function startAnalysis() {
+            document.getElementById('out').innerHTML = "Зареждане на данни от базата... (Може да отнеме няколко секунди)<br>";
+            let parentDetail = document.getElementById('parentInput').value.trim().toLowerCase();
+            let childDetail = document.getElementById('childInput').value.trim().toLowerCase();
+
+            if (!parentDetail || !childDetail) {
+                log("<span style='color:red'>Моля, въведете и двата детайла!</span>");
+                return;
+            }
+
+            try {
+                let [bom, routesData, allOtcheti] = await Promise.all([
+                    fetchAll('bom'),
+                    fetchAll('marshruti'),
+                    fetchAll('otcheti')
+                ]);
+                
+                log(`<br><b>=== 1. ПРОВЕРКА НА БОМ ===</b>`);
+                let parentsOfChild = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === childDetail);
+                log(`Всички редове, където ${childDetail} е дете:`);
+                let foundRelation = false;
+                parentsOfChild.forEach(p => {
+                    log(` - Родител: ${p['ID Родител']}, Компонент: ${p['ID Компонент']}, Количество: ${p['Количество']}`);
+                    if (String(p['ID Родител']).trim().toLowerCase() === parentDetail) {
+                        foundRelation = true;
+                    }
+                });
+
+                if (!foundRelation) {
+                    log(`<span style="color:red; font-weight:bold;">ВНИМАНИЕ: ${childDetail} НЕ Е дете на ${parentDetail} в БОМ-а! Проверете имената.</span>`);
+                }
+
+                log(`<br><b>=== 2. ПРОВЕРКА НА МАРШРУТНА КАРТА ===</b>`);
+                let routes = routesData.filter(r => String(r['Код на детайла']||'').trim().toLowerCase() === parentDetail);
+                routes.sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
+                log(`Намерени ${routes.length} операции за ${parentDetail}:`);
+                routes.forEach(r => log(` - Оп. ${r['№ Операция']}: ${r['Име на операция']}`));
+
+                let opNames = routes.map(r => String(r['Име на операция']).trim().toLowerCase());
+                let duplicates = opNames.filter((item, index) => opNames.indexOf(item) !== index);
+                if (duplicates.length > 0) {
+                    log(`<span style="color:red; font-weight:bold;">ВНИМАНИЕ: Намерени повтарящи се имена на операции: ${duplicates.join(', ')}</span>`);
+                } else {
+                    log("<span style='color:lime;'>Няма повтарящи се имена на операции.</span>");
+                }
+
+                log(`<br><b>=== 3. ОТЧЕТЕНИ БРОЙКИ ЗА ${parentDetail} ===</b>`);
+                let myOtcheti = allOtcheti.filter(o => String(o['ID Детайл']).trim().toLowerCase() === parentDetail);
+                let completedOps = {};
+                myOtcheti.forEach(r => {
+                    let op = String(r['Операция']).trim().toLowerCase();
+                    let qty = parseFloat(r['Количество']) || 0;
+                    if (r['Статус'] === 'Отчетено' && r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                        completedOps[op] = (completedOps[op] || 0) + qty; 
+                    }
+                });
+                log("Сума на отчетените (от операторите) бройки по операции:");
+                if(Object.keys(completedOps).length === 0) log(" - Няма отчетени бройки.");
+                Object.keys(completedOps).forEach(k => log(` - ${k}: ${completedOps[k]} бр.`));
+
+                log(`<br><b>=== 4. СИМУЛАЦИЯ НА СИСТЕМАТА ===</b>`);
+                let grossCompletedOps = {};
+                let scrappedOps = {};
+                Object.keys(completedOps).forEach(op => {
+                    grossCompletedOps[parentDetail + '_' + op] = completedOps[op];
+                });
+
+                for (let i = routes.length - 2; i >= 0; i--) {
+                    let opKey = parentDetail + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                    let nextOpKey = parentDetail + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                    let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
+                    grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+                }
+                
+                log("Бройки след обратното разпространение (forward/backward):");
+                routes.forEach(r => {
+                    let opKey = parentDetail + '_' + String(r['Име на операция']).trim().toLowerCase();
+                    log(` - ${opKey} = ${grossCompletedOps[opKey] || 0} бр.`);
+                });
+
+                if(routes.length > 0) {
+                    let firstOpKey = parentDetail + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
+                    let parentConsumed = grossCompletedOps[firstOpKey] || 0;
+                    log(`\n=> Първа операция е: ${firstOpKey}. Стойност = ${parentConsumed} бр.`);
+                    log(`=> Следователно ${parentDetail} е консумирал: ${parentConsumed} бр. от всички свои компоненти (вкл. ${childDetail})!`);
+                }
+
+                log("<br><b style='color:lime'>ГОТОВО.</b>");
+            } catch(e) {
+                log("<br><span style='color:red'>ГРЕШКА: " + e.stack + "</span>");
+            }
+        }
+    </script>
+</body>
+</html>

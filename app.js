@@ -355,11 +355,12 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 savedQty[code] = (savedQty[code] || 0) + qty;
             }
             completedOps[key] = (completedOps[key] || 0) + qty;
-            if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
-                grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
-            }
-            if (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0)) {
+            
+            let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
+            if (isManual) {
                 manualOps[key] = (manualOps[key] || 0) + qty;
+            } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
             }
             opStatusMap[key] = 'Отчетено';
         } else if (r['Статус'] !== 'Брак') {
@@ -384,7 +385,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
             
             let manualRequiredFromMe = (manualOps[nextOpKey] || 0);
-            manualOps[opKey] = Math.max(manualOps[opKey] || 0, manualRequiredFromMe);
+            manualOps[opKey] = (manualOps[opKey] || 0) + manualRequiredFromMe;
             
             let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
             completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
@@ -430,7 +431,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
                     let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (manualOps[lastOpKey] || 0));
+                    parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
                 } else {
                     parentConsumed = getTotalShipped(parentCode, new Set(visited));
                 }
@@ -511,7 +512,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let opName = String(route['Име на операция']).trim();
                 let opKey = code.toLowerCase() + '_' + opName.toLowerCase();
                 
-                let globalGross = grossTrueDoneOps[opKey] || 0;
+                let globalGross = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
                 let globalNet = Math.max(0, globalGross - consumedByShipped);
                 
                 let usedSoFar = alreadyAllocated[opKey] || 0;

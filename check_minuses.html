@@ -73,24 +73,11 @@
                     if (r['╨б╤В╨░╤В╤Г╤Б'] === '╨С╤А╨░╨║') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
                     else if (r['╨б╤В╨░╤В╤Г╤Б'] === '╨Ю╤В╤З╨╡╤В╨╡╨╜╨╛') {
                         completedOps[key] = (completedOps[key]||0) + qty;
-                        if (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] !== '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Х╨║╤Б╨┐╨╡╨┤╨╕╤Ж╨╕╤П)' && !(r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty < 0)) {
-                            grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty;
-                        }
-                        if (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨а╤К╤З╨╜╨╛ ╨┤╨╛╨▒╨░╨▓╨╡╨╜)' || (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty > 0)) {
+                        let isManual = (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨а╤К╤З╨╜╨╛ ╨┤╨╛╨▒╨░╨▓╨╡╨╜)' || (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty > 0));
+                        if (isManual) {
                             manualOps[key] = (manualOps[key]||0) + qty;
-                        }
-                        
-                        if (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨а╤К╤З╨╜╨╛ ╨┤╨╛╨▒╨░╨▓╨╡╨╜)' && routesByDetail[code]) {
-                            let route = routesByDetail[code].slice().sort((a, b) => (parseFloat(a['тДЦ ╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П']) || 0) - (parseFloat(b['тДЦ ╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П']) || 0));
-                            let opIdx = route.findIndex(x => String(x['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase() === op);
-                            if (opIdx > 0) {
-                                for (let i = 0; i < opIdx; i++) {
-                                    let priorOp = String(route[i]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
-                                    let priorKey = code + '_' + priorOp;
-                                    completedOps[priorKey] = (completedOps[priorKey]||0) + qty;
-                                    grossCompletedOps[priorKey] = (grossCompletedOps[priorKey]||0) + qty;
-                                }
-                            }
+                        } else if (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] !== '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Х╨║╤Б╨┐╨╡╨┤╨╕╤Ж╨╕╤П)' && !(r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty < 0)) {
+                            grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty;
                         }
                     }
                 });
@@ -108,7 +95,7 @@
                         let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
                         grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
                         let manualRequiredFromMe = manualOps[nextOpKey] || 0;
-                        manualOps[opKey] = Math.max(manualOps[opKey] || 0, manualRequiredFromMe);
+                        manualOps[opKey] = (manualOps[opKey] || 0) + manualRequiredFromMe;
                         let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
                         completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
                     }
@@ -148,7 +135,7 @@
                             let parentConsumed = 0;
                             if (parentRoutes && parentRoutes.length > 0) {
                                 let firstOpKey = parentCode + '_' + String(parentRoutes[0]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
-                                parentConsumed = Math.max(0, (grossStartedOps[firstOpKey] || 0) - (manualOps[firstOpKey] || 0));
+                                parentConsumed = grossStartedOps[firstOpKey] || 0;
                             } else {
                                 parentConsumed = getTotalShipped(parentCode, new Set(visited));
                             }
@@ -169,7 +156,7 @@
                     let lastRoute = routes[routes.length - 1];
                     let opName = String(lastRoute['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim();
                     let opKey = code + '_' + opName.toLowerCase();
-                    let myGrossDone = grossTrueDoneOps[opKey] || 0;
+                    let myGrossDone = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
                     
                     if (myGrossDone < consumedByShipped) {
                         let deficit = consumedByShipped - myGrossDone;
