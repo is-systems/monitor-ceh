@@ -377,12 +377,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             }
         }
         
-        let children = (staticCache.bomData || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
-        children.forEach(child => {
-            let childCode = String(child['ID Компонент']).trim().toLowerCase();
-            let mult = parseFloat(child['Количество']) || 1;
-            fullyCompleteVirtual(childCode, qty * mult);
-        });
+        // Children virtual completion removed to prevent doubling on the monitor,
+        // because app.js already visually adds `consumedByParents` to the children's display.
     }
 
     sortedReports.forEach(r => {
