@@ -500,7 +500,6 @@ async function computeSkladData(isGpTab) {
     });
     return rows;
 }
-}
 
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
