@@ -325,13 +325,10 @@ async function loadTasks(isSilent = false) {
                       }
                       let explicitNet = Math.max(0, explicitGross - totalExplicitSubsequentScrap);
                       
-                      let explicitUnconsumed = Math.max(0, explicitNet - consumedByParents[code]);
-                      explicitUnconsumed = Math.min(explicitUnconsumed, availableForThisPlan);
-                      
-                      let doneQty = consumedByParents[code] + Math.max(allocatedFromWh, explicitUnconsumed);
+                      let doneQty = consumedByParents[code] + allocatedFromWh;
                       if (doneQty < 0) doneQty = 0;
                       
-                      alreadyAllocated[opKey] = usedSoFar + Math.max(allocatedFromWh, explicitNet);
+                      alreadyAllocated[opKey] = usedSoFar + allocatedFromWh;
                       if (idx === 0) finalDoneQtyForChildren = doneQty;
                       
                       planOpDoneQty[idx] = doneQty;
