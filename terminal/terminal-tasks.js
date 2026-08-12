@@ -347,7 +347,14 @@ async function loadTasks(isSilent = false) {
                       let prevRoute = routes[idx - 1]; 
                       let prevOpName = String(prevRoute['Име на операция']).trim().toLowerCase();
                       let prevDoneQty = planOpDoneQty[idx - 1] || 0;
-                      maxAllowed = Math.max(0, prevDoneQty - doneQty);
+                      
+                      let prevOpKey = code + '_' + prevOpName;
+                      let prevGlobalGross = grossTrueDoneOps[prevOpKey] || 0;
+                      let prevGlobalNet = Math.max(0, prevGlobalGross + (savedQty[code] || 0) - consumedByShipped);
+                      let prevUsedSoFar = alreadyAllocated[prevOpKey] || 0;
+                      let prevUnallocated = Math.max(0, prevGlobalNet - prevUsedSoFar);
+                      
+                      maxAllowed = Math.max(0, prevDoneQty - doneQty + prevUnallocated);
                       displayMaxAllowed = maxAllowed;
                       if (maxAllowed <= 0) blockingReasons.push(`Оп. ${prevOpName} (няма завършени)`);
                   } else {
