@@ -322,6 +322,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let completedOps = {};
     let opStatusMap = {}; 
     let savedQty = {};
+    let manualOps = {};
     
     // Performance optimization: compute timestamps once before sorting (O(N) instead of O(N log N))
     let sortedReports = reportsData.map(r => {
@@ -357,6 +358,9 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
                 grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
             }
+            if (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0)) {
+                manualOps[key] = (manualOps[key] || 0) + qty;
+            }
             opStatusMap[key] = 'Отчетено';
         } else if (r['Статус'] !== 'Брак') {
             opStatusMap[key] = r['Статус']; 
@@ -378,6 +382,9 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             
             let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
             grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+            
+            let manualRequiredFromMe = (manualOps[nextOpKey] || 0);
+            manualOps[opKey] = Math.max(manualOps[opKey] || 0, manualRequiredFromMe);
             
             let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
             completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
@@ -423,7 +430,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
                     let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
+                    parentConsumed = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (manualOps[lastOpKey] || 0));
                 } else {
                     parentConsumed = getTotalShipped(parentCode, new Set(visited));
                 }
