@@ -334,26 +334,7 @@ async function computeSkladData(isGpTab) {
         return r;
     }).sort((a,b) => a._ts - b._ts);
     
-        
-        let children = (bomRes.data || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailCode);
-        children.forEach(child => {
-            let childCode = String(child['ID Компонент']).trim().toLowerCase();
-            let mult = parseFloat(child['Количество']) || 1;
-            fullyCompleteVirtual(childCode, qty * mult);
-        });
-    }
-    
-    sortedReports.forEach(r => {
-        let isManual = r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || r['Оператор'] === 'СИСТЕМА (Корекция наличност)' || r['Оператор'] === 'СИСТЕМА (Корекция+)';
-        if (isManual && r['Статус'] === 'Отчетено') {
-            let code = String(r['ID Детайл']).trim().toLowerCase();
-            let op = String(r['Операция']).trim().toLowerCase();
-            let qty = parseFloat(r['Количество']) || 0;
-            if (qty !== 0) {
-                compensateManualReport(code, op, qty);
-            }
-        }
-    });
+
     
     let allCombinedReports = sortedReports;
     
