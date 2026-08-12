@@ -116,6 +116,7 @@ async function loadTasks(isSilent = false) {
       let completedOps = {};
       let scrappedOps = {};
       let grossCompletedOps = {};
+      let manualOps = {};
       let explicitPlanGrossCompleted = {};
       let explicitPlanScrapped = {};
       let savedQty = {};
@@ -144,7 +145,10 @@ async function loadTasks(isSilent = false) {
                   savedQty[code] = (savedQty[code] || 0) + qty;
               }
               completedOps[key] = (completedOps[key]||0) + qty; 
-              if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+              let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
+              if (isManual) {
+                  manualOps[key] = (manualOps[key] || 0) + qty;
+              } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
                   grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
                   if (pId) explicitPlanGrossCompleted[planKey] = (explicitPlanGrossCompleted[planKey] || 0) + qty;
               }
@@ -163,6 +167,8 @@ async function loadTasks(isSilent = false) {
               
               let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
               grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+              let manualRequiredFromMe = manualOps[nextOpKey] || 0;
+              manualOps[opKey] = (manualOps[opKey] || 0) + manualRequiredFromMe;
               
               let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
               completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
@@ -304,7 +310,7 @@ async function loadTasks(isSilent = false) {
                       let opKey = code + '_' + opName;
                       let displayName = String(route['Код на детайла']).trim();
                       
-                      let globalGross = grossTrueDoneOps[opKey] || 0;
+                      let globalGross = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
                       let globalNet = Math.max(0, globalGross + (savedQty[code] || 0) - consumedByShipped);
                       
                       let usedSoFar = alreadyAllocated[opKey] || 0;
@@ -346,7 +352,7 @@ async function loadTasks(isSilent = false) {
                       let prevDoneQty = planOpDoneQty[idx - 1] || 0;
                       
                       let prevOpKey = code + '_' + prevOpName;
-                      let prevGlobalGross = grossTrueDoneOps[prevOpKey] || 0;
+                      let prevGlobalGross = (grossTrueDoneOps[prevOpKey] || 0) + (manualOps[prevOpKey] || 0);
                       let prevGlobalNet = Math.max(0, prevGlobalGross + (savedQty[code] || 0) - consumedByShipped);
                       let prevUsedSoFar = alreadyAllocated[prevOpKey] || 0;
                       let prevUnallocated = Math.max(0, prevGlobalNet - prevUsedSoFar);
@@ -370,7 +376,7 @@ async function loadTasks(isSilent = false) {
                                   let childRoutes = globalRoutesByDetail[cCode];
                                   if (childRoutes && childRoutes.length > 0) {
                                       let childLastOpKey = cCode + '_' + String(childRoutes[childRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                                      childGrossDone = grossTrueDoneOps[childLastOpKey] || 0;
+                                      childGrossDone = (grossTrueDoneOps[childLastOpKey] || 0) + (manualOps[childLastOpKey] || 0);
                                   }
                               }
                               let whStock = getSkladQty(cCode);
