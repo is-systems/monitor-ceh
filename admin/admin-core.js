@@ -549,6 +549,82 @@ async function computeSkladData(isGpTab) {
     return rows;
 }
 
+async function insertManualWithVirtuals(payload) {
+    let toInsert = [payload];
+    
+    let { data: routes } = await client.from('marshruti').select('*');
+    let { data: bom } = await client.from('bom').select('*');
+    
+    let routesByDetail = {};
+    (routes || []).forEach(r => {
+        let code = String(r['Код на детайла']).trim().toLowerCase();
+        if(!routesByDetail[code]) routesByDetail[code] = [];
+        routesByDetail[code].push(r);
+    });
+    Object.keys(routesByDetail).forEach(code => {
+        routesByDetail[code].sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
+    });
+    
+    function addNeeded(detailCode, opName, qty) {
+        let detOrig = detailCode;
+        let opOrig = opName;
+        let rts = routesByDetail[detailCode.toLowerCase()] || [];
+        rts.forEach(r => {
+            if (String(r['Име на операция']).trim().toLowerCase() === opName.toLowerCase()) {
+                detOrig = String(r['Код на детайла']).trim();
+                opOrig = String(r['Име на операция']).trim();
+            }
+        });
+        
+        toInsert.push({
+            "ID План": payload["ID План"] || null,
+            "ID Детайл": detOrig,
+            "Операция": opOrig,
+            "Количество": qty,
+            "Статус": "Отчетено",
+            "Оператор": "СИСТЕМА (Виртуална корекция)",
+            "Дата": payload["Дата"] || new Date().toISOString().split('T')[0]
+        });
+    }
+
+    function fullyCompleteVirtual(detailCode, q) {
+        let detailLower = detailCode.toLowerCase();
+        let rts = routesByDetail[detailLower] || [];
+        rts.forEach(r => {
+            addNeeded(detailLower, String(r['Име на операция']).trim(), q);
+        });
+        let children = (bom || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailLower);
+        children.forEach(child => {
+            let childCode = String(child['ID Компонент']).trim().toLowerCase();
+            let mult = parseFloat(child['Количество']) || 1;
+            fullyCompleteVirtual(childCode, q * mult);
+        });
+    }
+    
+    let detailLower = String(payload['ID Детайл']).trim().toLowerCase();
+    let opLower = String(payload['Операция']).trim().toLowerCase();
+    let qty = parseFloat(payload['Количество']) || 0;
+    
+    let sortedRts = routesByDetail[detailLower] || [];
+    let opIndex = sortedRts.findIndex(r => String(r['Име на операция']).trim().toLowerCase() === opLower);
+    
+    if (opIndex > 0) {
+        for (let i = 0; i < opIndex; i++) {
+            addNeeded(detailLower, String(sortedRts[i]['Име на операция']).trim(), qty);
+        }
+    }
+    
+    let children = (bom || []).filter(b => String(b['ID Родител']).trim().toLowerCase() === detailLower);
+    children.forEach(child => {
+        let childCode = String(child['ID Компонент']).trim().toLowerCase();
+        let mult = parseFloat(child['Количество']) || 1;
+        fullyCompleteVirtual(childCode, qty * mult);
+    });
+    
+    const { error } = await client.from('otcheti').insert(toInsert);
+    if (error) throw error;
+}
+
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
   
@@ -561,8 +637,7 @@ async function saveForm(e) {
               if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
               
               let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
-              const { error } = await client.from('otcheti').insert([payload]); 
-              if (error) throw error; 
+              await insertManualWithVirtuals(payload);
               
               Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
           } else {
@@ -576,8 +651,7 @@ async function saveForm(e) {
               
               if (diff !== 0) {
                   let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
-                  const { error } = await client.from('otcheti').insert([payload]); 
-                  if (error) throw error; 
+                  await insertManualWithVirtuals(payload);
               }
               
               await client.from('sklad_bufferi').delete().eq('ID Детайл', det);
@@ -654,8 +728,7 @@ async function saveForm(e) {
                     "Оператор": "СИСТЕМА (Корекция наличност)",
                     "Дата": new Date().toISOString()
                 };
-                const { error } = await client.from('otcheti').insert([otchetiPayload]);
-                if (error) throw error;
+                await insertManualWithVirtuals(otchetiPayload);
             }
             Swal.fire({icon: 'success', title: 'Наличността е коригирана!', timer: 1500, showConfirmButton: false});
         } else {
