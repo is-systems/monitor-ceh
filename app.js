@@ -532,7 +532,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 let pIdStr = String(n.planId || '').trim();
                 let planOpKey = pIdStr ? (opKey + '_' + pIdStr) : opKey;
                 
-                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrappedOps[planOpKey] || 0 }); 
+                n.operations.push({ name: opName, completed: doneQty, state: opState, scrapped: scrappedOps[planOpKey] || 0, latestStatus: latestStatus });
                 
                 if (idx === 0) finalDoneQtyForChildren = doneQty; 
             });
@@ -1008,7 +1008,10 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
 
         const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
         const formatFuture = (op) => `<span class="op-text op-future">${op.name} | ${formatQty(0, node.planQty, op.scrapped)}</span>`;
-        const formatActive = (op) => `<span class="op-text op-focus active">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
+        const formatActive = (op) => {
+            let colorClass = (op.latestStatus === 'Започната') ? 'active' : 'waiting';
+            return `<span class="op-text op-focus ${colorClass}">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
+        };
         const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
         const formatFinishedAll = (op) => `<span class="op-text op-finished-all">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
 
