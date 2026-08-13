@@ -380,7 +380,27 @@ async function loadTasks(isSilent = false) {
                                   }
                               }
                               let whStock = getSkladQty(cCode);
-                              let cFree = Math.max(0, (childGrossDone + (savedQty[cCode] || 0) + whStock) - childConsumed);
+                              let childReserved = 0;
+                              let parents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === cCode);
+                              parents.forEach(p => {
+                                  let pCode = String(p['ID Родител']).trim().toLowerCase();
+                                  if (pCode !== cCode) {
+                                      let pRoutes = globalRoutesByDetail[pCode];
+                                      if (pRoutes && pRoutes.length > 0) {
+                                          let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
+                                          let lastOpKey = pCode + '_' + String(pRoutes[pRoutes.length-1]['Име на операция']).trim().toLowerCase();
+                                          let pStarted = grossStartedOps[firstOpKey] || 0;
+                                          let pFinished = grossTrueDoneOps[lastOpKey] || 0;
+                                          let pReserved = pStarted - pFinished;
+                                          if (pReserved > 0) {
+                                              let pMult = parseFloat(p['Количество']) || 1;
+                                              childReserved += (pReserved * pMult);
+                                          }
+                                      }
+                                  }
+                              });
+
+                              let cFree = Math.max(0, (childGrossDone + (savedQty[cCode] || 0) + whStock) - childConsumed - childReserved);
                               let usedSoFar = alreadyAllocatedWarehouse[cCode] || 0;
                               let availableNow = Math.max(0, cFree - usedSoFar);
                               let sets = Math.floor(availableNow / multiplier);
