@@ -507,6 +507,82 @@ async function computeSkladData(isGpTab) {
     return rows;
 }
 
+async function backflushSimulation(targetDetail, targetOp, targetQty) {
+    if (targetQty === 0) return [];
+    
+    // 1. Fetch bom and routes
+    const [bomRes, routeRes] = await Promise.all([
+        client.from('bom').select('*'),
+        client.from('marshruti').select('*')
+    ]);
+    
+    let routesByDet = {};
+    (routeRes.data || []).forEach(r => {
+        let lc = String(r['Код на детайла']).trim().toLowerCase();
+        if (!routesByDet[lc]) routesByDet[lc] = [];
+        routesByDet[lc].push(r);
+    });
+    Object.values(routesByDet).forEach(arr => arr.sort((a, b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0)));
+
+    let bomByParent = {};
+    (bomRes.data || []).forEach(b => {
+        let p = String(b['ID Родител']).trim().toLowerCase();
+        if (!bomByParent[p]) bomByParent[p] = [];
+        bomByParent[p].push(b);
+    });
+
+    let otchetiInserts = [];
+    let now = new Date().toISOString();
+
+    function simulate(itemCode, qty, stopAtOp) {
+        let lc = itemCode.trim().toLowerCase();
+        
+        let children = bomByParent[lc] || [];
+        if (children.length > 0) {
+            children.forEach(child => {
+                let cCode = String(child['ID Компонент']).trim();
+                let cQty = (parseFloat(child['Количество']) || 1) * qty;
+                simulate(cCode, cQty, null); 
+            });
+        } else {
+            if (!routesByDet[lc] || routesByDet[lc].length === 0) {
+                otchetiInserts.push({
+                    "ID План": null, "ID Детайл": itemCode.trim(), "Операция": "Доставка", "Количество": qty, 
+                    "Статус": "Отчетено", "Оператор": "💉 СИСТЕМА (Виртуална компенсация)", "Дата": now
+                });
+                return;
+            }
+        }
+        
+        let routes = routesByDet[lc] || [];
+        if (routes.length === 0) return;
+        
+        for (let route of routes) {
+            let opName = String(route['Име на операция']).trim();
+            otchetiInserts.push({
+                "ID План": null,
+                "ID Детайл": itemCode.trim(),
+                "Операция": opName,
+                "Количество": qty,
+                "Статус": "Отчетено",
+                "Оператор": "💉 СИСТЕМА (Виртуална компенсация)", 
+                "Дата": now
+            });
+            if (stopAtOp && opName.toLowerCase() === stopAtOp.trim().toLowerCase()) {
+                break;
+            }
+        }
+    }
+
+    simulate(targetDetail, targetQty, targetOp);
+    
+    if (otchetiInserts.length > 0) {
+        otchetiInserts[otchetiInserts.length - 1]["Оператор"] = "💉 СИСТЕМА (Ръчно добавен)";
+    }
+    
+    return otchetiInserts;
+}
+
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
   
@@ -516,27 +592,34 @@ async function saveForm(e) {
               const det = document.getElementById('inp_skladDetail').value.trim();
               const op = document.getElementById('inp_skladOp').value.trim();
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
-              if (!det || !op || qty <= 0) throw new Error("Моля, попълнете всички полета коректно.");
+              if (!det || !op || qty === 0) throw new Error("Моля, попълнете всички полета коректно.");
               
-              let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": qty, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Ръчно добавен)", "Дата": new Date().toISOString() };
-              const { error: insErr } = await client.from('otcheti').insert([payload]);
-              if (insErr) throw insErr;
+              Swal.fire({title: 'Симулация на история...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+              let inserts = await backflushSimulation(det, op, qty);
+              if (inserts.length > 0) {
+                  const { error: insErr } = await client.from('otcheti').insert(inserts);
+                  if (insErr) throw insErr;
+              }
               
               Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
           } else {
-              const det = document.getElementById('inp_skladDetail').value;
+              const det = document.getElementById('inp_skladDetail').value.trim();
               const realOpEl = document.getElementById('inp_skladRealOp');
-              const op = (realOpEl && realOpEl.value) ? realOpEl.value : document.getElementById('inp_skladOp').value;
+              const op = (realOpEl && realOpEl.value) ? realOpEl.value.trim() : document.getElementById('inp_skladOp').value.trim();
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
               const diff = newQty - oldQty;
               
               if (diff !== 0) {
-                  let payload = { "ID План": null, "ID Детайл": det, "Операция": op, "Количество": diff, "Статус": "Отчетено", "Оператор": "СИСТЕМА (Корекция наличност)", "Дата": new Date().toISOString() };
-                  const { error: updErr } = await client.from('otcheti').insert([payload]);
-                  if (updErr) throw updErr;
+                  Swal.fire({title: 'Симулация на корекция...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                  let inserts = await backflushSimulation(det, op, diff);
+                  if (inserts.length > 0) {
+                      const { error: updErr } = await client.from('otcheti').insert(inserts);
+                      if (updErr) throw updErr;
+                  }
               }
+              
               
               await client.from('sklad_bufferi').delete().eq('ID Детайл', det);
               const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBuffer }]);
