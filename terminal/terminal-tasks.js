@@ -523,14 +523,13 @@ function renderTasks(tasks) {
     let isFocused = t.isTaken || (typeof activeTaskId !== 'undefined' && t.id === activeTaskId);
     let freeStateStyle = isFocused ? 'display: none;' : 'display: block;';
     let focusStateStyle = isFocused ? 'display: block;' : 'display: none;';
-    let opColorClass = isFocused ? 'op-active' : 'op-pending';
 
     html += `
       <div class="card" id="card_${t.id}" style="${borderStyle}">
         <div class="task-header">${labelHtml}<div style="display:flex; gap: 6px;">${displayNeedHtml}</div></div>
         <div class="detail-info"><div class="internal-name">${linkHtml}</div>${internalNameHtml}</div>
         ${sopHtml} ${descHtml}
-        <div class="route-flow"><span class="${opColorClass}">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
+        <div class="route-flow"><span class="op-active">▶ ${t.op}</span><span class="route-arrow">➔</span><span class="op-pending">${t.next_op}</span></div>
         ${bomBadgeHtml}
         <div id="free_state_${t.id}" style="${freeStateStyle}">${actionButtonHtml}</div>
         <div id="focus_state_${t.id}" style="${focusStateStyle}">
