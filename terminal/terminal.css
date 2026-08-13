@@ -43,6 +43,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0
 .op-pending { color: #94a3b8; }
 .route-arrow { color: #cbd5e1; font-size: 0.8em; }
 input[type="number"] { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; text-align: center; font-size: 1.3em; font-weight: bold; box-sizing: border-box; }
+input[type="number"]::placeholder { color: #cbd5e1; opacity: 1; font-weight: normal; }
 input[type="number"]:focus { border-color: #3b82f6; outline: none; }
 .btn, .btn-danger { color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em; }
 .btn { background: #16a34a; flex: 1; }
