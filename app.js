@@ -145,10 +145,10 @@ async function fetchDynamicData() {
 
     // Better: keep plan limited since it's filtered, but if plan can grow > 1000, we should fetchAll and filter
     let activePlans = (plansRes.data || []).filter(p => ['Активен', 'Завършен', 'Опакован'].includes(p['Статус']));
-    
+    let realReports = (reportsRes.data || []).filter(r => r['Оператор'] !== '💉 СИСТЕМА (Виртуална компенсация)');
     return {
         plansData: activePlans,
-        reportsData: reportsRes.data || [],
+        reportsData: realReports,
         skladData: skladRes.data || []
     };
 }
