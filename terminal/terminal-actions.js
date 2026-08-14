@@ -10,10 +10,10 @@ async function loadHistoryFromDB() {
     if (!currentOperator || currentOperator === "undefined" || !navigator.onLine) return;
     try {
         const { data, error } = await client.from('otcheti')
-            .select('ID Детайл, Количество, Дата, Статус')
+            .select('"ID Детайл", Количество, Дата, Статус')
             .eq('Оператор', currentOperator)
             .in('Статус', ['Отчетено', 'Брак'])
-            .order('"Дата"', { ascending: false })
+            .order('Дата', { ascending: false })
             .limit(5);
 
         if (error) throw error;
