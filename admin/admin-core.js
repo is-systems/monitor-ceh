@@ -9,6 +9,7 @@ window.onload = () => {
 };
 
 let globalActivePlansForDropdown = [];
+let globalColumnFilters = {};
 
 function initializeApp() { 
     client.from('plan').select('id, Вътрешно име').in('Статус', ['Активен']).then(res => {
@@ -28,6 +29,7 @@ function buildNavbar() {
 function switchTab(tabKey) {
   currentTab = tabKey; buildNavbar(); document.getElementById('searchInput').value = '';
   selectedIndices.clear(); updateMassActionBar();
+  globalColumnFilters = {}; document.getElementById('tableHead').innerHTML = '';
   
   const config = tableConfigs[tabKey]; const addBtn = document.getElementById('addNewBtn');
   const pdfBtn = document.getElementById('pdfBtn'); const logBtn = document.getElementById('logisticsBtn'); const sidebar = document.getElementById('personnelSidebar');
@@ -128,18 +130,54 @@ async function loadCurrentTableData() {
 function renderDynamicTable(itemsToRender = null) {
   currentRenderedRows = itemsToRender || globalRows; const config = tableConfigs[currentTab]; document.getElementById('loadingLayout').style.display = 'none';
   const table = document.getElementById('mainTable'); const thead = document.getElementById('tableHead'); const tbody = document.getElementById('tableBody');
-  thead.innerHTML = ''; tbody.innerHTML = ''; const headerRow = document.createElement('tr');
-  
-  if (!config.readOnlyTab) {
-      const thCheck = document.createElement('th');
-      thCheck.style.width = '40px'; thCheck.style.textAlign = 'center';
-      thCheck.innerHTML = `<input type="checkbox" id="selectAllCb" class="row-checkbox" onchange="toggleSelectAll(event)">`;
-      headerRow.appendChild(thCheck);
+  if (thead.innerHTML === '') {
+      const headerRow = document.createElement('tr');
+      if (!config.readOnlyTab) {
+          const thCheck = document.createElement('th');
+          thCheck.style.width = '40px'; thCheck.style.textAlign = 'center';
+          thCheck.innerHTML = `<input type="checkbox" id="selectAllCb" class="row-checkbox" onchange="toggleSelectAll(event)">`;
+          headerRow.appendChild(thCheck);
+      }
+
+      config.fields.forEach(f => { 
+          if (f.hideOnAdd) return; 
+          const th = document.createElement('th'); 
+          
+          const labelDiv = document.createElement('div');
+          labelDiv.innerText = f.label || f.name;
+          th.appendChild(labelDiv);
+          
+          const filterInput = document.createElement('input');
+          filterInput.type = 'text';
+          filterInput.placeholder = '🔍 Филтър...';
+          filterInput.style.width = '100%';
+          filterInput.style.boxSizing = 'border-box';
+          filterInput.style.marginTop = '6px';
+          filterInput.style.padding = '4px 6px';
+          filterInput.style.fontSize = '12px';
+          filterInput.style.border = '1px solid #cbd5e1';
+          filterInput.style.borderRadius = '4px';
+          filterInput.style.fontWeight = 'normal';
+          
+          if (globalColumnFilters[f.name]) filterInput.value = globalColumnFilters[f.name];
+          
+          filterInput.oninput = (e) => {
+              globalColumnFilters[f.name] = e.target.value.toLowerCase().trim();
+              filterTable();
+          };
+          
+          th.appendChild(filterInput);
+          headerRow.appendChild(th); 
+      });
+      
+      if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') { 
+          const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; 
+          headerRow.appendChild(thActions); 
+      }
+      thead.appendChild(headerRow);
   }
 
-  config.fields.forEach(f => { if (f.hideOnAdd) return; const th = document.createElement('th'); th.innerText = f.label || f.name; headerRow.appendChild(th); });
-  if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') { const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; headerRow.appendChild(thActions); }
-  thead.appendChild(headerRow);
+  tbody.innerHTML = '';
   
   if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab && currentTab !== 'sklad_gp' && currentTab !== 'sklad_wip' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
 
@@ -204,7 +242,29 @@ function renderDynamicTable(itemsToRender = null) {
   }
 }
 
-function filterTable() { const q = document.getElementById('searchInput').value.toLowerCase().trim(); if(!q) { renderDynamicTable(); return; } const f = globalRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))); renderDynamicTable(f); }
+function filterTable() { 
+    const q = document.getElementById('searchInput').value.toLowerCase().trim(); 
+    let f = globalRows;
+    
+    if (q) {
+        f = f.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    
+    Object.keys(globalColumnFilters).forEach(col => {
+        const colQ = globalColumnFilters[col];
+        if (colQ) {
+            f = f.filter(r => {
+                let val = r[col];
+                if ((col === 'Време' || col === 'Дата') && val) {
+                     try { let pVal = val; if (!pVal.endsWith('Z') && !pVal.includes('+')) pVal += 'Z'; val = new Date(pVal).toLocaleString('bg-BG'); } catch(e) {}
+                }
+                return String(val || '').toLowerCase().includes(colQ);
+            });
+        }
+    });
+    
+    renderDynamicTable(f); 
+}
 
 let globalNomenclatureCodes = [];
 
