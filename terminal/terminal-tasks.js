@@ -478,12 +478,7 @@ async function loadTasks(isSilent = false) {
 function renderTasks(tasks) {
   var container = document.getElementById('tasksContainer');
   
-  // Filter Green Cards if there are any Blue Cards for the current machine
-  let hasBlueCards = tasks.some(t => !t.isGreenCard);
   let visibleTasks = tasks;
-  if (hasBlueCards) {
-      visibleTasks = tasks.filter(t => !t.isGreenCard || t.isTaken);
-  }
 
   let filteredTasks = visibleTasks;
   if (currentTaskFilter === 'ready') filteredTasks = visibleTasks.filter(t => !t.isBlocked);

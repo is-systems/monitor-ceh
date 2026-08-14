@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<div id="output" style="white-space: pre-wrap; font-family: monospace;"></div>
+<script>
+    async function run() {
+        function log(msg) { document.getElementById('output').innerText += msg + '\n'; }
+        
+        const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+        
+        let headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+        
+        log("Fetching otcheti...");
+        let otcheti = await (await fetch(SUPABASE_URL + '/rest/v1/otcheti?select=*', {headers})).json();
+        log("Fetching bom...");
+        let bom = await (await fetch(SUPABASE_URL + '/rest/v1/bom?select=*', {headers})).json();
+        log("Fetching marshruti...");
+        let marshruti = await (await fetch(SUPABASE_URL + '/rest/v1/marshruti?select=*', {headers})).json();
+        
+        let routesByDetail = {};
+        marshruti.forEach(r => {
+            let code = String(r['Код на детайла']||'').trim().toLowerCase();
+            if(!routesByDetail[code]) routesByDetail[code] = [];
+            routesByDetail[code].push(r);
+        });
+        Object.keys(routesByDetail).forEach(c => {
+            routesByDetail[c].sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
+        });
+
+        let completedOps = {};
+        let manualOps = {};
+        let grossCompletedOps = {};
+        
+        otcheti.forEach(r => {
+            let code = String(r['ID Детайл']).trim().toLowerCase();
+            let op = String(r['Операция']).trim().toLowerCase();
+            let key = code + '_' + op;
+            let qty = parseFloat(r['Количество']) || 0;
+            
+            if (r['Статус'] === 'Отчетено') {
+                completedOps[key] = (completedOps[key]||0) + qty;
+                let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
+                if (isManual) {
+                    manualOps[key] = (manualOps[key]||0) + qty;
+                } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                    grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty; 
+                }
+            }
+        });
+        
+        let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {};
+        
+        Object.keys(routesByDetail).forEach(code => {
+            let routes = routesByDetail[code];
+            if(routes.length === 0) return;
+            
+            for (let i = routes.length - 2; i >= 0; i--) {
+                let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                
+                let requiredFromMe = (grossCompletedOps[nextOpKey] || 0);
+                grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
+                
+                let manualRequiredFromMe = manualOps[nextOpKey] || 0;
+                manualOps[opKey] = (manualOps[opKey] || 0) + manualRequiredFromMe;
+            }
+            
+            let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
+            grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
+            
+            for(let i = routes.length - 2; i >= 0; i--) {
+                let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
+                let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0);
+                if (bucket < 0) bucket = 0;
+                grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
+            }
+        });
+        
+        log("--- DIAGNOSTICS FOR макара вар. 11 ---");
+        let target = "макара вар. 11";
+        
+        log("Direct manualOps:");
+        Object.keys(manualOps).forEach(k => {
+            if (k.startsWith(target + "_")) log(k + ": " + manualOps[k]);
+        });
+        
+        log("Direct grossCompletedOps:");
+        Object.keys(grossCompletedOps).forEach(k => {
+            if (k.startsWith(target + "_")) log(k + ": " + grossCompletedOps[k]);
+        });
+
+        log("Direct grossTrueDoneOps:");
+        Object.keys(grossTrueDoneOps).forEach(k => {
+            if (k.startsWith(target + "_")) log(k + ": " + grossTrueDoneOps[k]);
+        });
+        
+        log("Checking backward propagation from parents...");
+        function trace(item) {
+            let parents = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === item);
+            parents.forEach(p => {
+                let parentCode = String(p['ID Родител']).trim().toLowerCase();
+                let mult = parseFloat(p['Количество']) || 1;
+                log(`Parent: ${parentCode} (multiplier ${mult})`);
+                Object.keys(grossTrueDoneOps).forEach(k => {
+                    if (k.startsWith(parentCode + "_")) log("  -> " + k + " = " + grossTrueDoneOps[k] + " (manual=" + (manualOps[k]||0) + ")");
+                });
+                trace(parentCode);
+            });
+        }
+        trace(target);
+        log("DONE!");
+    }
+    run();
+</script>
+</body>
+</html>
