@@ -413,7 +413,7 @@ async function computeSkladData(isGpTab) {
         routesByDetail[code].push(r);
     });
     
-    let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {}; let manualOps = {};
+    let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {}; let manualOps = {}; let savedQty = {};
     
     let sortedReports = (reportsRes.data || []).map(r => {
         r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
@@ -432,11 +432,14 @@ async function computeSkladData(isGpTab) {
         
         if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
         else if (r['Статус'] === 'Отчетено') {
+            if (op === 'възстановен') {
+                savedQty[code] = (savedQty[code] || 0) + qty;
+            }
             completedOps[key] = (completedOps[key]||0) + qty;
             let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
             if (isManual) {
                 manualOps[key] = (manualOps[key]||0) + qty;
-            } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0)) {
+            } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) {
                 grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty;
             }
         }
@@ -523,7 +526,7 @@ async function computeSkladData(isGpTab) {
             let opName = String(route['Име на операция']).trim();
             let opKey = code + '_' + opName.toLowerCase();
             let myGrossDone = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
-            let doneQty = Math.max(0, myGrossDone - consumedByShipped);
+            let doneQty = Math.max(0, myGrossDone + (savedQty[code] || 0) - consumedByShipped);
             
             let availableStock = 0;
             if (idx === routes.length - 1) {
@@ -532,7 +535,8 @@ async function computeSkladData(isGpTab) {
                 if (!isGpTab) {
                     let nextOpKey = code + '_' + String(routes[idx+1]['Име на операция']).trim().toLowerCase();
                     let nextOpDone = (grossTrueDoneOps[nextOpKey] || 0) + (manualOps[nextOpKey] || 0);
-                    availableStock = Math.max(0, doneQty - nextOpDone);
+                    let nextDoneQty = Math.max(0, nextOpDone + (savedQty[code] || 0) - consumedByShipped);
+                    availableStock = Math.max(0, doneQty - nextDoneQty);
                 }
             }
             
