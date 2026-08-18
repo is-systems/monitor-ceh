@@ -64,3 +64,34 @@ async function finishPackingTask(taskId, btn) {
         }
     });
 }
+
+let localHistoryData = [];
+function updateHistoryUI() {
+    var list = document.getElementById('historyList');
+    if (!list) return;
+    if (localHistoryData.length === 0) { list.innerHTML = '<li class="history-item" style="color:#94a3b8; text-align:center;">Няма скорошни действия</li>'; return; }
+    var html = '';
+    localHistoryData.forEach(function(h) {
+        let color = '#15803d'; let bg = '#dcfce7'; 
+        if(h.type.includes('БРАК')) { color = '#b91c1c'; bg = '#fee2e2'; }
+        else if(h.type.includes('ОФЛАЙН')) { color = '#b45309'; bg = '#fef3c7'; }
+        else if(h.type.includes('ОПАКОВАНЕ')) { color = '#0369a1'; bg = '#e0f2fe'; }
+        html += `<li class="history-item">
+            <span class="h-time">${h.time}</span>
+            <span class="h-type" style="background:${bg}; color:${color};">${h.type}</span>
+            <span class="h-name">${h.name}</span>
+            <span class="h-qty">${h.qty} бр.</span>
+        </li>`;
+    });
+    list.innerHTML = html;
+}
+
+function addLogToHistory(type, qty, taskId) {
+    var now = new Date(); 
+    var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    let taskData = globalTasks.find(t => t.id === taskId); 
+    var name = taskData ? (taskData.name) : 'Детайл';
+    localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name }); 
+    if (localHistoryData.length > 6) localHistoryData.pop(); 
+    updateHistoryUI();
+}
