@@ -334,12 +334,20 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let grossCompletedOps = {};
 
     let allCombinedReports = sortedReports;
+    let packagedQty = {}; // [NEW] Track packaged items
 
     allCombinedReports.forEach(r => {
         let code = String(r['ID Детайл']).trim().toLowerCase();
         let op = String(r['Операция']).trim().toLowerCase();
         let key = code + '_' + String(r['Операция']).trim().toLowerCase();
         let qty = parseFloat(r['Количество']) || 0;
+        
+        if (op.startsWith('опаковане - кашон') && r['Статус'] === 'Отчетено') {
+            let rawPId = String(r['ID План'] || '').trim();
+            let pId = planNameToId[rawPId] || rawPId;
+            let packKey = pId ? (code + '_' + pId) : code;
+            packagedQty[packKey] = (packagedQty[packKey] || 0) + qty;
+        }
         
         if (r['Статус'] === 'Брак') {
             scrappedOps[key] = (scrappedOps[key] || 0) + qty;
@@ -566,6 +574,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     Object.values(mergedNodes).forEach(n => {
 
         let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
+        
+        n.packagedQty = packagedQty[n.code.toLowerCase() + '_' + n.planId] || packagedQty[n.code.toLowerCase()] || 0;
         
         let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
@@ -970,6 +980,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
 
     const isRoot = !parentMap[node.id]; 
     const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
+    const packageMarker = (node.packagedQty && node.packagedQty > 0) ? `<span style="margin-left:8px; font-weight:800; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:6px; font-size:0.9em; box-shadow:0 1px 2px rgba(0,0,0,0.1);" title="${node.packagedQty} бр. опаковани">📦 ${node.packagedQty}</span>` : '';
     
     let headerQty = 0;
     let headerScrap = 0;
@@ -1074,7 +1085,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     return `
         <div class="vsm-node" id="card_${dId}" data-part-type="${node.partType || ''}">
         <div class="vsm-header">
-            <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}</span>
+            <span class="vsm-title ${titleClass}">${rootMarker}${node.displayName}${drawingLinkHTML}${packageMarker}</span>
             <span class="vsm-qty">| ${formatHeaderQty(headerQty, node.planQty, headerScrap)}</span>
         </div>
         ${opsHTML !== '' ? opsHTML : ''}

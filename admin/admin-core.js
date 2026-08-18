@@ -103,6 +103,26 @@ async function loadCurrentTableData() {
                   r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
               });
           }
+          const packRes = await client.from('otcheti').select('ID План, ID Детайл, Количество, Операция').ilike('Операция', 'Опаковане - Кашон №%').eq('Статус', 'Отчетено');
+          if (!packRes.error && packRes.data) {
+              const packMap = {};
+              packRes.data.forEach(p => {
+                  let pId = String(p['ID План'] || '').trim();
+                  let code = String(p['ID Детайл']).trim().toUpperCase();
+                  let key = pId + '_' + code;
+                  if (!packMap[key]) packMap[key] = {};
+                  let boxMatch = p['Операция'].match(/Опаковане - Кашон №\s*(.+)/i);
+                  let boxNum = boxMatch ? boxMatch[1] : '?';
+                  packMap[key][boxNum] = (packMap[key][boxNum] || 0) + (parseFloat(p['Количество']) || 0);
+              });
+              rows.forEach(r => {
+                  let key = String(r.id).trim() + '_' + String(r['ID Детайл']).trim().toUpperCase();
+                  if (packMap[key]) {
+                      let boxTexts = Object.keys(packMap[key]).map(b => `${packMap[key][b]} бр в кашон № ${b}`);
+                      r['__packaged_info'] = ` <span style="color:#d97706; font-size:0.85em; font-weight:bold;">(${boxTexts.join(', ')})</span>`;
+                  }
+              });
+          }
 
       } else if (currentTab === 'otcheti') {
           const planRes = await client.from('plan').select('id, "Вътрешно име", "Месец", "Година"');
@@ -221,9 +241,14 @@ function renderDynamicTable(itemsToRender = null) {
       if (currentTab === 'plan' && f.name === 'ID Детайл' && val) {
           let safeVal = String(val).replace(/"/g, '&quot;').replace(/'/g, '\\\'');
           td.innerHTML = `<button onclick="openResolverTree('${safeVal}')" style="background:none; border:none; color:#2563eb; font-weight:900; text-decoration:underline; cursor:pointer; font-size:1em; padding:0;">${val}</button>`;
+          if (item['__packaged_info']) td.innerHTML += item['__packaged_info'];
           row.appendChild(td); return;
       }
-      td.innerText = val; row.appendChild(td);
+      td.innerText = val; 
+      if (currentTab === 'plan' && f.name === 'Вътрешно име' && item['__packaged_info']) {
+          td.innerHTML = val + item['__packaged_info'];
+      }
+      row.appendChild(td);
     });
       if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
           const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
