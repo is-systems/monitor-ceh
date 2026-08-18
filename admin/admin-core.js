@@ -535,8 +535,8 @@ async function computeSkladData(isGpTab) {
                 if (!isGpTab) {
                     let nextOpKey = code + '_' + String(routes[idx+1]['Име на операция']).trim().toLowerCase();
                     let nextOpDone = (grossTrueDoneOps[nextOpKey] || 0) + (manualOps[nextOpKey] || 0);
-                    let nextDoneQty = Math.max(0, nextOpDone + (savedQty[code] || 0) - consumedByShipped);
-                    availableStock = Math.max(0, doneQty - nextDoneQty);
+                    let safeScrappedBetween = scrappedOps[nextOpKey] || 0;
+                    availableStock = Math.max(0, myGrossDone - nextOpDone - safeScrappedBetween);
                 }
             }
             
