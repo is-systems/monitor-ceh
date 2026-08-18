@@ -337,7 +337,8 @@ function buildForm(data = null) {
                 <div id="skladDetailDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #cbd5e1; border-radius:4px; z-index:1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"></div>
             </div>
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
-            <div class="form-group"><label>Количество за добавяне:</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="1" required></div>
+            <div class="form-group"><label>Количество за добавяне (физическо):</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" value="0" required></div>
+            <div class="form-group"><label>Количество за добавяне (буфер):</label><input type="number" id="inp_skladQtyBuffer" class="form-input" step="any" min="0" value="0" required></div>
           `;
           
           if (globalNomenclatureCodes.length === 0) {
@@ -677,13 +678,29 @@ async function saveForm(e) {
               const det = document.getElementById('inp_skladDetail').value.trim();
               const op = document.getElementById('inp_skladOp').value.trim();
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
-              if (!det || !op || qty === 0) throw new Error("Моля, попълнете всички полета коректно.");
+              const bufferQty = parseFloat(document.getElementById('inp_skladQtyBuffer').value) || 0;
+              if (!det || !op || (qty === 0 && bufferQty === 0)) throw new Error("Моля, въведете поне едно количество (физическо или буфер).");
               
-              Swal.fire({title: 'Симулация на история...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-              let inserts = await backflushSimulation(det, op, qty);
-              if (inserts.length > 0) {
-                  const { error: insErr } = await client.from('otcheti').insert(inserts);
-                  if (insErr) throw insErr;
+              if (qty > 0) {
+                  Swal.fire({title: 'Симулация на история...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                  let inserts = await backflushSimulation(det, op, qty);
+                  if (inserts.length > 0) {
+                      const { error: insErr } = await client.from('otcheti').insert(inserts);
+                      if (insErr) throw insErr;
+                  }
+              }
+              
+              if (bufferQty > 0) {
+                  Swal.fire({title: 'Запазване на буфер...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                  let currentBuffer = 0;
+                  const { data: bufData } = await client.from('sklad_bufferi').select('Буфер').eq('ID Детайл', det);
+                  if (bufData && bufData.length > 0) {
+                      currentBuffer = parseFloat(bufData[0]['Буфер']) || 0;
+                  }
+                  const newBufferTotal = currentBuffer + bufferQty;
+                  await client.from('sklad_bufferi').delete().eq('ID Детайл', det);
+                  const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBufferTotal }]);
+                  if (bufError) throw bufError;
               }
               
               Swal.fire({icon: 'success', title: 'Успешно добавено в склада!', timer: 1500, showConfirmButton: false});
