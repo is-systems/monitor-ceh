@@ -88,10 +88,10 @@ function updateHistoryUI() {
 
 function addLogToHistory(type, qty, taskId) {
     var now = new Date(); 
-    var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    var timeStr = now.getDate().toString().padStart(2, '0') + '.' + (now.getMonth() + 1).toString().padStart(2, '0') + ' ' + now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     let taskData = globalTasks.find(t => t.id === taskId); 
     var name = taskData ? (taskData.name) : 'Детайл';
     localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name }); 
-    if (localHistoryData.length > 6) localHistoryData.pop(); 
+    if (localHistoryData.length > 10) localHistoryData.pop(); 
     updateHistoryUI();
 }
