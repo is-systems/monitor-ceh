@@ -65,7 +65,7 @@ async function finishPackingTask(taskId, btn) {
     });
 }
 
-let localHistoryData = [];
+// Removed duplicate localHistoryData declaration
 function updateHistoryUI() {
     var list = document.getElementById('historyList');
     if (!list) return;
@@ -94,4 +94,56 @@ function addLogToHistory(type, qty, taskId) {
     localHistoryData.unshift({ time: timeStr, type: type, qty: qty, name: name }); 
     if (localHistoryData.length > 10) localHistoryData.pop(); 
     updateHistoryUI();
+}
+
+async function changeMachine(isInitial = false) {
+    currentMachine = "ОПАКОВАНЕ";
+    document.getElementById('uiMachineName').innerText = "ОПАКОВАНЕ";
+}
+
+async function loadHistoryFromDB() {
+    if (!currentOperator || currentOperator === "undefined" || !navigator.onLine) return;
+    try {
+        const { data, error } = await client.from('otcheti')
+            .select('"ID Детайл", Количество, Дата, Операция')
+            .eq('Оператор', currentOperator)
+            .ilike('Операция', 'Опаковане%')
+            .order('Дата', { ascending: false })
+            .limit(10);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+            localHistoryData = data.map(r => {
+                let d = new Date(r['Дата']);
+                let timeStr = d.getDate().toString().padStart(2, '0') + '.' + (d.getMonth() + 1).toString().padStart(2, '0') + ' ' + d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                
+                return {
+                    time: timeStr,
+                    type: 'ОПАКОВАНЕ',
+                    qty: r['Количество'],
+                    name: String(r['ID Детайл']).trim()
+                };
+            });
+            updateHistoryUI();
+        }
+    } catch (e) {
+        console.error("Грешка при зареждане на история от базата:", e);
+    }
+}
+
+function toggleHistory() { 
+    var panel = document.getElementById('historyPanel'); 
+    panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none'; 
+    if(panel.style.display === 'block') document.getElementById('messagesPanel').style.display = 'none';
+}
+
+async function toggleMessages() {
+    var panel = document.getElementById('messagesPanel');
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        document.getElementById('historyPanel').style.display = 'none';
+        if (typeof fetchMessages === 'function') await fetchMessages();
+    } else {
+        panel.style.display = 'none';
+    }
 }
