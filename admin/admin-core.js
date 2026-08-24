@@ -107,16 +107,15 @@ async function loadCurrentTableData() {
           if (!packRes.error && packRes.data) {
               const packMap = {};
               packRes.data.forEach(p => {
-                  let pId = String(p['ID План'] || '').trim();
                   let code = String(p['ID Детайл']).trim().toUpperCase();
-                  let key = pId + '_' + code;
+                  let key = code; // Only use detail ID because plan ID in otcheti might be a string (month) or number or null
                   if (!packMap[key]) packMap[key] = {};
                   let boxMatch = p['Операция'].match(/Опаковане - Кашон №\s*(.+)/i);
                   let boxNum = boxMatch ? boxMatch[1] : '?';
                   packMap[key][boxNum] = (packMap[key][boxNum] || 0) + (parseFloat(p['Количество']) || 0);
               });
               rows.forEach(r => {
-                  let key = String(r.id).trim() + '_' + String(r['ID Детайл']).trim().toUpperCase();
+                  let key = String(r['ID Детайл']).trim().toUpperCase();
                   if (packMap[key]) {
                       let totalPackaged = 0;
                       let boxes = Object.keys(packMap[key]);

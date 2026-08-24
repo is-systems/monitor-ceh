@@ -572,28 +572,38 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     });
 
     allNodes.forEach(n => {
-
-        let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
-        
         n.packagedQty = packagedQty[n.code.toLowerCase() + '_' + n.planId] || packagedQty[n.code.toLowerCase()] || 0;
-        
-        if (n.packagedQty >= n.planQty) {
-            n.hiddenDueToPacking = true;
+    });
+
+    let hidingCache = {};
+    function determineHiding(nodeId) {
+        if (hidingCache[nodeId] !== undefined) return hidingCache[nodeId];
+        let node = mergedNodes[nodeId];
+        if (node.packagedQty >= node.planQty) {
+            hidingCache[nodeId] = true;
+            return true;
         }
-        
-        let hasParents = false;
-        let allParentsHidden = true;
-        Object.keys(childrenMap).forEach(parentId => {
-            if (childrenMap[parentId].includes(n.id)) {
-                hasParents = true;
-                if (!mergedNodes[parentId].hiddenDueToPacking) {
+        let parents = Object.keys(childrenMap).filter(pId => childrenMap[pId].includes(nodeId));
+        if (parents.length > 0) {
+            let allParentsHidden = true;
+            for (let pId of parents) {
+                if (!determineHiding(pId)) {
                     allParentsHidden = false;
+                    break;
                 }
             }
-        });
-        if (hasParents && allParentsHidden) {
-            n.hiddenDueToPacking = true;
+            if (allParentsHidden) {
+                hidingCache[nodeId] = true;
+                return true;
+            }
         }
+        hidingCache[nodeId] = false;
+        return false;
+    }
+
+    allNodes.forEach(n => {
+        n.hiddenDueToPacking = determineHiding(n.id);
+        let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
         
         let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
