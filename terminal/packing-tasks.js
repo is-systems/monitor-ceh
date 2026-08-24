@@ -117,21 +117,19 @@ async function loadTasks(isSilent = false) {
               
               let availableToPack = Math.max(0, totalCompleted - totalPackaged);
               
-              if (availableToPack > 0) {
-                  globalTasks.push({
-                      id: 'pack_' + code + '_' + planIdMap[groupKey],
-                      plan_id: planIdMap[groupKey],
-                      plan_name: planNames[groupKey],
-                      name: code.toUpperCase(),
-                      internalName: namesMap[code] || '',
-                      available: availableToPack,
-                      target: targetQty
-                  });
-              }
+              globalTasks.push({
+                  id: 'pack_' + code + '_' + planIdMap[groupKey],
+                  plan_id: planIdMap[groupKey],
+                  plan_name: planNames[groupKey],
+                  name: code.toUpperCase(),
+                  internalName: namesMap[code] || '',
+                  available: availableToPack,
+                  target: targetQty
+              });
           });
       });
 
-      renderTasks(globalTasks);
+      setTaskFilter(currentTaskFilter || 'ready');
   } catch (err) { 
       console.error(err); 
       document.getElementById('tasksContainer').innerHTML = '<div style="text-align:center; padding: 40px; color:#ef4444; font-weight:bold;">❌ Грешка:<br>' + err.message + '</div>'; 
@@ -182,6 +180,18 @@ function renderTasks(tasks) {
 }
 
 function setTaskFilter(filterType) { 
-    // За Опаковане не ни трябват филтри, но запазваме функцията, за да не гърми HTML-ът
-    renderTasks(globalTasks); 
+    currentTaskFilter = filterType;
+    document.querySelectorAll('.t-filter-btn').forEach(btn => btn.classList.remove('active'));
+    var activeBtn = document.getElementById('filter_' + filterType);
+    if(activeBtn) activeBtn.classList.add('active');
+
+    let filtered = [];
+    if (filterType === 'ready') {
+        filtered = globalTasks.filter(t => t.available > 0);
+    } else if (filterType === 'taken') {
+        filtered = []; // За опаковане няма "поети/започнати" задачи
+    } else {
+        filtered = globalTasks; // Всички
+    }
+    renderTasks(filtered);
 }
