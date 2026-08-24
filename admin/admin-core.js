@@ -103,7 +103,7 @@ async function loadCurrentTableData() {
                   r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
               });
           }
-          const packRes = await client.from('otcheti').select('ID План, ID Детайл, Количество, Операция').ilike('Операция', 'Опаковане - Кашон №%').eq('Статус', 'Отчетено');
+          const packRes = await client.from('otcheti').select('ID План, ID Детайл, Количество, Операция').ilike('Операция', '%Опаковане%').eq('Статус', 'Отчетено');
           if (!packRes.error && packRes.data) {
               const packMap = {};
               packRes.data.forEach(p => {

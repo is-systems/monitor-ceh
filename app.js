@@ -572,7 +572,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     });
 
     allNodes.forEach(n => {
-        n.packagedQty = packagedQty[n.code.toLowerCase() + '_' + n.planId] || packagedQty[n.code.toLowerCase()] || 0;
+        let cleanCode = n.code.toLowerCase().replace(/#+$/, '');
+        n.packagedQty = packagedQty[cleanCode + '_' + n.planId] || packagedQty[cleanCode] || 0;
     });
 
     let hidingCache = {};
