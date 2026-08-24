@@ -118,8 +118,11 @@ async function loadCurrentTableData() {
               rows.forEach(r => {
                   let key = String(r.id).trim() + '_' + String(r['ID Детайл']).trim().toUpperCase();
                   if (packMap[key]) {
-                      let boxTexts = Object.keys(packMap[key]).map(b => `${packMap[key][b]} бр в кашон № ${b}`);
-                      r['__packaged_info'] = ` <span style="color:#d97706; font-size:0.85em; font-weight:bold;">(${boxTexts.join(', ')})</span>`;
+                      let totalPackaged = 0;
+                      let boxes = Object.keys(packMap[key]);
+                      boxes.forEach(b => totalPackaged += packMap[key][b]);
+                      let boxesStr = boxes.length > 0 ? ` (кашони: ${boxes.join(', ')})` : '';
+                      r['__packaged_info'] = `<br><span style="color:#16a34a; font-size:0.85em; font-weight:bold;">📦 Опаковани - ${totalPackaged} бр.${boxesStr}</span>`;
                   }
               });
           }
@@ -423,12 +426,17 @@ async function computeSkladData(isGpTab) {
 
     
     let allCombinedReports = sortedReports;
+    let packagedTotal = {};
     
     allCombinedReports.forEach(r => {
         let code = String(r['ID Детайл']).trim().toLowerCase();
         let op = String(r['Операция']).trim().toLowerCase();
         let key = code + '_' + op;
         let qty = parseFloat(r['Количество']) || 0;
+        
+        if (op.startsWith('опаковане - кашон') && r['Статус'] === 'Отчетено') {
+            packagedTotal[code] = (packagedTotal[code] || 0) + qty;
+        }
         
         if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
         else if (r['Статус'] === 'Отчетено') {
@@ -580,10 +588,14 @@ async function computeSkladData(isGpTab) {
             let freeStock = Math.max(0, availableStock - reservedSum);
             
             if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
+                let displayName = nomNameMap[code] || route['Код на детайла'];
+                if (isGpTab && idx === routes.length - 1 && packagedTotal[code]) {
+                    displayName += ` (Опаковани ${packagedTotal[code]} бр)`;
+                }
                 rows.push({
                     "RawPlanId": "",
                     "ID Детайл": route['Код на детайла'],
-                    "Име": nomNameMap[code] || route['Код на детайла'],
+                    "Име": displayName,
                     "Операция": opName,
                     "Оригинална Операция": opName,
                     "Общо": availableStock,

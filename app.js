@@ -571,11 +571,29 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         });
     });
 
-    Object.values(mergedNodes).forEach(n => {
+    allNodes.forEach(n => {
 
         let typeStr = (n.partType + " " + n.code).toLowerCase().replace(/[\s\.\-\_]+/g, '');
         
         n.packagedQty = packagedQty[n.code.toLowerCase() + '_' + n.planId] || packagedQty[n.code.toLowerCase()] || 0;
+        
+        if (n.packagedQty >= n.planQty) {
+            n.hiddenDueToPacking = true;
+        }
+        
+        let hasParents = false;
+        let allParentsHidden = true;
+        Object.keys(childrenMap).forEach(parentId => {
+            if (childrenMap[parentId].includes(n.id)) {
+                hasParents = true;
+                if (!mergedNodes[parentId].hiddenDueToPacking) {
+                    allParentsHidden = false;
+                }
+            }
+        });
+        if (hasParents && allParentsHidden) {
+            n.hiddenDueToPacking = true;
+        }
         
         let isDirectlyInPlan = explicitPlanItems.has(`${n.planId}___${n.code.toUpperCase()}`);
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
@@ -976,6 +994,7 @@ function drawDashboard(jsonString) {
 }
 
 function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
+    if (node.hiddenDueToPacking) return '';
     let dId = getDomId(node.id);
 
     const isRoot = !parentMap[node.id]; 
