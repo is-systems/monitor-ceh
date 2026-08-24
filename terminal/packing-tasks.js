@@ -63,6 +63,18 @@ async function loadTasks(isSilent = false) {
           planIdMap[groupKey] = planId;
       });
 
+      let prePackingOpByDetail = {};
+      Object.keys(globalRoutesByDetail).forEach(code => {
+          let routes = globalRoutesByDetail[code];
+          for (let i = routes.length - 1; i >= 0; i--) {
+              let opName = String(routes[i]['Име на операция']).trim().toLowerCase();
+              if (!opName.startsWith('опаковане')) {
+                  prePackingOpByDetail[code] = opName;
+                  break;
+              }
+          }
+      });
+
       let completedFinalOps = {};
       let packagedQty = {};
       let explicitPlanPackagedQty = {};
@@ -87,13 +99,9 @@ async function loadTasks(isSilent = false) {
                   explicitPlanPackagedQty[planKey] = (explicitPlanPackagedQty[planKey] || 0) + qty;
               }
           } else {
-              // Намираме последната операция за този детайл
-              let routes = globalRoutesByDetail[code];
-              if (routes && routes.length > 0) {
-                  let lastOpName = String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
-                  if (op === lastOpName) {
-                      completedFinalOps[code] = (completedFinalOps[code] || 0) + qty;
-                  }
+              let expectedOp = prePackingOpByDetail[code];
+              if (expectedOp && op === expectedOp) {
+                  completedFinalOps[code] = (completedFinalOps[code] || 0) + qty;
               }
           }
       });
