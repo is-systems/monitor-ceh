@@ -1,6 +1,6 @@
-body { font-family: 'Segoe UI', sans-serif; background-color: #fff3cd; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
+body { font-family: 'Segoe UI', sans-serif; background-color: #ffffff; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
 .container { padding: 15px; display: flex; flex-direction: column; align-items: center; }
-.app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #fff3cd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
+.app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
 .profile-area { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 8px; }
 .profile-area:active { background: #f1f5f9; }
 .operator-name { font-size: 0.8em; color: #64748b; font-weight: bold; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -12,7 +12,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #fff3cd; margin: 0
 .btn-out:active { background-color: #b91c1c; transform: scale(0.95); }
 .machine-bar { 
     width: 100%; 
-    background: #fff3cd; 
+    background: #ffffff; 
     padding: 8px 15px; 
     text-align: center; 
     font-size: 0.85em; 
