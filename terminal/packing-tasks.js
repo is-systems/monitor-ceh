@@ -16,19 +16,29 @@ async function loadTasks(isSilent = false) {
   if (!isSilent) container.innerHTML = '<div id="loadingMsg" style="text-align:center; padding: 40px; font-weight:bold; color:#64748b; font-size: 1.2em;">Търсене на задачи за опаковане... 🔄</div>';
   
   try {
-      const [plansRes, routesRes, reportsRes, nomRes] = await Promise.all([
+      const [plansRes, routesRes, reportsRes, nomRes, gpRes] = await Promise.all([
           client.from('plan').select('*').in('Статус', ['Активен', 'Завършен']).limit(100000), 
           client.from('marshruti').select('*').limit(100000), 
           client.from('otcheti').select('*').order('Дата', {ascending: false}).limit(100000), 
-          client.from('Номенклатура').select('*').limit(100000)
+          client.from('Номенклатура').select('*').limit(100000),
+          client.from('inventory_gp').select('*').limit(100000)
       ]);
 
       if (plansRes.error) throw plansRes.error;
       if (routesRes.error) throw routesRes.error; 
       if (reportsRes.error) throw reportsRes.error;
+      if (gpRes.error) throw gpRes.error;
 
       let namesMap = {}; 
       if (nomRes.data) nomRes.data.forEach(n => { let code = String(n['ID Детайл']).trim().toLowerCase(); namesMap[code] = n['Вътрешно име'] || ''; });
+
+      let gpStock = {};
+      if (gpRes.data) {
+          gpRes.data.forEach(row => {
+              let code = String(row['ID Детайл']).trim().toLowerCase();
+              gpStock[code] = (gpStock[code] || 0) + (parseFloat(row['Количество']) || 0);
+          });
+      }
 
       let globalRoutesByDetail = {};
       routesRes.data.forEach(r => { 
@@ -49,7 +59,7 @@ async function loadTasks(isSilent = false) {
           let targetQty = parseFloat(plan['Целево количество']) || 0;
           let monthYear = (plan['Месец'] && plan['Година']) ? (plan['Месец'] + ' ' + plan['Година']) : '';
           
-          let groupKey = monthYear || planId; 
+          let groupKey = planId; 
           
           if (nomRes.data) {
               let translated = nomRes.data.find(n => String(n['Вътрешно име']).trim() === rootItem);
@@ -61,18 +71,6 @@ async function loadTasks(isSilent = false) {
           planRoots[groupKey][rootItem] = (planRoots[groupKey][rootItem] || 0) + targetQty;
           planNames[groupKey] = monthYear ? monthYear : plan['Вътрешно име'];
           planIdMap[groupKey] = planId;
-      });
-
-      let prePackingOpByDetail = {};
-      Object.keys(globalRoutesByDetail).forEach(code => {
-          let routes = globalRoutesByDetail[code];
-          for (let i = routes.length - 1; i >= 0; i--) {
-              let opName = String(routes[i]['Име на операция']).trim().toLowerCase();
-              if (!opName.startsWith('опаковане')) {
-                  prePackingOpByDetail[code] = opName;
-                  break;
-              }
-          }
       });
 
       let completedFinalOps = {};
@@ -99,37 +97,46 @@ async function loadTasks(isSilent = false) {
                   explicitPlanPackagedQty[planKey] = (explicitPlanPackagedQty[planKey] || 0) + qty;
               }
           } else {
-              let expectedOp = prePackingOpByDetail[code];
-              if (expectedOp && op === expectedOp) {
-                  completedFinalOps[code] = (completedFinalOps[code] || 0) + qty;
+              // Намираме последната операция за този детайл
+              let routes = globalRoutesByDetail[code];
+              if (routes && routes.length > 0) {
+                  let lastOpName = String(routes[routes.length - 1]['Име на операция']).trim().toLowerCase();
+                  if (op === lastOpName) {
+                      completedFinalOps[code] = (completedFinalOps[code] || 0) + qty;
+                  }
               }
           }
       });
 
       globalTasks = [];
 
+      let taskCounter = 0;
+
       Object.keys(planRoots).forEach(groupKey => {
           Object.keys(planRoots[groupKey]).forEach(code => {
               let targetQty = planRoots[groupKey][code];
               
-              let totalCompleted = completedFinalOps[code] || 0;
               let totalPackaged = packagedQty[code] || 0;
+              let availableToPack = Math.max(0, (gpStock[code] || 0) - totalPackaged);
               
-              let availableToPack = Math.max(0, totalCompleted - totalPackaged);
+              let explicitPackaged = explicitPlanPackagedQty[code + '_' + planIdMap[groupKey]] || 0;
+              let remainingTarget = Math.max(0, targetQty - explicitPackaged);
               
-              globalTasks.push({
-                  id: 'pack_' + code + '_' + planIdMap[groupKey],
-                  plan_id: planIdMap[groupKey],
-                  plan_name: planNames[groupKey],
-                  name: code.toUpperCase(),
-                  internalName: namesMap[code] || '',
-                  available: availableToPack,
-                  target: targetQty
-              });
+              if (availableToPack > 0 && remainingTarget > 0) {
+                  globalTasks.push({
+                      id: 'packTask_' + (++taskCounter),
+                      plan_id: planIdMap[groupKey],
+                      plan_name: planNames[groupKey],
+                      name: code.toUpperCase(),
+                      internalName: namesMap[code] || '',
+                      available: availableToPack,
+                      target: remainingTarget
+                  });
+              }
           });
       });
 
-      setTaskFilter(currentTaskFilter || 'ready');
+      renderTasks(globalTasks);
   } catch (err) { 
       console.error(err); 
       document.getElementById('tasksContainer').innerHTML = '<div style="text-align:center; padding: 40px; color:#ef4444; font-weight:bold;">❌ Грешка:<br>' + err.message + '</div>'; 
@@ -170,7 +177,7 @@ function renderTasks(tasks) {
             <input type="text" id="box_${t.id}" class="box-input" placeholder="Въведи номер на кашон">
             
             <label style="font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Брой детайли в кашона</label>
-            <input type="number" id="qty_${t.id}" class="box-input" value="${t.available}" max="${t.available}" inputmode="numeric" style="margin-bottom:15px;">
+            <input type="number" id="qty_${t.id}" min="1" class="box-input" value="${Math.min(t.available, t.target)}" max="${Math.min(t.available, t.target)}" inputmode="numeric" style="margin-bottom:15px;">
             
             <button class="btn" id="btn_${t.id}" onclick="finishPackingTask('${t.id}', this)" style="background-color: #2563eb; width: 100%; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);">✅ ОТЧЕТИ ОПАКОВАНЕ</button>
         </div>
@@ -180,18 +187,6 @@ function renderTasks(tasks) {
 }
 
 function setTaskFilter(filterType) { 
-    currentTaskFilter = filterType;
-    document.querySelectorAll('.t-filter-btn').forEach(btn => btn.classList.remove('active'));
-    var activeBtn = document.getElementById('filter_' + filterType);
-    if(activeBtn) activeBtn.classList.add('active');
-
-    let filtered = [];
-    if (filterType === 'ready') {
-        filtered = globalTasks.filter(t => t.available > 0);
-    } else if (filterType === 'taken') {
-        filtered = []; // За опаковане няма "поети/започнати" задачи
-    } else {
-        filtered = globalTasks; // Всички
-    }
-    renderTasks(filtered);
+    // За Опаковане не ни трябват филтри, но запазваме функцията, за да не гърми HTML-ът
+    renderTasks(globalTasks); 
 }

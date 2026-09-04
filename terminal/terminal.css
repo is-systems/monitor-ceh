@@ -1,6 +1,6 @@
-body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
+body { font-family: 'Segoe UI', sans-serif; background-color: #fff3cd; margin: 0; padding: 0; color: #1c1e21; overflow-x: hidden; }
 .container { padding: 15px; display: flex; flex-direction: column; align-items: center; }
-.app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
+.app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #fff3cd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); box-sizing: border-box; position: sticky; top: 0; z-index: 100; }
 .profile-area { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 8px; }
 .profile-area:active { background: #f1f5f9; }
 .operator-name { font-size: 0.8em; color: #64748b; font-weight: bold; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -12,7 +12,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0
 .btn-out:active { background-color: #b91c1c; transform: scale(0.95); }
 .machine-bar { 
     width: 100%; 
-    background: #e2e8f0; 
+    background: #fff3cd; 
     padding: 8px 15px; 
     text-align: center; 
     font-size: 0.85em; 
@@ -26,7 +26,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #f1f5f9; margin: 0
     text-overflow: ellipsis;
 }
 .machine-title { color: #1e3a8a; font-weight: 900; text-decoration: underline; margin-left: 5px;}
-.task-filters { display: flex; width: 100%; background: white; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+.task-filters { display: flex; width: 100%; background: #fff3cd; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 .t-filter-btn { flex: 1; padding: 12px 5px; text-align: center; font-size: 0.85em; font-weight: 900; color: #64748b; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
 .t-filter-btn.active { color: #2563eb; border-bottom-color: #2563eb; background: #f8fafc; }
 #tasksContainer { width: 100%; max-width: 550px; margin: 15px auto 80px auto; display: flex; flex-direction: column; gap: 20px; }

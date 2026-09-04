@@ -87,6 +87,7 @@ function claimCurrentTaskDOM(taskId) {
   if (taskData) {
       taskData.isTaken = true;
       client.from('otcheti').insert([{ 
+          "ID План": taskData.plan_id,
           "ID Детайл": taskData.name, 
           "Оператор": currentOperator, 
           "Количество": 0, 
@@ -105,6 +106,7 @@ function pauseTaskDOM(taskId) {
   if (taskData) {
       taskData.isTaken = false;
       client.from('otcheti').insert([{ 
+          "ID План": taskData.plan_id,
           "ID Детайл": taskData.name, 
           "Оператор": currentOperator, 
           "Количество": 0, 
@@ -151,24 +153,36 @@ async function finishTask(taskId, btn) {
           }
 
           let startedAt = window['startTime_' + taskId] || new Date().toISOString();
-          let inserts = [{ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
-          
-          if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
-
+          let inserts = [];
+          if (taskData.scrapAllowance && taskData.scrapAllowance > 0 && val > taskData.pureQty) {
+              let excess = val - taskData.pureQty;
+              let normalQty = taskData.pureQty;
+              if (normalQty > 0) {
+                  inserts.push({ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": normalQty, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+              }
+              inserts.push({ "ID План": "СВРЪХПРОИЗВОДСТВО", "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": excess, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+          } else {
+              inserts.push({ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+          }
           const { error } = await client.from('otcheti').insert(inserts);
           if(error) throw error;
-          
-          if (typeof executeSkladUpdates === 'function') await executeSkladUpdates(inserts);
           
           addLogToHistory('ГОТОВО', val, taskId); activeTaskId = null; 
           Swal.fire({ icon: 'success', title: 'Браво!', text: 'Отчетени: ' + val + ' бр.', timer: 1500, showConfirmButton: false }).then(() => { loadTasks(); });
       } catch(err) { 
           if (!navigator.onLine || err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('fetch')) {
               let startedAt = window['startTime_' + taskId] || new Date().toISOString();
-              let inserts = [{ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
-              
-              if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
-              
+              let inserts = [];
+              if (taskData.scrapAllowance && taskData.scrapAllowance > 0 && val > taskData.pureQty) {
+                  let excess = val - taskData.pureQty;
+                  let normalQty = taskData.pureQty;
+                  if (normalQty > 0) {
+                      inserts.push({ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": normalQty, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+                  }
+                  inserts.push({ "ID План": "СВРЪХПРОИЗВОДСТВО", "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": excess, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+              } else {
+                  inserts.push({ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+              }
               if (taskData.hasLimit) { taskData.maxAllowed -= val; if (taskData.maxAllowed < 0) taskData.maxAllowed = 0; }
               saveToOfflineQueue(inserts, taskId, 'Отчетени: ' + val + ' бр.');
           } else {
@@ -186,7 +200,8 @@ async function reportScrap(taskId, btn) {
   let taskData = globalTasks.find(t => t.id === taskId);
   if (taskData.hasLimit && val > taskData.maxAllowed) { Swal.fire('Невъзможно', `Имаш материал само за ${taskData.maxAllowed} бр.!`, 'error'); return; }
 
-  if (taskData.name.includes('#')) {
+  let allowedResolverOps = ['зареждане', 'хонинговане', 'сглобяване + измерване'];
+  if (allowedResolverOps.includes(taskData.op.trim().toLowerCase())) {
       let children = globalBomData.filter(b => String(b['ID Родител']).trim() === taskData.name);
       if (children.length > 0) {
           let checkboxHtml = '<div style="text-align:left; margin-top:15px; font-size:14px; max-height: 250px; overflow-y: auto;"><p style="color:#e74c3c; font-weight:bold; margin-bottom:12px;">Кои компоненти вътре бяха счупени?<br><span style="font-size: 0.8em; color: #64748b;">(Отмаркирайте спасените детайли)</span></p>';
@@ -224,20 +239,19 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
 
         allChildren.forEach(child => {
             let cName = String(child['ID Компонент']).trim();
+            let multiplier = parseFloat(child['Количество']) || 1; 
+            let qty = val * multiplier;
             if (!scrappedChildrenNames.includes(cName)) {
-                let multiplier = parseFloat(child['Количество']) || 1; let savedQty = val * multiplier;
                 let cRoutes = globalRoutesByDetail[cName] || []; 
-                let opToLog = "Възстановен"; 
-                inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+                let opToLog = cRoutes.length > 0 ? String(cRoutes[cRoutes.length - 1]['Име на операция']).trim() : "Готово"; 
+                inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": qty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+            } else {
+                inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Бракуван Компонент)", "Количество": qty, "Операция": "Бракуван в " + taskData.name, "Статус": "Брак", "Дата": new Date().toISOString(), "Време Старт": startedAt });
             }
         });
 
-        if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
-
         const { error } = await client.from('otcheti').insert(inserts);
         if (error) throw error; 
-        
-        if (typeof executeSkladUpdates === 'function') await executeSkladUpdates(inserts);
         
         addLogToHistory('БРАК', val, taskData.id); Swal.close(); activeTaskId = null; loadTasks(); 
     } catch(err) { 
@@ -246,15 +260,16 @@ async function executeScrapLogic(taskData, val, allChildren, scrappedChildrenNam
             let inserts = [{ "ID План": taskData.plan_id, "ID Детайл": taskData.name, "Оператор": currentOperator, "Количество": val, "Операция": taskData.op, "Статус": "Брак", "Дата": new Date().toISOString(), "Време Старт": startedAt }];
             allChildren.forEach(child => {
                 let cName = String(child['ID Компонент']).trim();
+                let multiplier = parseFloat(child['Количество']) || 1; 
+                let qty = val * multiplier;
                 if (!scrappedChildrenNames.includes(cName)) {
-                    let multiplier = parseFloat(child['Количество']) || 1; let savedQty = val * multiplier;
                     let cRoutes = globalRoutesByDetail[cName] || []; 
-                    let opToLog = "Възстановен"; 
-                    inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": savedQty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+                    let opToLog = cRoutes.length > 0 ? String(cRoutes[cRoutes.length - 1]['Име на операция']).trim() : "Готово"; 
+                    inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Спасен)", "Количество": qty, "Операция": opToLog, "Статус": "Отчетено", "Дата": new Date().toISOString(), "Време Старт": startedAt });
+                } else {
+                    inserts.push({ "ID План": taskData.plan_id, "ID Детайл": cName, "Оператор": "СИСТЕМА (Бракуван Компонент)", "Количество": qty, "Операция": "Бракуван в " + taskData.name, "Статус": "Брак", "Дата": new Date().toISOString(), "Време Старт": startedAt });
                 }
             });
-            
-            if (typeof appendMaterialConsumptionInserts === 'function') appendMaterialConsumptionInserts(taskData, val, startedAt, inserts);
             
             if (taskData.hasLimit) { taskData.maxAllowed -= val; if (taskData.maxAllowed < 0) taskData.maxAllowed = 0; }
             saveToOfflineQueue(inserts, taskData.id, 'БРАК: ' + val + ' бр.');
@@ -373,22 +388,40 @@ function appendMaterialConsumptionInserts(taskData, val, startedAt, insertsArray
     let lcName = String(taskData.name).trim().toLowerCase();
     let cRoutes = globalRoutesByDetail[lcName] || globalRoutesByDetail[Object.keys(globalRoutesByDetail).find(k => _norm(k) === normName)] || [];
     let isLastOp = false;
+    let isFirstOp = false;
     
     if (cRoutes.length > 0) {
         let lastOp = cRoutes[cRoutes.length - 1];
         if (_norm(lastOp['Име на операция']) === _norm(taskData.op)) {
             isLastOp = true;
         }
+        let firstOp = cRoutes[0];
+        if (_norm(firstOp['Име на операция']) === _norm(taskData.op)) {
+            isFirstOp = true;
+        }
     } else {
         isLastOp = true;
+        isFirstOp = true;
     }
 
-    let debugChildrenLen = -1;
+    let children = globalBomData.filter(b => _norm(b['ID Родител']) === normName);
+    for (let child of children) {
+        let consumeNow = false;
+        let opNum = child['Влага се на Оп. №'] ? parseFloat(child['Влага се на Оп. №']) : 0;
+        
+        if (opNum > 0) {
+            // Consume at specific operation
+            if (opNum === taskData.opNum) {
+                consumeNow = true;
+            }
+        } else {
+            // Default behavior: consume at the first operation
+            if (isFirstOp) {
+                consumeNow = true;
+            }
+        }
 
-    if (isLastOp) {
-        let children = globalBomData.filter(b => _norm(b['ID Родител']) === normName);
-        debugChildrenLen = children.length;
-        for (let child of children) {
+        if (consumeNow) {
             let childName = String(child['ID Компонент']).trim();
             let multiplier = parseFloat(child['Количество']) || 1;
             let consumedQty = val * multiplier;

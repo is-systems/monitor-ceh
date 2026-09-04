@@ -1,10 +1,10 @@
-body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
-.navbar { background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 15px; }
+body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #fff3cd; margin: 0; padding: 0; color: #0f172a; }
+.navbar { background-color: #fff3cd; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 15px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 1.3em; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
 .nav-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab-btn { background: transparent; border: none; padding: 10px 16px; font-weight: 700; font-size: 0.9em; color: #64748b; cursor: pointer; border-radius: 6px; transition: all 0.2s; white-space: nowrap; }
 .tab-btn:hover { background-color: #f1f5f9; color: #0f172a; }
-.tab-btn.active { background-color: #e0e7ff; color: #4338ca; }
+.tab-btn.active { background-color: #fef08a; color: #a16207; }
 .main-container { max-width: 98%; margin: 20px auto; padding: 0 15px; box-sizing: border-box; }
 .controls-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap; }
 .search-box { flex: 1; max-width: 400px; min-width: 250px; }

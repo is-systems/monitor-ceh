@@ -32,12 +32,13 @@ function switchTab(tabKey) {
   globalColumnFilters = {}; document.getElementById('tableHead').innerHTML = '';
   
   const config = tableConfigs[tabKey]; const addBtn = document.getElementById('addNewBtn');
-  const pdfBtn = document.getElementById('pdfBtn'); const logBtn = document.getElementById('logisticsBtn'); const sidebar = document.getElementById('personnelSidebar');
+  const pdfBtn = document.getElementById('pdfBtn'); const logBtn = document.getElementById('logisticsBtn'); const mrpBtn = document.getElementById('mrpBtn'); const sidebar = document.getElementById('personnelSidebar');
   
   addBtn.innerText = `➕ Нов запис в ${config.label.replace(/[^а-яА-Я ]/g, '').trim()}`; 
   addBtn.style.display = (config.readOnlyTab && tabKey !== 'sklad_gp' && tabKey !== 'sklad_wip') ? 'none' : 'flex';
   if (pdfBtn) pdfBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
   if (logBtn) logBtn.style.display = (tabKey === 'plan') ? 'flex' : 'none';
+  if (mrpBtn) mrpBtn.style.display = (tabKey === 'porachki') ? 'flex' : 'none';
 
   // Тук прехвърлихме показването на папките само когато сме в менюто Персонал
   if (tabKey === 'personal') { sidebar.style.display = 'block'; loadPersonnelSidebar(); } else { sidebar.style.display = 'none'; }
@@ -103,28 +104,37 @@ async function loadCurrentTableData() {
                   r['ID Детайл'] = nomMap[r['Вътрешно име']] || r['Вътрешно име']; 
               });
           }
-          const packRes = await client.from('otcheti').select('ID План, ID Детайл, Количество, Операция').ilike('Операция', '%Опаковане%').eq('Статус', 'Отчетено');
+          const packRes = await client.from('otcheti').select('*').ilike('Операция', 'Опаковане - Кашон №%').in('Статус', ['Отчетено', 'Изпратено']);
           if (!packRes.error && packRes.data) {
               const packMap = {};
               packRes.data.forEach(p => {
+                  let pId = String(p['ID План'] || '').trim();
                   let code = String(p['ID Детайл']).trim().toUpperCase();
-                  let key = code; // Only use detail ID because plan ID in otcheti might be a string (month) or number or null
+                  let key = pId + '_' + code;
                   if (!packMap[key]) packMap[key] = {};
                   let boxMatch = p['Операция'].match(/Опаковане - Кашон №\s*(.+)/i);
                   let boxNum = boxMatch ? boxMatch[1] : '?';
                   packMap[key][boxNum] = (packMap[key][boxNum] || 0) + (parseFloat(p['Количество']) || 0);
               });
               rows.forEach(r => {
-                  let key = String(r['ID Детайл']).trim().toUpperCase();
+                  let key = String(r.id).trim() + '_' + String(r['ID Детайл']).trim().toUpperCase();
                   if (packMap[key]) {
-                      let totalPackaged = 0;
-                      let boxes = Object.keys(packMap[key]);
-                      boxes.forEach(b => totalPackaged += packMap[key][b]);
-                      let boxesStr = boxes.length > 0 ? ` (кашони: ${boxes.join(', ')})` : '';
-                      r['__packaged_info'] = `<br><span style="color:#16a34a; font-size:0.85em; font-weight:bold;">📦 Опаковани - ${totalPackaged} бр.${boxesStr}</span>`;
+                      let boxTexts = Object.keys(packMap[key]).map(b => `${packMap[key][b]} бр в кашон № ${b}`);
+                      r['__packaged_info'] = ` <span style="color:#d97706; font-size:0.85em; font-weight:bold;">(${boxTexts.join(', ')})</span>`;
                   }
               });
           }
+          rows.sort((a, b) => {
+              const statusWeight = (status) => {
+                  let s = String(status || '').trim().toLowerCase();
+                  if (s === 'изпратен' || s === 'завършен') return 1;
+                  return 0;
+              };
+              let weightA = statusWeight(a['Статус']);
+              let weightB = statusWeight(b['Статус']);
+              if (weightA !== weightB) return weightA - weightB;
+              return parseInt(b.id || 0) - parseInt(a.id || 0);
+          });
 
       } else if (currentTab === 'otcheti') {
           const planRes = await client.from('plan').select('id, "Вътрешно име", "Месец", "Година"');
@@ -145,6 +155,19 @@ async function loadCurrentTableData() {
       } else if (currentTab === 'sklad_wip') {
           rows = await computeSkladData(false);
       }
+      
+      if (currentTab === 'sklad') {
+          const nomRes = await client.from('Номенклатура').select('*');
+          if (!nomRes.error && nomRes.data) {
+              const nomMap = {};
+              nomRes.data.forEach(n => { nomMap[String(n['ID Детайл']).trim().toLowerCase()] = n['Мерна единица'] || n['Единици']; });
+              rows.forEach(r => {
+                  let code = String(r['ID Детайл']).trim().toLowerCase();
+                  if (nomMap[code]) r['Мерна единица'] = nomMap[code];
+              });
+          }
+      }
+
       globalRows = rows; filterTable();
   } catch (err) { document.getElementById('loadingLayout').innerHTML = '❌ Грешка: ' + err.message; }
 }
@@ -192,8 +215,8 @@ function renderDynamicTable(itemsToRender = null) {
           headerRow.appendChild(th); 
       });
       
-      if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') { 
-          const thActions = document.createElement('th'); thActions.innerText = 'Действия'; thActions.style.textAlign = 'center'; 
+      if (!config.readOnlyTab && currentTab !== 'sklad') { 
+          const thActions = document.createElement('th'); thActions.innerText = 'Действие'; thActions.style.textAlign = 'center'; 
           headerRow.appendChild(thActions); 
       }
       thead.appendChild(headerRow);
@@ -201,7 +224,7 @@ function renderDynamicTable(itemsToRender = null) {
 
   tbody.innerHTML = '';
   
-  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab && currentTab !== 'sklad_gp' && currentTab !== 'sklad_wip' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
+  if (currentRenderedRows.length === 0) { tbody.innerHTML = `<tr><td colspan="${config.fields.length + (config.readOnlyTab || currentTab === 'sklad' ? 0 : 2)}" style="text-align:center; padding:40px;">Няма данни.</td></tr>`; table.style.display = 'table'; return; }
 
   currentRenderedRows.forEach((item) => {
     const row = document.createElement('tr'); const trueIndex = globalRows.indexOf(item);
@@ -246,13 +269,17 @@ function renderDynamicTable(itemsToRender = null) {
           if (item['__packaged_info']) td.innerHTML += item['__packaged_info'];
           row.appendChild(td); return;
       }
+      if ((currentTab === 'sklad_gp' || currentTab === 'sklad_wip') && (f.name === 'Общо' || f.name === 'Минимално количество/Буфер') && typeof val === 'number' && val < 0) {
+          td.innerHTML = `<span style="color:#dc2626; font-weight:bold;">${val}</span>`;
+          row.appendChild(td); return;
+      }
       td.innerText = val; 
       if (currentTab === 'plan' && f.name === 'Вътрешно име' && item['__packaged_info']) {
           td.innerHTML = val + item['__packaged_info'];
       }
       row.appendChild(td);
     });
-      if (!config.readOnlyTab || currentTab === 'sklad_gp' || currentTab === 'sklad_wip') {
+      if (!config.readOnlyTab && currentTab !== 'sklad') {
           const tdActions = document.createElement('td'); tdActions.style.textAlign = 'center';
           tdActions.innerHTML = `<button class="action-btn btn-edit" onclick="openEditModal(${trueIndex})">✏️</button><button class="action-btn btn-delete" onclick="deleteItem(${trueIndex})">🗑️</button>`;
           row.appendChild(tdActions);
@@ -270,11 +297,12 @@ function renderDynamicTable(itemsToRender = null) {
 }
 
 function filterTable() { 
-    const q = document.getElementById('searchInput').value.toLowerCase().trim(); 
+    const normalizeStr = (str) => String(str || '').replace(/[\u00A0\s]+/g, ' ').trim().toLowerCase();
+    const q = normalizeStr(document.getElementById('searchInput').value); 
     let f = globalRows;
     
     if (q) {
-        f = f.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+        f = f.filter(r => Object.values(r).some(v => normalizeStr(v).includes(q)));
     }
     
     Object.keys(globalColumnFilters).forEach(col => {
@@ -285,7 +313,7 @@ function filterTable() {
                 if ((col === 'Време' || col === 'Дата') && val) {
                      try { let pVal = val; if (!pVal.endsWith('Z') && !pVal.includes('+')) pVal += 'Z'; val = new Date(pVal).toLocaleString('bg-BG'); } catch(e) {}
                 }
-                return String(val || '').toLowerCase().includes(colQ);
+                return normalizeStr(val).includes(colQ);
             });
         }
     });
@@ -339,8 +367,9 @@ function buildForm(data = null) {
                 <div id="skladDetailDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #cbd5e1; border-radius:4px; z-index:1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"></div>
             </div>
             <div class="form-group"><label>Операция:</label><select id="inp_skladOp" class="form-input" required><option value="">-- Въведете детайл първо --</option></select></div>
-            <div class="form-group"><label>Количество за добавяне (физическо):</label><input type="number" id="inp_skladQty" class="form-input" step="any" min="0" value="0" required></div>
-            <div class="form-group"><label>Количество за добавяне (буфер):</label><input type="number" id="inp_skladQtyBuffer" class="form-input" step="any" min="0" value="0" required></div>
+            <div class="form-group"><label>Количество (физическо):</label><input type="number" id="inp_skladQty" class="form-input" step="any" value="0" required></div>
+            <div class="form-group"><label>Количество (буфер):</label><input type="number" id="inp_skladQtyBuffer" class="form-input" step="any" value="0" required></div>
+            <div class="form-group"><label>Процент Брак (%):</label><input type="number" id="inp_skladScrap" class="form-input" step="any" min="0" placeholder="Без промяна"></div>
           `;
           
           if (globalNomenclatureCodes.length === 0) {
@@ -356,7 +385,8 @@ function buildForm(data = null) {
             <div class="form-group"><label>Операция:</label><input type="text" id="inp_skladOp" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"><input type="hidden" id="inp_skladRealOp"></div>
             <div class="form-group"><label>Текуща наличност:</label><input type="number" id="inp_skladOldQty" class="form-input" readonly style="background:#f1f5f9; color:#64748b;"></div>
             <div class="form-group"><label>НОВА наличност:</label><input type="number" id="inp_skladQty" class="form-input" step="any" required></div>
-            <div class="form-group"><label>Буфер (Минимално количество):</label><input type="number" id="inp_skladBuffer" class="form-input" step="any" min="0" required></div>
+            <div class="form-group"><label>Буфер (Минимално количество):</label><input type="number" id="inp_skladBuffer" class="form-input" step="any" required></div>
+            <div class="form-group"><label>Процент Брак (%):</label><input type="number" id="inp_skladScrap" class="form-input" step="any" min="0" required></div>
           `;
           document.getElementById('inp_skladDetail').value = data['ID Детайл'] || '';
           document.getElementById('inp_skladOp').value = data['Операция'] || '';
@@ -364,6 +394,7 @@ function buildForm(data = null) {
           document.getElementById('inp_skladOldQty').value = data['Общо'] || 0;
           document.getElementById('inp_skladQty').value = data['Общо'] || 0;
           document.getElementById('inp_skladBuffer').value = data['Минимално количество/Буфер'] || 0;
+          document.getElementById('inp_skladScrap').value = data['% Брак'] || 0;
       }
       return;
   }
@@ -399,290 +430,163 @@ async function fetchAll(table, orderCol) {
 }
 
 async function computeSkladData(isGpTab) {
-    const [reportsRes, marshrutiRes, bomRes, nomRes, bufferRes, plansRes] = await Promise.all([
-        fetchAll('otcheti'),
-        fetchAll('marshruti'), // NO ORDER COL - causes PostgreSQL offset data loss
-        fetchAll('bom'),
+    const table = isGpTab ? 'inventory_gp' : 'inventory_wip';
+    const [invRes, nomRes, bufferRes, routeRes] = await Promise.all([
+        fetchAll(table),
         fetchAll('Номенклатура'),
         fetchAll('sklad_bufferi'),
-        fetchAll('plan')
+        fetchAll('marshruti')
     ]);
     
-    let routesByDetail = {};
-    (marshrutiRes.data || []).forEach(r => {
-        let code = String(r['Код на детайла']).trim().toLowerCase();
-        if(!routesByDetail[code]) routesByDetail[code] = [];
-        routesByDetail[code].push(r);
-    });
-    
-    let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {}; let manualOps = {}; let savedQty = {};
-    
-    let sortedReports = (reportsRes.data || []).map(r => {
-        r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
-        return r;
-    }).sort((a,b) => a._ts - b._ts);
-    
-
-    
-    let allCombinedReports = sortedReports;
-    let packagedTotal = {};
-    
-    allCombinedReports.forEach(r => {
-        let code = String(r['ID Детайл']).trim().toLowerCase();
-        let op = String(r['Операция']).trim().toLowerCase();
-        let key = code + '_' + op;
-        let qty = parseFloat(r['Количество']) || 0;
-        
-        if (op.startsWith('опаковане - кашон') && r['Статус'] === 'Отчетено') {
-            packagedTotal[code] = (packagedTotal[code] || 0) + qty;
-        }
-        
-        if (r['Статус'] === 'Брак') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
-        else if (r['Статус'] === 'Отчетено') {
-            if (op === 'възстановен') {
-                savedQty[code] = (savedQty[code] || 0) + qty;
-            }
-            completedOps[key] = (completedOps[key]||0) + qty;
-            let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
-            if (isManual) {
-                manualOps[key] = (manualOps[key]||0) + qty;
-            } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) {
-                grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty;
-            }
-        }
-    });
-    
-    let trueDoneOps = {}; let grossTrueDoneOps = {}; let shippedQty = {}; let grossStartedOps = {};
-    
-    Object.keys(routesByDetail).forEach(code => {
-        let routes = routesByDetail[code];
-        routes.sort((a, b) => (parseFloat(a['№ Операция']) || 0) - (parseFloat(b['№ Операция']) || 0));
-        if(routes.length === 0) return;
-        
-        for (let i = routes.length - 2; i >= 0; i--) {
-            let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-            
-            let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
-            grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
-            
-            let manualRequiredFromMe = manualOps[nextOpKey] || 0;
-            manualOps[opKey] = (manualOps[opKey] || 0) + manualRequiredFromMe;
-            
-            let trueRequired = (completedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
-            completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
-        }
-        
-        let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
-        trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
-        grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
-        
-        for(let i = routes.length - 2; i >= 0; i--) {
-            let opKey = code + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-            let nextOpKey = code + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
-            
-            let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
-            if (bucket < 0) bucket = 0;
-            grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
-            
-            let trueBucket = (completedOps[opKey] || 0) - (completedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
-            if (trueBucket < 0) trueBucket = 0;
-            trueDoneOps[opKey] = (trueDoneOps[nextOpKey] || 0) + trueBucket;
-        }
-        
-        let firstOpKey = code + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
-        grossStartedOps[firstOpKey] = (grossCompletedOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
-        
-        shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
-    });
-    
-    let totalShippedCache = {};
-    function getTotalShipped(item, visited = new Set()) {
-        let lc = item.toLowerCase();
-        if(totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
-        if(visited.has(lc)) return 0; visited.add(lc);
-        let direct = shippedQty[lc] || 0; let indirect = 0;
-        let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
-        parents.forEach(p => {
-            let parentCode = String(p['ID Родител']).trim().toLowerCase();
-            if(parentCode !== lc) {
-                let parentRoutes = routesByDetail[parentCode];
-                let parentConsumed = 0;
-                if (parentRoutes && parentRoutes.length > 0) {
-                    let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                    parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
-                } else {
-                    parentConsumed = getTotalShipped(parentCode, new Set(visited));
-                }
-                indirect += parentConsumed * (parseFloat(p['Количество'])||1);
-            }
+    let bufferMap = {};
+    let bufferScrapMap = {};
+    if (bufferRes.data) {
+        bufferRes.data.forEach(b => {
+            let code = String(b['ID Детайл']).trim().toLowerCase();
+            bufferMap[code] = parseFloat(b['Буфер']) || 0;
+            bufferScrapMap[code] = parseFloat(b['% Брак']) || 0;
         });
-        totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
     }
     
-    let bufferMap = {}; (bufferRes.data || []).forEach(b => { bufferMap[String(b['ID Детайл']).trim().toLowerCase()] = parseFloat(b['Буфер']) || 0; });
-    let nomNameMap = {}; (nomRes.data || []).forEach(n => { nomNameMap[String(n['ID Детайл']).trim().toLowerCase()] = n['Вътрешно име'] || n['ID Детайл']; });
-    let planNames = {}; (plansRes.data || []).forEach(p => { planNames[String(p.id).trim()] = p['Вътрешно име'] || p.id; });
+    let nomNameMap = {};
+    let nomLocMap = {};
+    if (nomRes.data) {
+        nomRes.data.forEach(n => {
+            let c = String(n['ID Детайл']).trim().toLowerCase();
+            nomNameMap[c] = n['Вътрешно име'] || n['ID Детайл'];
+            nomLocMap[c] = String(n['Местоположение'] || '').trim();
+        });
+    }
     
+    let routeMap = {};
+    let lastDropoffMap = {};
+    if (routeRes.data) {
+        let routeGroups = {};
+        routeRes.data.forEach(r => {
+            let code = String(r['Код на детайла']).trim().toLowerCase();
+            let op = String(r['Име на операция']).trim().toLowerCase();
+            let dropoff = String(r['Инструкция за оставяне'] || '').trim();
+            if (dropoff) {
+                if (!routeMap[code]) routeMap[code] = {};
+                routeMap[code][op] = dropoff;
+            }
+            if (!routeGroups[code]) routeGroups[code] = [];
+            routeGroups[code].push(r);
+        });
+        Object.keys(routeGroups).forEach(code => {
+            let ops = routeGroups[code];
+            ops.sort((a, b) => (parseInt(a['№ Операция']) || 0) - (parseInt(b['№ Операция']) || 0));
+            let lastOpDropoff = String(ops[ops.length - 1]['Инструкция за оставяне'] || '').trim();
+            if (lastOpDropoff) {
+                lastDropoffMap[code] = lastOpDropoff;
+            }
+        });
+    }
+    
+    let packingData = [];
+    if (isGpTab) {
+        let pRes = await client.from('otcheti')
+            .select('*')
+            .ilike('Операция', '%Опаковане%')
+            .eq('Статус', 'Отчетено')
+            .limit(100000);
+        if (pRes.data) packingData = pRes.data;
+    }
+    
+    let packedByDetail = {};
+    let packedDetailsByBox = {};
+    packingData.forEach(p => {
+        let code = String(p['ID Детайл']).trim().toLowerCase();
+        let qty = parseFloat(p['Количество']) || 0;
+        let op = String(p['Операция']);
+        let boxMatch = op.match(/Кашон №\s*(.+)/i);
+        let box = boxMatch ? boxMatch[1].trim() : 'Неизвестен';
+        
+        if (!packedByDetail[code]) {
+            packedByDetail[code] = 0;
+            packedDetailsByBox[code] = {};
+        }
+        packedByDetail[code] += qty;
+        packedDetailsByBox[code][box] = (packedDetailsByBox[code][box] || 0) + qty;
+    });
+
     let rows = [];
-    Object.keys(routesByDetail).forEach(code => {
-        let routes = routesByDetail[code];
-        if(routes.length === 0) return;
-        let consumedByShipped = getTotalShipped(code);
-        routes.forEach((route, idx) => {
-            let opName = String(route['Име на операция']).trim();
-            let opKey = code + '_' + opName.toLowerCase();
-            let myGrossDone = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
-            let doneQty = Math.max(0, myGrossDone + (savedQty[code] || 0) - consumedByShipped);
+    (invRes.data || []).forEach(item => {
+        let code = String(item['ID Детайл']).trim().toLowerCase();
+        let qty = parseFloat(item['Количество']) || 0;
+        let buf = bufferMap[code] || 0;
+        let scrap = bufferScrapMap[code] || 0;
+        let opName = isGpTab ? 'Готов детайл' : (item['Операция'] || '');
+        
+        let reservedQty = packedByDetail[code] || 0;
+        let freeQty = Math.max(0, qty - reservedQty);
+        
+        let reservedStr = "0";
+        if (reservedQty > 0) {
+            let boxTexts = [];
+            Object.keys(packedDetailsByBox[code]).forEach(b => {
+                boxTexts.push(`${packedDetailsByBox[code][b]} бр в Кашон №${b}`);
+            });
+            reservedStr = boxTexts.join(', ');
+        }
+
+        let loc = '';
+        let opKey = String(item['Операция'] || '').trim().toLowerCase();
+        if (isGpTab) {
+            loc = nomLocMap[code] || lastDropoffMap[code] || 'Склад Готови Детайли';
+        } else {
+            loc = (routeMap[code] && routeMap[code][opKey]) ? routeMap[code][opKey] : 'Буфер';
+        }
+
+        let shouldShowEmpty = (buf > 0 || (scrap > 0 && scrap !== 20)) && isGpTab;
+
+        if (qty > 0 || shouldShowEmpty || reservedQty > 0) {
+            rows.push({
+                "RawPlanId": "",
+                "ID Детайл": item['ID Детайл'],
+                "Име": nomNameMap[code] || item['ID Детайл'],
+                "Локация": loc,
+                "Операция": opName,
+                "Оригинална Операция": opName,
+                "Общо": qty,
+                "Запазени": reservedStr,
+                "Свободни": freeQty,
+                "Минимално количество/Буфер": buf,
+                "% Брак": scrap
+            });
+        }
+    });
+    
+    if (isGpTab) {
+        Object.keys(bufferMap).forEach(code => {
+            let buf = bufferMap[code];
+            let scrap = bufferScrapMap[code] || 0;
+            let shouldShowEmpty = buf > 0 || (scrap > 0 && scrap !== 20);
             
-            let availableStock = 0;
-            if (idx === routes.length - 1) {
-                if (isGpTab) availableStock = doneQty;
-            } else {
-                if (!isGpTab) {
-                    let nextOpKey = code + '_' + String(routes[idx+1]['Име на операция']).trim().toLowerCase();
-                    let nextOpDone = (grossTrueDoneOps[nextOpKey] || 0) + (manualOps[nextOpKey] || 0);
-                    let safeScrappedBetween = scrappedOps[nextOpKey] || 0;
-                    availableStock = Math.max(0, myGrossDone - nextOpDone - safeScrappedBetween);
-                }
-            }
-            
-            let reservedSum = 0;
-            let reservedDetails = [];
-            
-            // Parents only consume fully finished pieces (from the last operation)
-            if (idx === routes.length - 1) {
-                let parents = (bomRes.data || []).filter(b => String(b['ID Компонент']).trim().toLowerCase() === code);
-                parents.forEach(p => {
-                    let pCode = String(p['ID Родител']).trim().toLowerCase();
-                    if (pCode !== code) {
-                        let pRoutes = routesByDetail[pCode];
-                        if (pRoutes && pRoutes.length > 0) {
-                            let firstOpKey = pCode + '_' + String(pRoutes[0]['Име на операция']).trim().toLowerCase();
-                            let lastOpKey = pCode + '_' + String(pRoutes[pRoutes.length-1]['Име на операция']).trim().toLowerCase();
-                            let pStarted = grossStartedOps[firstOpKey] || 0;
-                            let pFinished = grossTrueDoneOps[lastOpKey] || 0;
-                            
-                            let pReserved = pStarted - pFinished;
-                            
-                            // If it's a finished good, we must also account for fully shipped parents
-                            let mult = parseFloat(p['Количество']) || 1;
-                            
-                            // To know total consumed by this parent over all time:
-                            // The parent started `pStarted` pieces, so it consumed `pStarted * mult` pieces.
-                            // But wait! Is `Запазени` meant to be total historical consumption, or just current reservation?
-                            // Based on the user's expectation, a finished parent should NOT hold "reserved" pieces!
-                            // "Запазени" should ONLY be pieces that the parent has started but NOT finished!
-                            let actualReserved = pReserved * mult;
-                            if (actualReserved > 0) {
-                                reservedSum += actualReserved;
-                                let pName = nomNameMap[pCode] || pCode;
-                                reservedDetails.push(`${actualReserved} бр. за ${pName}`);
-                            }
-                        }
-                    }
-                });
-            }
-            let reservedStr = reservedSum > 0 ? `${reservedSum} (${reservedDetails.join(', ')})` : "0";
-            let freeStock = Math.max(0, availableStock - reservedSum);
-            
-            if (availableStock > 0 || (bufferMap[code] > 0 && isGpTab && idx === routes.length - 1)) {
-                let displayName = nomNameMap[code] || route['Код на детайла'];
-                if (isGpTab && idx === routes.length - 1 && packagedTotal[code]) {
-                    displayName += ` (Опаковани ${packagedTotal[code]} бр)`;
-                }
+            if (shouldShowEmpty && !rows.some(r => String(r['ID Детайл']).trim().toLowerCase() === code)) {
                 rows.push({
                     "RawPlanId": "",
-                    "ID Детайл": route['Код на детайла'],
-                    "Име": displayName,
-                    "Операция": opName,
-                    "Оригинална Операция": opName,
-                    "Общо": availableStock,
-                    "Запазени": reservedStr,
-                    "Свободни": freeStock,
-                    "Минимално количество/Буфер": bufferMap[code] || 0
+                    "ID Детайл": code.toUpperCase(),
+                    "Име": nomNameMap[code] || code,
+                    "Локация": nomLocMap[code] || lastDropoffMap[code] || 'Склад Готови Детайли',
+                    "Операция": "Готов детайл",
+                    "Оригинална Операция": "Готов детайл",
+                    "Общо": 0,
+                    "Запазени": "0",
+                    "Свободни": 0,
+                    "Минимално количество/Буфер": buf,
+                    "% Брак": scrap
                 });
             }
         });
-    });
+    }
+    
     return rows;
 }
 
-async function backflushSimulation(targetDetail, targetOp, targetQty) {
-    if (targetQty === 0) return [];
-    
-    // 1. Fetch bom and routes
-    const [bomRes, routeRes] = await Promise.all([
-        client.from('bom').select('*'),
-        client.from('marshruti').select('*')
-    ]);
-    
-    let routesByDet = {};
-    (routeRes.data || []).forEach(r => {
-        let lc = String(r['Код на детайла']).trim().toLowerCase();
-        if (!routesByDet[lc]) routesByDet[lc] = [];
-        routesByDet[lc].push(r);
-    });
-    Object.values(routesByDet).forEach(arr => arr.sort((a, b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0)));
 
-    let bomByParent = {};
-    (bomRes.data || []).forEach(b => {
-        let p = String(b['ID Родител']).trim().toLowerCase();
-        if (!bomByParent[p]) bomByParent[p] = [];
-        bomByParent[p].push(b);
-    });
 
-    let otchetiInserts = [];
-    let now = new Date().toISOString();
-
-    function simulate(itemCode, qty, stopAtOp) {
-        let lc = itemCode.trim().toLowerCase();
-        
-        let children = bomByParent[lc] || [];
-        if (children.length > 0) {
-            children.forEach(child => {
-                let cCode = String(child['ID Компонент']).trim();
-                let cQty = (parseFloat(child['Количество']) || 1) * qty;
-                simulate(cCode, cQty, null); 
-            });
-        } else {
-            if (!routesByDet[lc] || routesByDet[lc].length === 0) {
-                otchetiInserts.push({
-                    "ID План": null, "ID Детайл": itemCode.trim(), "Операция": "Доставка", "Количество": qty, 
-                    "Статус": "Отчетено", "Оператор": "💉 СИСТЕМА (Виртуална компенсация)", "Дата": now
-                });
-                return;
-            }
-        }
-        
-        let routes = routesByDet[lc] || [];
-        if (routes.length === 0) return;
-        
-        for (let route of routes) {
-            let opName = String(route['Име на операция']).trim();
-            otchetiInserts.push({
-                "ID План": null,
-                "ID Детайл": itemCode.trim(),
-                "Операция": opName,
-                "Количество": qty,
-                "Статус": "Отчетено",
-                "Оператор": "💉 СИСТЕМА (Виртуална компенсация)", 
-                "Дата": now
-            });
-            if (stopAtOp && opName.toLowerCase() === stopAtOp.trim().toLowerCase()) {
-                break;
-            }
-        }
-    }
-
-    simulate(targetDetail, targetQty, targetOp);
-    
-    if (otchetiInserts.length > 0) {
-        otchetiInserts[otchetiInserts.length - 1]["Оператор"] = "💉 СИСТЕМА (Ръчно добавен)";
-    }
-    
-    return otchetiInserts;
-}
+// backflushSimulation removed as it is no longer used
 
 async function saveForm(e) {
   e.preventDefault(); const config = tableConfigs[currentTab]; const btn = e.target.querySelector('button[type="submit"]'); btn.innerText = 'Записване...'; btn.disabled = true; 
@@ -694,27 +598,69 @@ async function saveForm(e) {
               const op = document.getElementById('inp_skladOp').value.trim();
               const qty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const bufferQty = parseFloat(document.getElementById('inp_skladQtyBuffer').value) || 0;
-              if (!det || !op || (qty === 0 && bufferQty === 0)) throw new Error("Моля, въведете поне едно количество (физическо или буфер).");
+              const scrapInput = document.getElementById('inp_skladScrap').value;
+              const scrap = parseFloat(scrapInput) || 0;
+              if (!det || !op || (qty === 0 && bufferQty === 0 && scrapInput === "")) throw new Error("Моля, въведете поне едно количество (физическо, буфер) или % брак.");
               
-              if (qty > 0) {
-                  Swal.fire({title: 'Симулация на история...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-                  let inserts = await backflushSimulation(det, op, qty);
-                  if (inserts.length > 0) {
-                      const { error: insErr } = await client.from('otcheti').insert(inserts);
-                      if (insErr) throw insErr;
+              if (qty !== 0) {
+                  Swal.fire({title: 'Записване на наличности...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                  
+                  let cleanDet = det.toLowerCase();
+                  let opName = op.trim().toLowerCase();
+                  let tName = currentTab === 'sklad_gp' ? 'inventory_gp' : 'inventory_wip';
+                  
+                  const { data: routeData } = await client.from('marshruti').select('*').ilike('Код на детайла', cleanDet);
+                  if (routeData && routeData.length > 0) {
+                      routeData.sort((a,b) => (parseInt(a['№ Операция'])||0) - (parseInt(b['№ Операция'])||0));
+                      let lastOp = routeData[routeData.length - 1]['Име на операция'].trim().toLowerCase();
+                      
+                      if (opName === lastOp || opName === 'готов детайл') {
+                          tName = 'inventory_gp';
+                          opName = 'готов детайл';
+                      } else {
+                          tName = 'inventory_wip';
+                      }
+                  } else {
+                      if (currentTab === 'sklad_gp') opName = 'готов детайл';
                   }
+                  
+                  let query = client.from(tName).select('Количество').eq('ID Детайл', cleanDet);
+                  if (tName === 'inventory_wip') query = query.eq('Операция', opName);
+                  let { data: currData } = await query;
+                  
+                  let currentStock = currData && currData.length > 0 ? parseFloat(currData[0]['Количество']) || 0 : 0;
+                  let newTotal = currentStock + qty;
+                  
+                  if (newTotal < 0) {
+                      Swal.close();
+                      throw new Error(`Недостатъчна наличност! Опитвате се да извадите повече бройки, отколкото има в склада (Налични: ${currentStock}).`);
+                  }
+                  
+                  let payload = { "ID Детайл": cleanDet, "Количество": newTotal };
+                  if (tName === 'inventory_wip') payload["Операция"] = opName;
+                  
+                  let { error: upsertErr } = await client.from(tName).upsert([payload], { onConflict: tName === 'inventory_gp' ? 'ID Детайл' : 'ID Детайл, Операция' });
+                  if (upsertErr) throw upsertErr;
+                  
+                  let auditNewData = { "ID Детайл": cleanDet, "Разлика": qty, "Ново Количество": newTotal };
+                  if (tName === 'inventory_wip') auditNewData["Операция"] = opName;
+                  
+                  await client.from('audit_logs').insert([{ table_name: tName, action_type: 'MANUAL_ADJUSTMENT', old_data: { "Количество": currentStock }, new_data: auditNewData }]);
               }
               
-              if (bufferQty > 0) {
+              if (bufferQty !== 0 || scrapInput !== "") {
                   Swal.fire({title: 'Запазване на буфер...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
                   let currentBuffer = 0;
-                  const { data: bufData } = await client.from('sklad_bufferi').select('Буфер').eq('ID Детайл', det);
+                  let currentScrap = 0;
+                  const { data: bufData } = await client.from('sklad_bufferi').select('Буфер, "% Брак"').eq('ID Детайл', det);
                   if (bufData && bufData.length > 0) {
                       currentBuffer = parseFloat(bufData[0]['Буфер']) || 0;
+                      currentScrap = parseFloat(bufData[0]['% Брак']) || 0;
                   }
                   const newBufferTotal = currentBuffer + bufferQty;
+                  const newScrap = scrapInput !== "" ? parseFloat(scrapInput) : currentScrap;
                   await client.from('sklad_bufferi').delete().eq('ID Детайл', det);
-                  const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBufferTotal }]);
+                  const { error: bufError } = await client.from('sklad_bufferi').insert([{ "ID Детайл": det, "Операция": op, "Буфер": newBufferTotal, "% Брак": newScrap }]);
                   if (bufError) throw bufError;
               }
               
@@ -726,15 +672,37 @@ async function saveForm(e) {
               const oldQty = parseFloat(document.getElementById('inp_skladOldQty').value) || 0;
               const newQty = parseFloat(document.getElementById('inp_skladQty').value) || 0;
               const newBuffer = parseFloat(document.getElementById('inp_skladBuffer').value) || 0;
+              const newScrap = parseFloat(document.getElementById('inp_skladScrap').value) || 0;
               const diff = newQty - oldQty;
               
               if (diff !== 0) {
-                  Swal.fire({title: 'Симулация на корекция...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-                  let inserts = await backflushSimulation(det, op, diff);
-                  if (inserts.length > 0) {
-                      const { error: updErr } = await client.from('otcheti').insert(inserts);
-                      if (updErr) throw updErr;
+                  Swal.fire({title: 'Записване на наличности...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                  let tName = currentTab === 'sklad_gp' ? 'inventory_gp' : 'inventory_wip';
+                  let opName = currentTab === 'sklad_gp' ? 'готов детайл' : op.trim().toLowerCase();
+                  let cleanDet = det.toLowerCase();
+                  
+                  let query = client.from(tName).select('Количество').eq('ID Детайл', cleanDet);
+                  if (currentTab === 'sklad_wip') query = query.eq('Операция', opName);
+                  let { data: currData } = await query;
+                  
+                  let currentStock = currData && currData.length > 0 ? parseFloat(currData[0]['Количество']) || 0 : 0;
+                  let newTotal = currentStock + diff;
+                  
+                  if (newTotal < 0) {
+                      Swal.close();
+                      throw new Error(`Недостатъчна наличност! Опитвате се да извадите повече бройки, отколкото има в склада (Налични: ${currentStock}).`);
                   }
+                  
+                  let payload = { "ID Детайл": cleanDet, "Количество": newTotal };
+                  if (currentTab === 'sklad_wip') payload["Операция"] = opName;
+                  
+                  let { error: upsertErr } = await client.from(tName).upsert([payload], { onConflict: currentTab === 'sklad_gp' ? 'ID Детайл' : 'ID Детайл, Операция' });
+                  if (upsertErr) throw upsertErr;
+                  
+                  let auditNewData = { "ID Детайл": cleanDet, "Разлика": diff, "Ново Количество": newTotal };
+                  if (currentTab === 'sklad_wip') auditNewData["Операция"] = opName;
+                  
+                  await client.from('audit_logs').insert([{ table_name: tName, action_type: 'UPDATE', old_data: { "Количество": oldQty }, new_data: auditNewData }]);
               }
               
               
@@ -750,7 +718,18 @@ async function saveForm(e) {
   }
 
   let payload = {};
-  config.fields.forEach(f => { const el = document.getElementById('inp_' + f.name); if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) { let val = el.value; if (f.type === 'number') val = parseFloat(val) || 0; payload[f.name] = val; } });
+  config.fields.forEach(f => { 
+      const el = document.getElementById('inp_' + f.name); 
+      if (el && !f.readonly && !(isEditMode && f.readonlyOnEdit)) { 
+          let val = el.value; 
+          if (f.type === 'number') {
+              val = parseFloat(val) || 0; 
+          } else if (f.type === 'date' && val === "") {
+              val = null;
+          }
+          payload[f.name] = val; 
+      } 
+  });
   try {
     if (currentTab === 'plan' && payload['Статус'] === '🚚 Изпратен') {
         let oldStatus = isEditMode ? globalRows[editingIndex]['Статус'] : null;
@@ -793,6 +772,25 @@ async function saveForm(e) {
         }
     }
 
+    if (currentTab === 'porachki' && payload['Статус'] === 'Прието') {
+        let oldStatus = isEditMode ? globalRows[editingIndex]['Статус'] : null;
+        if (oldStatus !== 'Прието') {
+            let itemCode = payload['Материал'];
+            let qty = parseFloat(payload['Количество']) || 0;
+            
+            // fetch current from sklad
+            const { data: skData, error: skErr } = await client.from('sklad').select('Доставено, Остатък').eq('ID Детайл', itemCode);
+            if (!skErr && skData && skData.length > 0) {
+                let currentDostaveno = parseFloat(skData[0]['Доставено']) || 0;
+                let currentOstatuk = parseFloat(skData[0]['Остатък']) || 0;
+                await client.from('sklad').update({ 
+                    'Доставено': currentDostaveno + qty,
+                    'Остатък': currentOstatuk + qty
+                }).eq('ID Детайл', itemCode);
+            }
+        }
+    }
+
     if (isEditMode) { 
         const row = globalRows[editingIndex]; 
         const keyVal = row[config.key]; 
@@ -822,7 +820,44 @@ async function saveForm(e) {
             Swal.fire({icon: 'success', title: 'Успешно запазено!', timer: 1000, showConfirmButton: false}); 
         }
     } 
-    else { const { error } = await client.from(config.table).insert([payload]); if (error) throw error; Swal.fire({icon: 'success', title: 'Успешно добавено!', timer: 1000, showConfirmButton: false}); }
+    else { 
+        let inserts = [payload];
+        
+        if (currentTab === 'plan') {
+            const phantoms = {
+                "575-91001-9": "Ф63.4 204J",
+                "h25-f1e": "Кв. Фл. 22108201Е",
+                "575-60021": "Капак с китайски отливки"
+            };
+            let code = String(payload['Вътрешно име'] || '').trim().toLowerCase();
+            if (phantoms[code]) {
+                let phantomPayload = { ...payload };
+                phantomPayload['Вътрешно име'] = phantoms[code];
+                inserts.push(phantomPayload);
+            }
+        }
+
+        const { error } = await client.from(config.table).insert(inserts); 
+        if (error) throw error; 
+        Swal.fire({icon: 'success', title: 'Успешно добавено!', timer: 1000, showConfirmButton: false}); 
+    }
+    
+    if (currentTab === 'porachki') {
+        let isNewOrder = !isEditMode;
+        let isChangedToPorachano = isEditMode && payload['Статус'] === 'Поръчано' && globalRows[editingIndex]['Статус'] !== 'Поръчано';
+        if (isNewOrder || isChangedToPorachano) {
+            let recipient = payload['Имейл на доставчик'] || '';
+            let materialName = payload['Материал'] || '';
+            let orderQty = payload['Количество'] || 0;
+            let subject = encodeURIComponent("Поръчка на материал: " + materialName);
+            let body = encodeURIComponent(`Здравейте,\n\nБихме искали да поръчаме следната позиция:\nМатериал: ${materialName}\nКоличество: ${orderQty} бр.\n\nМоля да потвърдите получаването на поръчката и очаквано време за доставка.\n\nПоздрави,`);
+            
+            // Вместо mailto, директно отваряме Gmail (понеже видях, че ползвате Gmail)
+            let gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
+            // Отваряме в нов, по-малък прозорец (popup), за да не изгубите админ панела
+            window.open(gmailUrl, 'GmailPopup', 'width=800,height=600,left=200,top=100,scrollbars=yes');
+        }
+    }
     closeModal(); loadCurrentTableData();
   } catch (err) { Swal.fire('Грешка', err.message, 'error'); } finally { btn.innerText = 'Запази запис'; btn.disabled = false; }
 }
@@ -835,10 +870,19 @@ async function deleteItem(index) {
       if (res.isConfirmed) { 
           try { 
               Swal.fire({title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
-              let opName = currentTab === 'sklad_gp' ? (row['Оригинална Операция'] || row['Операция']) : row['Операция'];
-              let payload = { "ID План": null, "ID Детайл": row['ID Детайл'], "Операция": opName, "Количество": -(parseFloat(row['Общо']) || 0), "Статус": "Отчетено", "Оператор": "СИСТЕМА (Нулиране)", "Дата": new Date().toISOString() };
-              const { error } = await client.from('otcheti').insert([payload]); 
+              let tName = currentTab === 'sklad_gp' ? 'inventory_gp' : 'inventory_wip';
+              let opName = currentTab === 'sklad_gp' ? 'готов детайл' : (row['Оригинална Операция'] || row['Операция']).trim().toLowerCase();
+              let cleanDet = String(row['ID Детайл']).trim().toLowerCase();
+              
+              let query = client.from(tName).delete().eq('ID Детайл', cleanDet);
+              if (currentTab === 'sklad_wip') query = query.eq('Операция', opName);
+              const { error } = await query;
+              
               if (error) throw error; 
+              
+              let auditNewData = { "ID Детайл": cleanDet, "Ново Количество": 0 };
+              if (currentTab === 'sklad_wip') auditNewData["Операция"] = opName;
+              await client.from('audit_logs').insert([{ table_name: tName, action_type: 'DELETE', old_data: { "Количество": row['Общо'] }, new_data: auditNewData }]);
               Swal.fire({icon: 'success', title: 'Изтрито!', timer: 1000, showConfirmButton: false}); 
               loadCurrentTableData(); 
           } catch(err) { Swal.fire('Грешка', err.message, 'error'); } 
@@ -882,11 +926,19 @@ window.openLogisticsModal = function() {
     let plansMap = {};
     globalRows.forEach(row => {
         let key = row['Месец'] + ' ' + row['Година'];
-        if (!plansMap[key]) plansMap[key] = { name: key, month: row['Месец'], year: row['Година'], total: 0, done: 0, packed: 0 };
+        if (!plansMap[key]) plansMap[key] = { name: key, month: row['Месец'], year: row['Година'], total: 0, done: 0, packed: 0, fullyPacked: true };
         
         plansMap[key].total++;
-        if (row['Статус'] === 'Завършен') plansMap[key].done++;
-        if (row['Статус'] === 'Опакован') plansMap[key].packed++;
+        if (row['Статус'] === 'Завършен' || row['Статус'] === '📦 Опакован') {
+            plansMap[key].done++;
+            let target = parseFloat(row['Целево количество']) || 0;
+            let packed = parseFloat(row['__total_packed']) || 0;
+            if (packed >= target || row['Статус'] === '📦 Опакован') {
+                plansMap[key].packed++; // Отчитаме го като логически опакован
+            } else {
+                plansMap[key].fullyPacked = false;
+            }
+        }
     });
 
     let html = '';
@@ -897,15 +949,14 @@ window.openLogisticsModal = function() {
     } else {
         plansList.forEach(p => {
             html += `<div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="font-weight:bold; font-size:1.1em; margin-bottom:10px; color:#334155;">📅 План: Месец ${p.month} / ${p.year} (Общо ${p.total} детайла)</div>
+                <div style="font-weight:bold; font-size:1.1em; margin-bottom:10px; color:#334155;">📅 План: Месец ${p.month} / ${p.year} (Общо ${p.total} реда детайли)</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div style="font-size:0.95em;">
-                        <div style="color:#059669; margin-bottom:4px;">🟢 Завършени: <b>${p.done}</b> бр.</div>
-                        <div style="color:#0284c7;">📦 Опаковани: <b>${p.packed}</b> бр.</div>
+                        <div style="color:#059669; margin-bottom:4px;">🟢 Завършени детайли: <b>${p.done}</b> бр.</div>
+                        <div style="color:#0284c7;">📦 От тях 100% опаковани: <b>${p.packed}</b> бр.</div>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:8px;">
-                        <button class="btn-primary" ${p.done === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} onclick="window.massLogisticsAction('${p.month}', '${p.year}', 'Завършен', 'Опакован')" style="background:#0284c7; min-width:200px;">📦 Опаковай Завършените</button>
-                        <button class="btn-primary" ${p.packed === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} onclick="window.massLogisticsAction('${p.month}', '${p.year}', 'Опакован', '🚚 Изпратен')" style="background:#f59e0b; min-width:200px;">🚚 Изпрати Опакованите</button>
+                        <button class="btn-primary" ${p.done === 0 || !p.fullyPacked ? 'disabled style="opacity:0.5;cursor:not-allowed;" title="Всички завършени детайли трябва да са 100% опаковани!"' : ''} onclick="window.massLogisticsAction('${p.month}', '${p.year}')" style="background:#f59e0b; min-width:200px;">🚚 Изпрати План ${p.month}/${p.year}</button>
                     </div>
                 </div>
             </div>`;
@@ -916,21 +967,69 @@ window.openLogisticsModal = function() {
     document.getElementById('logisticsModalBackdrop').style.display = 'flex';
 };
 
-window.massLogisticsAction = async function(month, year, fromStatus, toStatus) {
-    const res = await Swal.fire({ title: 'Сигурни ли сте?', text: `Искате ли да промените всички детайли от статус '${fromStatus}' на '${toStatus}' за Месец ${month} / ${year}?`, icon: 'question', showCancelButton: true, confirmButtonText: 'Да, продължи', cancelButtonText: 'Отказ' });
+window.massLogisticsAction = async function(month, year) {
+    const res = await Swal.fire({ title: 'Сигурни ли сте?', text: `Искате ли да изпратите (експедирате) всички завършени детайли за Месец ${month} / ${year}? Това ще извади наличностите им от склада!`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Да, изпрати', cancelButtonText: 'Отказ' });
     if (!res.isConfirmed) return;
 
     try {
-        Swal.fire({title: 'Обновяване...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        Swal.fire({title: 'Изпращане...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
         
-        const { data, error } = await client.from('plan')
-            .update({ 'Статус': toStatus })
-            .eq('Месец', month).eq('Година', year).eq('Статус', fromStatus)
-            .select('id');
+        // 1. Взимаме детайлите, които ще бъдат изпратени
+        const { data: detailsToShip, error: fetchErr } = await client.from('plan')
+            .select('id, "Вътрешно име", "Целево количество"')
+            .eq('Месец', month).eq('Година', year).in('Статус', ['Завършен', '📦 Опакован']);
             
-        if (error) throw error;
+        if (fetchErr) throw fetchErr;
         
-        Swal.fire({icon: 'success', title: 'Успешно!', text: `Обновени са ${data ? data.length : 0} записа.`, timer: 2000, showConfirmButton: false});
+        if (detailsToShip && detailsToShip.length > 0) {
+            const nomRes = await client.from('Номенклатура').select('*');
+            const nomMap = {};
+            if (!nomRes.error && nomRes.data) {
+                nomRes.data.forEach(n => {
+                    if (n['Вътрешно име']) nomMap[n['Вътрешно име']] = n['ID Детайл'];
+                    if (n['ID Детайл']) nomMap[n['ID Детайл']] = n['ID Детайл'];
+                });
+            }
+
+            // 2. Подготвяме отчетите за Експедиция
+            let otchetiInserts = detailsToShip.map(d => {
+                let idDetail = nomMap[d["Вътрешно име"]] || d["Вътрешно име"];
+                return {
+                    "ID План": String(d.id),
+                    "ID Детайл": String(idDetail).trim(),
+                    "Операция": "Експедиция",
+                    "Количество": parseFloat(d["Целево количество"]) || 0,
+                    "Статус": "Изпратено",
+                    "Оператор": "Система (Логистика)",
+                    "Дата": new Date().toISOString()
+                };
+            });
+            
+            // 3. Инсъртваме отчетите (Това ще извика тригера и ще извади от склада)
+            const { error: insErr } = await client.from('otcheti').insert(otchetiInserts);
+            if (insErr) throw insErr;
+            
+            // 3.5. Обновяваме статуса на всички записи за 'Опаковане' свързани с тези планове на 'Изпратено',
+            // за да изчезнат от колоната 'Запазени'
+            const planIds = detailsToShip.map(d => String(d.id));
+            if (planIds.length > 0) {
+                const { error: updPackErr } = await client.from('otcheti')
+                    .update({ 'Статус': 'Изпратено' })
+                    .in('ID План', planIds)
+                    .ilike('Операция', '%Опаковане%')
+                    .eq('Статус', 'Отчетено');
+                if (updPackErr) console.error("Грешка при изпращане на кашоните:", updPackErr);
+            }
+        }
+
+        // 4. Обновяваме статуса им на '🚚 Изпратен'
+        const { error: updErr } = await client.from('plan')
+            .update({ 'Статус': '🚚 Изпратен' })
+            .eq('Месец', month).eq('Година', year).in('Статус', ['Завършен', '📦 Опакован']);
+            
+        if (updErr) throw updErr;
+        
+        Swal.fire({icon: 'success', title: 'Успешно!', text: `Изпратени са ${detailsToShip ? detailsToShip.length : 0} записа.`, timer: 2000, showConfirmButton: false});
         
         document.getElementById('logisticsModalBackdrop').style.display = 'none';
         loadCurrentTableData();
@@ -938,3 +1037,204 @@ window.massLogisticsAction = async function(month, year, fromStatus, toStatus) {
         Swal.fire('Грешка', err.message, 'error');
     }
 };
+
+window.openMrpModal = async function() {
+    try {
+        Swal.fire({title: 'Анализ на нуждите...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+        
+        const { data: plans, error: planErr } = await client.from('plan').select('*').eq('Статус', 'Активен');
+        if (planErr) throw planErr;
+        
+        const { data: bomList, error: bomErr } = await client.from('bom').select('*');
+        if (bomErr) throw bomErr;
+        
+
+        
+        const { data: skladList, error: skladErr } = await client.from('sklad').select('*');
+        if (skladErr) throw skladErr;
+        
+        const bomMap = {};
+        bomList.forEach(b => {
+            let parent = b['ID Родител']?.trim()?.toLowerCase();
+            if (!bomMap[parent]) bomMap[parent] = [];
+            bomMap[parent].push({ child: b['ID Компонент']?.trim()?.toLowerCase(), qty: parseFloat(b['Количество']) || 1 });
+        });
+        
+        const skladMap = {};
+        skladList.forEach(s => {
+            skladMap[s['ID Детайл']?.trim()?.toLowerCase()] = {
+                name: s['ID Детайл'],
+                stock: parseFloat(s['Остатък']) || 0,
+                min: parseFloat(s['Минимално количество']) || 0
+            };
+        });
+        
+        let totalDemands = {};
+        
+        function explode(itemId, qty) {
+            if(!itemId) return;
+            let key = itemId.trim().toLowerCase();
+            if (bomMap[key] && bomMap[key].length > 0) {
+                bomMap[key].forEach(childNode => {
+                    explode(childNode.child, qty * childNode.qty);
+                });
+            } else {
+                if (!totalDemands[key]) totalDemands[key] = 0;
+                totalDemands[key] += qty;
+            }
+        }
+        
+        plans.forEach(p => {
+            let planItem = p['ID Детайл'] || p['Вътрешно име'];
+            let planQty = parseFloat(p['Целево количество']) || 0;
+            explode(planItem, planQty);
+        });
+        
+        let deficits = [];
+        for (let itemKey in totalDemands) {
+            let demand = totalDemands[itemKey];
+            let sk = skladMap[itemKey];
+            
+            if (sk) { 
+                let stock = sk.stock;
+                let min = sk.min;
+                let free = stock - demand;
+                
+                if (free < min) {
+                    deficits.push({
+                        item: sk.name,
+                        stock: stock,
+                        demand: demand,
+                        free: free,
+                        min: min,
+                        missing: min - free
+                    });
+                }
+            }
+        }
+        
+        let html = '';
+        if (deficits.length === 0) {
+            html = `<div style="text-align:center; padding: 40px; font-size:1.2em; color:#059669; font-weight:bold;">✅ Няма критични липси! Всички материали са над минимума.</div>`;
+        } else {
+            html = `<table class="minimal-table" style="width:100%; text-align:left; border-collapse:collapse;">
+                <thead><tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1;">
+                    <th style="padding:10px;">Материал</th>
+                    <th style="padding:10px; text-align:center;">Наличност</th>
+                    <th style="padding:10px; text-align:center;">Нужно за Планове</th>
+                    <th style="padding:10px; text-align:center;">Свободно</th>
+                    <th style="padding:10px; text-align:center;">Минимум</th>
+                    <th style="padding:10px; text-align:center;">Действие</th>
+                </tr></thead>
+                <tbody>`;
+            deficits.sort((a,b) => b.missing - a.missing).forEach(d => {
+                html += `<tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:10px; font-weight:bold; color:#0f172a;">${d.item}</td>
+                    <td style="padding:10px; text-align:center;">${d.stock}</td>
+                    <td style="padding:10px; text-align:center; color:#d97706;">${d.demand}</td>
+                    <td style="padding:10px; text-align:center; color:#ef4444; font-weight:bold;">${d.free}</td>
+                    <td style="padding:10px; text-align:center;">${d.min}</td>
+                    <td style="padding:10px; text-align:center;">
+                        <button class="btn-primary" onclick="window.createOrderForDeficit('${d.item}', ${d.missing})" style="background:#3b82f6; padding: 4px 10px; font-size: 0.85em;">➕ Поръчай</button>
+                    </td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+        
+        Swal.close();
+        document.getElementById('mrpContent').innerHTML = html;
+        document.getElementById('mrpModalBackdrop').style.display = 'flex';
+        
+    } catch(err) {
+        Swal.fire('Грешка при анализа', err.message, 'error');
+    }
+};
+
+window.createOrderForDeficit = function(item, recommendedQty) {
+    document.getElementById('mrpModalBackdrop').style.display = 'none';
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        if(btn.innerText.includes('Поръчки')) btn.click();
+    });
+    
+    setTimeout(() => {
+        openAddModal();
+        setTimeout(() => {
+            let itemInput = document.getElementById('inp_Материал');
+            let qtyInput = document.getElementById('inp_Количество');
+            if(itemInput) itemInput.value = item;
+            if(qtyInput) qtyInput.value = recommendedQty;
+        }, 300);
+    }, 100);
+};
+
+function openAuditModal() {
+    document.getElementById('auditModalBackdrop').style.display = 'flex';
+    fetchAuditLogs();
+}
+
+async function fetchAuditLogs() {
+    let container = document.getElementById('auditContent');
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Зареждане на историята... ⏳</div>';
+    
+    let tableFilter = document.getElementById('auditTableFilter').value;
+    
+    try {
+        let query = client.from('audit_logs').select('*').order('changed_at', { ascending: false }).limit(200);
+        
+        if (tableFilter !== 'all') {
+            query = query.eq('table_name', tableFilter);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Няма записани промени за тази таблица.</div>';
+            return;
+        }
+        
+        let html = '<table style="width:100%; border-collapse:collapse; background:white; font-size:0.9em; box-shadow:0 1px 3px rgba(0,0,0,0.1);">';
+        html += '<thead style="background:#e2e8f0; color:#475569;"><tr><th style="padding:10px; border:1px solid #cbd5e1; text-align:left; width:150px;">Време</th><th style="padding:10px; border:1px solid #cbd5e1; text-align:left; width:120px;">Таблица</th><th style="padding:10px; border:1px solid #cbd5e1; text-align:center; width:80px;">Действие</th><th style="padding:10px; border:1px solid #cbd5e1; text-align:left;">Детайли</th></tr></thead><tbody>';
+        
+        data.forEach(log => {
+            let dateStr = new Date(log.changed_at).toLocaleString('bg-BG');
+            let actionBadge = '';
+            if (log.action_type === 'DELETE') actionBadge = '<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:0.8em;">ИЗТРИВАНЕ</span>';
+            else if (log.action_type === 'INSERT') actionBadge = '<span style="background:#dcfce7; color:#166534; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:0.8em;">ДОБАВЯНЕ</span>';
+            else actionBadge = '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:0.8em;">РЕДАКЦИЯ</span>';
+            
+            let detailsHtml = '';
+            let oldData = log.old_data || {};
+            let newData = log.new_data || {};
+            
+            if (log.action_type === 'DELETE') {
+                detailsHtml = `<div style="color:#64748b;"><b>Изтрит запис:</b> ${JSON.stringify(oldData)}</div>`;
+            } else if (log.action_type === 'INSERT') {
+                detailsHtml = `<div style="color:#166534;"><b>Нов запис:</b> ${JSON.stringify(newData)}</div>`;
+            } else {
+                let changesHtml = [];
+                for (let key in newData) {
+                    if (oldData[key] !== newData[key]) {
+                        changesHtml.push(`<div><b>${key}:</b> <span style="text-decoration:line-through; color:#ef4444;">${oldData[key]}</span> ➡️ <span style="color:#16a34a;">${newData[key]}</span></div>`);
+                    }
+                }
+                detailsHtml = changesHtml.length > 0 ? changesHtml.join('') : '<span style="color:#94a3b8;">Няма промяна в полетата</span>';
+            }
+            
+            html += `<tr>
+                <td style="padding:10px; border:1px solid #e2e8f0; color:#475569;">${dateStr}</td>
+                <td style="padding:10px; border:1px solid #e2e8f0; font-weight:bold; color:#1e293b;">${log.table_name}</td>
+                <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">${actionBadge}</td>
+                <td style="padding:10px; border:1px solid #e2e8f0; font-family:monospace;">${detailsHtml}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+    } catch (err) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Грешка: ' + err.message + '</div>';
+    }
+}

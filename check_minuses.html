@@ -1,13 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Check Minuses</title>
 </head>
 <body>
-    <h2>╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╨╖╨░ ╨╝╨╕╨╜╤Г╤Б╨╕ (╨б╨░╨╝╨╛ ╨╖╨░ ╤З╨╡╤В╨╡╨╜╨╡)</h2>
-    <p>╨в╨╛╨╖╨╕ ╨╕╨╜╤Б╤В╤А╤Г╨╝╨╡╨╜╤В ╤Б╨║╨░╨╜╨╕╤А╨░ ╨▓╤Б╨╕╤З╨║╨╕ ╨╝╨░╤А╤И╤А╤Г╤В╨╕ ╨╕ ╨╛╤В╤З╨╡╤В╨╕, ╨╖╨░ ╨┤╨░ ╨╜╨░╨╝╨╡╤А╨╕ ╨┤╨╡╤В╨░╨╣╨╗╨╕, ╨║╨╛╨╕╤В╨╛ ╨╕╨╝╨░╤В ╨▓╨╕╤А╤В╤Г╨░╨╗╨╜╨╕ "╨┤╤Г╨┐╨║╨╕" (╨╝╨╕╨╜╤Г╤Б╨╕) ╨┐╨╛ ╨▓╨╡╤А╨╕╨│╨░╤В╨░.</p>
-    <button id="btnStart" onclick="startFix()" style="padding: 10px 20px; font-size: 16px; background: blue; color: white;">╨б╤В╨░╤А╤В╨╕╤А╨░╨╣ ╨┐╤А╨╛╨▓╨╡╤А╨║╨░╤В╨░</button>
+    <h2>в•ЁРЇв•¤Рђв•Ёв•›в•Ёв–“в•Ёв•Ўв•¤Рђв•Ёв•‘в•Ёв–‘ в•Ёв•–в•Ёв–‘ в•Ёв•ќв•Ёв••в•Ёв•њв•¤Р“в•¤Р‘в•Ёв•• (в•ЁР±в•Ёв–‘в•Ёв•ќв•Ёв•› в•Ёв•–в•Ёв–‘ в•¤Р—в•Ёв•Ўв•¤Р’в•Ёв•Ўв•Ёв•њв•Ёв•Ў)</h2>
+    <p>в•ЁРІв•Ёв•›в•Ёв•–в•Ёв•• в•Ёв••в•Ёв•њв•¤Р‘в•¤Р’в•¤Рђв•¤Р“в•Ёв•ќв•Ёв•Ўв•Ёв•њв•¤Р’ в•¤Р‘в•Ёв•‘в•Ёв–‘в•Ёв•њв•Ёв••в•¤Рђв•Ёв–‘ в•Ёв–“в•¤Р‘в•Ёв••в•¤Р—в•Ёв•‘в•Ёв•• в•Ёв•ќв•Ёв–‘в•¤Рђв•¤Рв•¤Рђв•¤Р“в•¤Р’в•Ёв•• в•Ёв•• в•Ёв•›в•¤Р’в•¤Р—в•Ёв•Ўв•¤Р’в•Ёв••, в•Ёв•–в•Ёв–‘ в•Ёв”¤в•Ёв–‘ в•Ёв•њв•Ёв–‘в•Ёв•ќв•Ёв•Ўв•¤Рђв•Ёв•• в•Ёв”¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—в•Ёв••, в•Ёв•‘в•Ёв•›в•Ёв••в•¤Р’в•Ёв•› в•Ёв••в•Ёв•ќв•Ёв–‘в•¤Р’ в•Ёв–“в•Ёв••в•¤Рђв•¤Р’в•¤Р“в•Ёв–‘в•Ёв•—в•Ёв•њв•Ёв•• "в•Ёв”¤в•¤Р“в•Ёв”ђв•Ёв•‘в•Ёв••" (в•Ёв•ќв•Ёв••в•Ёв•њв•¤Р“в•¤Р‘в•Ёв••) в•Ёв”ђв•Ёв•› в•Ёв–“в•Ёв•Ўв•¤Рђв•Ёв••в•Ёв”‚в•Ёв–‘в•¤Р’в•Ёв–‘.</p>
+    <button id="btnStart" onclick="startFix()" style="padding: 10px 20px; font-size: 16px; background: blue; color: white;">в•ЁР±в•¤Р’в•Ёв–‘в•¤Рђв•¤Р’в•Ёв••в•¤Рђв•Ёв–‘в•Ёв•Ј в•Ёв”ђв•¤Рђв•Ёв•›в•Ёв–“в•Ёв•Ўв•¤Рђв•Ёв•‘в•Ёв–‘в•¤Р’в•Ёв–‘</button>
     <div id="log" style="margin-top: 20px; font-family: monospace;"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -21,11 +21,11 @@
         async function startFix() {
             const btn = document.getElementById('btnStart');
             btn.disabled = true;
-            btn.innerText = '╨Ч╨░╤А╨╡╨╢╨┤╨░╨╜╨╡...';
-            log('╨Ч╨░╨┐╨╛╤З╨▓╨░ ╨╕╨╖╨▓╨╗╨╕╤З╨░╨╜╨╡ ╨╜╨░ ╨┤╨░╨╜╨╜╨╕...');
+            btn.innerText = 'в•ЁР§в•Ёв–‘в•¤Рђв•Ёв•Ўв•Ёв•ўв•Ёв”¤в•Ёв–‘в•Ёв•њв•Ёв•Ў...';
+            log('в•ЁР§в•Ёв–‘в•Ёв”ђв•Ёв•›в•¤Р—в•Ёв–“в•Ёв–‘ в•Ёв••в•Ёв•–в•Ёв–“в•Ёв•—в•Ёв••в•¤Р—в•Ёв–‘в•Ёв•њв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв–‘в•Ёв•њв•Ёв•њв•Ёв••...');
             
-            const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+            const SUPABASE_URL = 'https://aoekbmhgbohsgpwqsizv.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU';
             const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
             async function fetchAll(table) {
@@ -46,13 +46,13 @@
                     fetchAll('otcheti'),
                     fetchAll('marshruti'),
                     fetchAll('bom'),
-                    fetchAll('╨Э╨╛╨╝╨╡╨╜╨║╨╗╨░╤В╤Г╤А╨░')
+                    fetchAll('в•ЁР­в•Ёв•›в•Ёв•ќв•Ёв•Ўв•Ёв•њв•Ёв•‘в•Ёв•—в•Ёв–‘в•¤Р’в•¤Р“в•¤Рђв•Ёв–‘')
                 ]);
-                log(`╨Ш╨╖╤В╨╡╨│╨╗╨╡╨╜╨╕: ${otcheti.length} ╨╛╤В╤З╨╡╤В╨░, ${marshruti.length} ╨╝╨░╤А╤И╤А╤Г╤В╨░.`);
+                log(`в•ЁРЁв•Ёв•–в•¤Р’в•Ёв•Ўв•Ёв”‚в•Ёв•—в•Ёв•Ўв•Ёв•њв•Ёв••: ${otcheti.length} в•Ёв•›в•¤Р’в•¤Р—в•Ёв•Ўв•¤Р’в•Ёв–‘, ${marshruti.length} в•Ёв•ќв•Ёв–‘в•¤Рђв•¤Рв•¤Рђв•¤Р“в•¤Р’в•Ёв–‘.`);
 
                 let routesByDetail = {};
                 marshruti.forEach(r => {
-                    let code = String(r['╨Ъ╨╛╨┤ ╨╜╨░ ╨┤╨╡╤В╨░╨╣╨╗╨░']).trim().toLowerCase();
+                    let code = String(r['в•ЁРЄв•Ёв•›в•Ёв”¤ в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—в•Ёв–‘']).trim().toLowerCase();
                     if(!routesByDetail[code]) routesByDetail[code] = [];
                     routesByDetail[code].push(r);
                 });
@@ -60,23 +60,23 @@
                 let completedOps = {}; let scrappedOps = {}; let grossCompletedOps = {}; let manualOps = {};
                 
                 let sortedReports = otcheti.map(r => {
-                    r._ts = new Date(r['╨Т╤А╨╡╨╝╨╡ ╨б╤В╨░╤А╤В'] || r['╨Ф╨░╤В╨░']).getTime();
+                    r._ts = new Date(r['в•ЁРўв•¤Рђв•Ёв•Ўв•Ёв•ќв•Ёв•Ў в•ЁР±в•¤Р’в•Ёв–‘в•¤Рђв•¤Р’'] || r['в•ЁР¤в•Ёв–‘в•¤Р’в•Ёв–‘']).getTime();
                     return r;
                 }).sort((a,b) => a._ts - b._ts);
                 
                 sortedReports.forEach(r => {
-                    let code = String(r['ID ╨Ф╨╡╤В╨░╨╣╨╗']).trim().toLowerCase();
-                    let op = String(r['╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                    let code = String(r['ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—']).trim().toLowerCase();
+                    let op = String(r['в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                     let key = code + '_' + op;
-                    let qty = parseFloat(r['╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛']) || 0;
+                    let qty = parseFloat(r['в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›']) || 0;
                     
-                    if (r['╨б╤В╨░╤В╤Г╤Б'] === '╨С╤А╨░╨║') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
-                    else if (r['╨б╤В╨░╤В╤Г╤Б'] === '╨Ю╤В╤З╨╡╤В╨╡╨╜╨╛') {
+                    if (r['в•ЁР±в•¤Р’в•Ёв–‘в•¤Р’в•¤Р“в•¤Р‘'] === 'в•ЁРЎв•¤Рђв•Ёв–‘в•Ёв•‘') { scrappedOps[key] = (scrappedOps[key]||0) + qty; } 
+                    else if (r['в•ЁР±в•¤Р’в•Ёв–‘в•¤Р’в•¤Р“в•¤Р‘'] === 'в•ЁР®в•¤Р’в•¤Р—в•Ёв•Ўв•¤Р’в•Ёв•Ўв•Ёв•њв•Ёв•›') {
                         completedOps[key] = (completedOps[key]||0) + qty;
-                        let isManual = (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨а╤К╤З╨╜╨╛ ╨┤╨╛╨▒╨░╨▓╨╡╨╜)' || (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty > 0));
+                        let isManual = (r['в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р’в•Ёв•›в•¤Рђ'] === 'в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР  (в•ЁР°в•¤Рљв•¤Р—в•Ёв•њв•Ёв•› в•Ёв”¤в•Ёв•›в•Ёв–’в•Ёв–‘в•Ёв–“в•Ёв•Ўв•Ёв•њ)' || (r['в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р’в•Ёв•›в•¤Рђ'] === 'в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР  (в•ЁРЄв•Ёв•›в•¤Рђв•Ёв•Ўв•Ёв•‘в•¤Р–в•Ёв••в•¤Рџ в•Ёв•њв•Ёв–‘в•Ёв•—в•Ёв••в•¤Р—в•Ёв•њв•Ёв•›в•¤Р‘в•¤Р’)' && qty > 0));
                         if (isManual) {
                             manualOps[key] = (manualOps[key]||0) + qty;
-                        } else if (r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] !== '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Х╨║╤Б╨┐╨╡╨┤╨╕╤Ж╨╕╤П)' && !(r['╨Ю╨┐╨╡╤А╨░╤В╨╛╤А'] === '╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)' && qty < 0)) {
+                        } else if (r['в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р’в•Ёв•›в•¤Рђ'] !== 'в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР  (в•ЁРҐв•Ёв•‘в•¤Р‘в•Ёв”ђв•Ёв•Ўв•Ёв”¤в•Ёв••в•¤Р–в•Ёв••в•¤Рџ)' && !(r['в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р’в•Ёв•›в•¤Рђ'] === 'в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР  (в•ЁРЄв•Ёв•›в•¤Рђв•Ёв•Ўв•Ёв•‘в•¤Р–в•Ёв••в•¤Рџ в•Ёв•њв•Ёв–‘в•Ёв•—в•Ёв••в•¤Р—в•Ёв•њв•Ёв•›в•¤Р‘в•¤Р’)' && qty < 0)) {
                             grossCompletedOps[key] = (grossCompletedOps[key]||0) + qty;
                         }
                     }
@@ -86,12 +86,12 @@
                 
                 Object.keys(routesByDetail).forEach(code => {
                     let routes = routesByDetail[code];
-                    routes.sort((a, b) => (parseFloat(a['тДЦ ╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П']) || 0) - (parseFloat(b['тДЦ ╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П']) || 0));
+                    routes.sort((a, b) => (parseFloat(a['С‚Р”Р¦ в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']) || 0) - (parseFloat(b['С‚Р”Р¦ в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']) || 0));
                     if(routes.length === 0) return;
                     
                     for (let i = routes.length - 2; i >= 0; i--) {
-                        let opKey = code + '_' + String(routes[i]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
-                        let nextOpKey = code + '_' + String(routes[i+1]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                        let opKey = code + '_' + String(routes[i]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
+                        let nextOpKey = code + '_' + String(routes[i+1]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                         let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
                         grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
                         let manualRequiredFromMe = manualOps[nextOpKey] || 0;
@@ -100,13 +100,13 @@
                         completedOps[opKey] = Math.max(completedOps[opKey] || 0, trueRequired);
                     }
                     
-                    let lastOpKey = code + '_' + String(routes[routes.length-1]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                    let lastOpKey = code + '_' + String(routes[routes.length-1]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                     trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
                     grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
                     
                     for(let i = routes.length - 2; i >= 0; i--) {
-                        let opKey = code + '_' + String(routes[i]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
-                        let nextOpKey = code + '_' + String(routes[i+1]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                        let opKey = code + '_' + String(routes[i]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
+                        let nextOpKey = code + '_' + String(routes[i+1]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                         let bucket = (grossCompletedOps[opKey] || 0) - (grossCompletedOps[nextOpKey] || 0) - (scrappedOps[nextOpKey] || 0);
                         if (bucket < 0) bucket = 0;
                         grossTrueDoneOps[opKey] = (grossTrueDoneOps[nextOpKey] || 0) + bucket;
@@ -115,7 +115,7 @@
                         trueDoneOps[opKey] = (trueDoneOps[nextOpKey] || 0) + trueBucket;
                     }
                     
-                    let firstOpKey = code + '_' + String(routes[0]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                    let firstOpKey = code + '_' + String(routes[0]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                     grossStartedOps[firstOpKey] = (grossCompletedOps[firstOpKey] || 0) + (scrappedOps[firstOpKey] || 0);
                     
                     shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey] || 0) - (trueDoneOps[lastOpKey] || 0));
@@ -127,25 +127,25 @@
                     if(totalShippedCache[lc] !== undefined) return totalShippedCache[lc];
                     if(visited.has(lc)) return 0; visited.add(lc);
                     let direct = shippedQty[lc] || 0; let indirect = 0;
-                    let parents = bom.filter(b => String(b['ID ╨Ъ╨╛╨╝╨┐╨╛╨╜╨╡╨╜╤В']).trim().toLowerCase() === lc);
+                    let parents = bom.filter(b => String(b['ID в•ЁРЄв•Ёв•›в•Ёв•ќв•Ёв”ђв•Ёв•›в•Ёв•њв•Ёв•Ўв•Ёв•њв•¤Р’']).trim().toLowerCase() === lc);
                     parents.forEach(p => {
-                        let parentCode = String(p['ID ╨а╨╛╨┤╨╕╤В╨╡╨╗']).trim().toLowerCase();
+                        let parentCode = String(p['ID в•ЁР°в•Ёв•›в•Ёв”¤в•Ёв••в•¤Р’в•Ёв•Ўв•Ёв•—']).trim().toLowerCase();
                         if(parentCode !== lc) {
                             let parentRoutes = routesByDetail[parentCode];
                             let parentConsumed = 0;
                             if (parentRoutes && parentRoutes.length > 0) {
-                                let firstOpKey = parentCode + '_' + String(parentRoutes[0]['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim().toLowerCase();
+                                let firstOpKey = parentCode + '_' + String(parentRoutes[0]['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim().toLowerCase();
                                 parentConsumed = grossStartedOps[firstOpKey] || 0;
                             } else {
                                 parentConsumed = getTotalShipped(parentCode, new Set(visited));
                             }
-                            indirect += parentConsumed * (parseFloat(p['╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛'])||1);
+                            indirect += parentConsumed * (parseFloat(p['в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›'])||1);
                         }
                     });
                     totalShippedCache[lc] = direct + indirect; return totalShippedCache[lc];
                 }
 
-                log('╨Ш╨╖╤З╨╕╤Б╨╗╤П╨▓╨░╨╜╨╡ ╨╜╨░ ╨┤╨╡╤Д╨╕╤Ж╨╕╤В╨╕╤В╨╡...');
+                log('в•ЁРЁв•Ёв•–в•¤Р—в•Ёв••в•¤Р‘в•Ёв•—в•¤Рџв•Ёв–“в•Ёв–‘в•Ёв•њв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв•Ўв•¤Р”в•Ёв••в•¤Р–в•Ёв••в•¤Р’в•Ёв••в•¤Р’в•Ёв•Ў...');
                 
                 let inserts = [];
                 Object.keys(routesByDetail).forEach(code => {
@@ -154,39 +154,39 @@
                     let consumedByShipped = getTotalShipped(code);
                     
                     let lastRoute = routes[routes.length - 1];
-                    let opName = String(lastRoute['╨Ш╨╝╨╡ ╨╜╨░ ╨╛╨┐╨╡╤А╨░╤Ж╨╕╤П']).trim();
+                    let opName = String(lastRoute['в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв•›в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ']).trim();
                     let opKey = code + '_' + opName.toLowerCase();
                     let myGrossDone = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
                     
                     if (myGrossDone < consumedByShipped) {
                         let deficit = consumedByShipped - myGrossDone;
                         inserts.push({
-                            "ID ╨Ф╨╡╤В╨░╨╣╨╗": String(lastRoute['╨Ъ╨╛╨┤ ╨╜╨░ ╨┤╨╡╤В╨░╨╣╨╗╨░']).trim(),
-                            "╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П": opName,
-                            "╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛": deficit
+                            "ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—": String(lastRoute['в•ЁРЄв•Ёв•›в•Ёв”¤ в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—в•Ёв–‘']).trim(),
+                            "в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ": opName,
+                            "в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›": deficit
                         });
-                        log(`╨Э╨░╨╝╨╡╤А╨╡╨╜ ╨┤╨╡╤Д╨╕╤Ж╨╕╤В ╨╖╨░ ${String(lastRoute['╨Ъ╨╛╨┤ ╨╜╨░ ╨┤╨╡╤В╨░╨╣╨╗╨░']).trim()}: ${deficit} ╨▒╤А.`);
+                        log(`в•ЁР­в•Ёв–‘в•Ёв•ќв•Ёв•Ўв•¤Рђв•Ёв•Ўв•Ёв•њ в•Ёв”¤в•Ёв•Ўв•¤Р”в•Ёв••в•¤Р–в•Ёв••в•¤Р’ в•Ёв•–в•Ёв–‘ ${String(lastRoute['в•ЁРЄв•Ёв•›в•Ёв”¤ в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—в•Ёв–‘']).trim()}: ${deficit} в•Ёв–’в•¤Рђ.`);
                     }
                 });
 
                 if (inserts.length === 0) {
-                    log('тЬЕ ╨Т╤Б╨╕╤З╨║╨╛ ╨╡ ╤В╨╛╤З╨╜╨╛, ╨╜╤П╨╝╨░ ╨╗╨╕╨┐╤Б╨▓╨░╤Й╨╕ ╨┐╨╛╨╗╤Г╤Д╨░╨▒╤А╨╕╨║╨░╤В╨╕.');
+                    log('С‚Р¬Р• в•ЁРўв•¤Р‘в•Ёв••в•¤Р—в•Ёв•‘в•Ёв•› в•Ёв•Ў в•¤Р’в•Ёв•›в•¤Р—в•Ёв•њв•Ёв•›, в•Ёв•њв•¤Рџв•Ёв•ќв•Ёв–‘ в•Ёв•—в•Ёв••в•Ёв”ђв•¤Р‘в•Ёв–“в•Ёв–‘в•¤Р™в•Ёв•• в•Ёв”ђв•Ёв•›в•Ёв•—в•¤Р“в•¤Р”в•Ёв–‘в•Ёв–’в•¤Рђв•Ёв••в•Ёв•‘в•Ёв–‘в•¤Р’в•Ёв••.');
                 } else {
-                    log('тЭМ ╨Э╨░╨╝╨╡╤А╨╡╨╜╨╕ ╤Б╨░ ╨╗╨╕╨┐╤Б╨▓╨░╤Й╨╕ ╨┐╨╛╨╗╤Г╤Д╨░╨▒╤А╨╕╨║╨░╤В╨╕ (╨╝╨╕╨╜╤Г╤Б╨╕), ╨║╨╛╨╕╤В╨╛ ╨в╨а╨п╨С╨Т╨Р ╨┤╨░ ╤Б╨╡ ╨╕╨╖╤З╨╕╤Б╤В╤П╤В:');
+                    log('С‚Р­Рњ в•ЁР­в•Ёв–‘в•Ёв•ќв•Ёв•Ўв•¤Рђв•Ёв•Ўв•Ёв•њв•Ёв•• в•¤Р‘в•Ёв–‘ в•Ёв•—в•Ёв••в•Ёв”ђв•¤Р‘в•Ёв–“в•Ёв–‘в•¤Р™в•Ёв•• в•Ёв”ђв•Ёв•›в•Ёв•—в•¤Р“в•¤Р”в•Ёв–‘в•Ёв–’в•¤Рђв•Ёв••в•Ёв•‘в•Ёв–‘в•¤Р’в•Ёв•• (в•Ёв•ќв•Ёв••в•Ёв•њв•¤Р“в•¤Р‘в•Ёв••), в•Ёв•‘в•Ёв•›в•Ёв••в•¤Р’в•Ёв•› в•ЁРІв•ЁР°в•ЁРїв•ЁРЎв•ЁРўв•ЁР  в•Ёв”¤в•Ёв–‘ в•¤Р‘в•Ёв•Ў в•Ёв••в•Ёв•–в•¤Р—в•Ёв••в•¤Р‘в•¤Р’в•¤Рџв•¤Р’:');
                 }
                 
                 if (inserts.length > 0) {
                     btn.insertAdjacentHTML('afterend', `
-                        <button id="btnFix" onclick="fixMinuses()" style="padding: 10px 20px; font-size: 16px; background: red; color: white; margin-left: 10px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold;">тЪая╕П ╨Я╨Ю╨Я╨а╨Р╨Т╨Ш ╨Ш ╨Ш╨Ч╨з╨Ш╨б╨в╨Ш ╨Ь╨Ш╨Э╨г╨б╨Ш╨в╨Х ╨Т ╨С╨Р╨Ч╨Р╨в╨Р</button>
+                        <button id="btnFix" onclick="fixMinuses()" style="padding: 10px 20px; font-size: 16px; background: red; color: white; margin-left: 10px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold;">С‚РЄР°СЏв••Рџ в•ЁРЇв•ЁР®в•ЁРЇв•ЁР°в•ЁР в•ЁРўв•ЁРЁ в•ЁРЁ в•ЁРЁв•ЁР§в•ЁР·в•ЁРЁв•ЁР±в•ЁРІв•ЁРЁ в•ЁР¬в•ЁРЁв•ЁР­в•ЁРів•ЁР±в•ЁРЁв•ЁРІв•ЁРҐ в•ЁРў в•ЁРЎв•ЁР в•ЁР§в•ЁР в•ЁРІв•ЁР </button>
                     `);
                     window.insertsToFix = inserts;
                 }
                 
-                btn.innerText = '╨Я╤А╨╛╨▓╨╡╤А╨╕ ╨╛╤В╨╜╨╛╨▓╨╛';
+                btn.innerText = 'в•ЁРЇв•¤Рђв•Ёв•›в•Ёв–“в•Ёв•Ўв•¤Рђв•Ёв•• в•Ёв•›в•¤Р’в•Ёв•њв•Ёв•›в•Ёв–“в•Ёв•›';
                 btn.disabled = false;
             } catch(err) {
-                log('╨У╤А╨╡╤И╨║╨░: ' + err.message);
-                btn.innerText = '╨Я╤А╨╛╨▓╨╡╤А╨╕ ╨╛╤В╨╜╨╛╨▓╨╛';
+                log('в•ЁРЈв•¤Рђв•Ёв•Ўв•¤Рв•Ёв•‘в•Ёв–‘: ' + err.message);
+                btn.innerText = 'в•ЁРЇв•¤Рђв•Ёв•›в•Ёв–“в•Ёв•Ўв•¤Рђв•Ёв•• в•Ёв•›в•¤Р’в•Ёв•њв•Ёв•›в•Ёв–“в•Ёв•›';
                 btn.disabled = false;
             }
         }
@@ -195,41 +195,44 @@
             if (!window.insertsToFix || window.insertsToFix.length === 0) return;
             const btnFix = document.getElementById('btnFix');
             btnFix.disabled = true;
-            btnFix.innerText = '╨Ч╨░╨┐╨╕╤Б╨▓╨░╨╜╨╡...';
+            btnFix.innerText = 'в•ЁР§в•Ёв–‘в•Ёв”ђв•Ёв••в•¤Р‘в•Ёв–“в•Ёв–‘в•Ёв•њв•Ёв•Ў...';
             
-            const SUPABASE_URL = 'https://zdythzcgcjxwbxufunuh.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+            const SUPABASE_URL = 'https://aoekbmhgbohsgpwqsizv.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU';
             const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             
-            log('╨Ч╨░╨┐╨╛╤З╨▓╨░ ╨╖╨░╨┐╨╕╤Б ╨╜╨░ ' + window.insertsToFix.length + ' ╨╗╨╕╨┐╤Б╨▓╨░╤Й╨╕ ╨▒╤А╨╛╨╣╨║╨╕...');
+            log('в•ЁР§в•Ёв–‘в•Ёв”ђв•Ёв•›в•¤Р—в•Ёв–“в•Ёв–‘ в•Ёв•–в•Ёв–‘в•Ёв”ђв•Ёв••в•¤Р‘ в•Ёв•њв•Ёв–‘ ' + window.insertsToFix.length + ' в•Ёв•—в•Ёв••в•Ёв”ђв•¤Р‘в•Ёв–“в•Ёв–‘в•¤Р™в•Ёв•• в•Ёв–’в•¤Рђв•Ёв•›в•Ёв•Јв•Ёв•‘в•Ёв••...');
             let successCount = 0;
             for (let i = 0; i < window.insertsToFix.length; i++) {
                 let ins = window.insertsToFix[i];
                 let payload = {
-                    "╨Ш╨╝╨╡ ╨╜╨░ ╨┤╨╡╤В╨░╨╣╨╗": ins["ID ╨Ф╨╡╤В╨░╨╣╨╗"],
-                    "ID ╨Ф╨╡╤В╨░╨╣╨╗": ins["ID ╨Ф╨╡╤В╨░╨╣╨╗"],
-                    "╨Ю╨┐╨╡╤А╨░╤В╨╛╤А": "╨б╨Ш╨б╨в╨Х╨Ь╨Р (╨Ъ╨╛╤А╨╡╨║╤Ж╨╕╤П ╨╜╨░╨╗╨╕╤З╨╜╨╛╤Б╤В)",
-                    "╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П": ins["╨Ю╨┐╨╡╤А╨░╤Ж╨╕╤П"],
-                    "╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛": ins["╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛"],
-                    "╨б╤В╨░╤В╤Г╤Б": "╨Ю╤В╤З╨╡╤В╨╡╨╜╨╛",
-                    "╨Т╤А╨╡╨╝╨╡ ╨б╤В╨░╤А╤В": new Date().toISOString(),
-                    "╨Т╤А╨╡╨╝╨╡ ╨Ъ╤А╨░╨╣": new Date().toISOString(),
-                    "╨Ф╨░╤В╨░": new Date().toISOString().split('T')[0],
-                    "ID ╨Я╨╗╨░╨╜": "╨Ъ╨Ю╨а╨Х╨Ъ╨ж╨Ш╨п",
-                    "╨Ь╨░╤И╨╕╨╜╨░": "╨б╨Ш╨б╨в╨Х╨Ь╨Р",
-                    "╨Ш╨╝╨╡╨╣╨╗": "system"
+                    "в•ЁРЁв•Ёв•ќв•Ёв•Ў в•Ёв•њв•Ёв–‘ в•Ёв”¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—": ins["ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—"],
+                    "ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—": ins["ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—"],
+                    "в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р’в•Ёв•›в•¤Рђ": "в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР  (в•ЁРЄв•Ёв•›в•¤Рђв•Ёв•Ўв•Ёв•‘в•¤Р–в•Ёв••в•¤Рџ в•Ёв•њв•Ёв–‘в•Ёв•—в•Ёв••в•¤Р—в•Ёв•њв•Ёв•›в•¤Р‘в•¤Р’)",
+                    "в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ": ins["в•ЁР®в•Ёв”ђв•Ёв•Ўв•¤Рђв•Ёв–‘в•¤Р–в•Ёв••в•¤Рџ"],
+                    "в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›": ins["в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›"],
+                    "в•ЁР±в•¤Р’в•Ёв–‘в•¤Р’в•¤Р“в•¤Р‘": "в•ЁР®в•¤Р’в•¤Р—в•Ёв•Ўв•¤Р’в•Ёв•Ўв•Ёв•њв•Ёв•›",
+                    "в•ЁРўв•¤Рђв•Ёв•Ўв•Ёв•ќв•Ёв•Ў в•ЁР±в•¤Р’в•Ёв–‘в•¤Рђв•¤Р’": new Date().toISOString(),
+                    "в•ЁРўв•¤Рђв•Ёв•Ўв•Ёв•ќв•Ёв•Ў в•ЁРЄв•¤Рђв•Ёв–‘в•Ёв•Ј": new Date().toISOString(),
+                    "в•ЁР¤в•Ёв–‘в•¤Р’в•Ёв–‘": new Date().toISOString().split('T')[0],
+                    "ID в•ЁРЇв•Ёв•—в•Ёв–‘в•Ёв•њ": "в•ЁРЄв•ЁР®в•ЁР°в•ЁРҐв•ЁРЄв•ЁР¶в•ЁРЁв•ЁРї",
+                    "в•ЁР¬в•Ёв–‘в•¤Рв•Ёв••в•Ёв•њв•Ёв–‘": "в•ЁР±в•ЁРЁв•ЁР±в•ЁРІв•ЁРҐв•ЁР¬в•ЁР ",
+                    "в•ЁРЁв•Ёв•ќв•Ёв•Ўв•Ёв•Јв•Ёв•—": "system"
                 };
                 let {error} = await client.from('otcheti').insert([payload]);
                 if (error) {
-                    log('╨У╤А╨╡╤И╨║╨░ ╨┐╤А╨╕ ╨╖╨░╨┐╨╕╤Б ╨╖╨░ ' + ins["ID ╨Ф╨╡╤В╨░╨╣╨╗"] + ': ' + error.message);
+                    log('в•ЁРЈв•¤Рђв•Ёв•Ўв•¤Рв•Ёв•‘в•Ёв–‘ в•Ёв”ђв•¤Рђв•Ёв•• в•Ёв•–в•Ёв–‘в•Ёв”ђв•Ёв••в•¤Р‘ в•Ёв•–в•Ёв–‘ ' + ins["ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—"] + ': ' + error.message);
                 } else {
                     successCount++;
-                    log('╨г╤Б╨┐╨╡╤И╨╜╨╛ ╨╖╨░╨┐╨╕╤Б╨░╨╜╨╕ ' + ins["╨Ъ╨╛╨╗╨╕╤З╨╡╤Б╤В╨▓╨╛"] + ' ╨▒╤А. ╨╖╨░ ' + ins["ID ╨Ф╨╡╤В╨░╨╣╨╗"]);
+                    log('в•ЁРів•¤Р‘в•Ёв”ђв•Ёв•Ўв•¤Рв•Ёв•њв•Ёв•› в•Ёв•–в•Ёв–‘в•Ёв”ђв•Ёв••в•¤Р‘в•Ёв–‘в•Ёв•њв•Ёв•• ' + ins["в•ЁРЄв•Ёв•›в•Ёв•—в•Ёв••в•¤Р—в•Ёв•Ўв•¤Р‘в•¤Р’в•Ёв–“в•Ёв•›"] + ' в•Ёв–’в•¤Рђ. в•Ёв•–в•Ёв–‘ ' + ins["ID в•ЁР¤в•Ёв•Ўв•¤Р’в•Ёв–‘в•Ёв•Јв•Ёв•—"]);
                 }
             }
-            log('╨У╨╛╤В╨╛╨▓╨╛! ╨Ч╨░╨┐╨╕╤Б╨░╨╜╨╕ ' + successCount + ' ╨╛╤В ' + window.insertsToFix.length);
+            log('в•ЁРЈв•Ёв•›в•¤Р’в•Ёв•›в•Ёв–“в•Ёв•›! в•ЁР§в•Ёв–‘в•Ёв”ђв•Ёв••в•¤Р‘в•Ёв–‘в•Ёв•њв•Ёв•• ' + successCount + ' в•Ёв•›в•¤Р’ ' + window.insertsToFix.length);
             btnFix.style.display = 'none';
         }
     </script>
 </body>
 </html>
+
+
+

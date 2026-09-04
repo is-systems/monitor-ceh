@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Анализ на БОМ и Отчети</title>
+    <title>РђРЅР°Р»РёР· РЅР° Р‘РћРњ Рё РћС‚С‡РµС‚Рё</title>
     <style>
         body { font-family: monospace; background: #111; color: #0f0; padding: 20px; font-size: 14px; }
         h1 { color: #fff; }
@@ -15,22 +15,22 @@
     </style>
 </head>
 <body>
-    <h1>Детайлен лог на изчисленията</h1>
+    <h1>Р”РµС‚Р°Р№Р»РµРЅ Р»РѕРі РЅР° РёР·С‡РёСЃР»РµРЅРёСЏС‚Р°</h1>
     <div class="form-group">
-        <label>Родител (напр. 1/4" (R3)#): </label>
+        <label>Р РѕРґРёС‚РµР» (РЅР°РїСЂ. 1/4" (R3)#): </label>
         <input type="text" id="parentInput" value='1/4" (R3)#'>
     </div>
     <div class="form-group">
-        <label>Дете (напр. 1/4"): </label>
+        <label>Р”РµС‚Рµ (РЅР°РїСЂ. 1/4"): </label>
         <input type="text" id="childInput" value='1/4"'>
     </div>
-    <button onclick="startAnalysis()">Анализирай</button>
+    <button onclick="startAnalysis()">РђРЅР°Р»РёР·РёСЂР°Р№</button>
 
     <div id="out"></div>
 
     <script>
-        const url = 'https://zdythzcgcjxwbxufunuh.supabase.co/rest/v1';
-        const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXRoemNnY2p4d2J4dWZ1bnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MTcxNTMsImV4cCI6MjA5NjE5MzE1M30.XGZX5DHhJCGz9X5s__3iuSghukjanyJmGKv8MLig_jE';
+        const url = 'https://aoekbmhgbohsgpwqsizv.supabase.co/rest/v1';
+        const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU';
         const headers = { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' };
         
         async function fetchAll(endpoint) {
@@ -52,12 +52,12 @@
         }
 
         async function startAnalysis() {
-            document.getElementById('out').innerHTML = "Зареждане на данни от базата... (Може да отнеме няколко секунди)<br>";
+            document.getElementById('out').innerHTML = "Р—Р°СЂРµР¶РґР°РЅРµ РЅР° РґР°РЅРЅРё РѕС‚ Р±Р°Р·Р°С‚Р°... (РњРѕР¶Рµ РґР° РѕС‚РЅРµРјРµ РЅСЏРєРѕР»РєРѕ СЃРµРєСѓРЅРґРё)<br>";
             let parentDetail = document.getElementById('parentInput').value.trim().toLowerCase();
             let childDetail = document.getElementById('childInput').value.trim().toLowerCase();
 
             if (!parentDetail || !childDetail) {
-                log("<span style='color:red'>Моля, въведете и двата детайла!</span>");
+                log("<span style='color:red'>РњРѕР»СЏ, РІСЉРІРµРґРµС‚Рµ Рё РґРІР°С‚Р° РґРµС‚Р°Р№Р»Р°!</span>");
                 return;
             }
 
@@ -68,50 +68,50 @@
                     fetchAll('otcheti')
                 ]);
                 
-                log(`<br><b>=== 1. ПРОВЕРКА НА БОМ ===</b>`);
-                let parentsOfChild = bom.filter(b => String(b['ID Компонент']).trim().toLowerCase() === childDetail);
-                log(`Всички редове, където ${childDetail} е дете:`);
+                log(`<br><b>=== 1. РџР РћР’Р•Р РљРђ РќРђ Р‘РћРњ ===</b>`);
+                let parentsOfChild = bom.filter(b => String(b['ID РљРѕРјРїРѕРЅРµРЅС‚']).trim().toLowerCase() === childDetail);
+                log(`Р’СЃРёС‡РєРё СЂРµРґРѕРІРµ, РєСЉРґРµС‚Рѕ ${childDetail} Рµ РґРµС‚Рµ:`);
                 let foundRelation = false;
                 parentsOfChild.forEach(p => {
-                    log(` - Родител: ${p['ID Родител']}, Компонент: ${p['ID Компонент']}, Количество: ${p['Количество']}`);
-                    if (String(p['ID Родител']).trim().toLowerCase() === parentDetail) {
+                    log(` - Р РѕРґРёС‚РµР»: ${p['ID Р РѕРґРёС‚РµР»']}, РљРѕРјРїРѕРЅРµРЅС‚: ${p['ID РљРѕРјРїРѕРЅРµРЅС‚']}, РљРѕР»РёС‡РµСЃС‚РІРѕ: ${p['РљРѕР»РёС‡РµСЃС‚РІРѕ']}`);
+                    if (String(p['ID Р РѕРґРёС‚РµР»']).trim().toLowerCase() === parentDetail) {
                         foundRelation = true;
                     }
                 });
 
                 if (!foundRelation) {
-                    log(`<span style="color:red; font-weight:bold;">ВНИМАНИЕ: ${childDetail} НЕ Е дете на ${parentDetail} в БОМ-а! Проверете имената.</span>`);
+                    log(`<span style="color:red; font-weight:bold;">Р’РќРРњРђРќРР•: ${childDetail} РќР• Р• РґРµС‚Рµ РЅР° ${parentDetail} РІ Р‘РћРњ-Р°! РџСЂРѕРІРµСЂРµС‚Рµ РёРјРµРЅР°С‚Р°.</span>`);
                 }
 
-                log(`<br><b>=== 2. ПРОВЕРКА НА МАРШРУТНА КАРТА ===</b>`);
-                let routes = routesData.filter(r => String(r['Код на детайла']||'').trim().toLowerCase() === parentDetail);
-                routes.sort((a,b) => (parseFloat(a['№ Операция'])||0) - (parseFloat(b['№ Операция'])||0));
-                log(`Намерени ${routes.length} операции за ${parentDetail}:`);
-                routes.forEach(r => log(` - Оп. ${r['№ Операция']}: ${r['Име на операция']}`));
+                log(`<br><b>=== 2. РџР РћР’Р•Р РљРђ РќРђ РњРђР РЁР РЈРўРќРђ РљРђР РўРђ ===</b>`);
+                let routes = routesData.filter(r => String(r['РљРѕРґ РЅР° РґРµС‚Р°Р№Р»Р°']||'').trim().toLowerCase() === parentDetail);
+                routes.sort((a,b) => (parseFloat(a['в„– РћРїРµСЂР°С†РёСЏ'])||0) - (parseFloat(b['в„– РћРїРµСЂР°С†РёСЏ'])||0));
+                log(`РќР°РјРµСЂРµРЅРё ${routes.length} РѕРїРµСЂР°С†РёРё Р·Р° ${parentDetail}:`);
+                routes.forEach(r => log(` - РћРї. ${r['в„– РћРїРµСЂР°С†РёСЏ']}: ${r['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']}`));
 
-                let opNames = routes.map(r => String(r['Име на операция']).trim().toLowerCase());
+                let opNames = routes.map(r => String(r['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase());
                 let duplicates = opNames.filter((item, index) => opNames.indexOf(item) !== index);
                 if (duplicates.length > 0) {
-                    log(`<span style="color:red; font-weight:bold;">ВНИМАНИЕ: Намерени повтарящи се имена на операции: ${duplicates.join(', ')}</span>`);
+                    log(`<span style="color:red; font-weight:bold;">Р’РќРРњРђРќРР•: РќР°РјРµСЂРµРЅРё РїРѕРІС‚Р°СЂСЏС‰Рё СЃРµ РёРјРµРЅР° РЅР° РѕРїРµСЂР°С†РёРё: ${duplicates.join(', ')}</span>`);
                 } else {
-                    log("<span style='color:lime;'>Няма повтарящи се имена на операции.</span>");
+                    log("<span style='color:lime;'>РќСЏРјР° РїРѕРІС‚Р°СЂСЏС‰Рё СЃРµ РёРјРµРЅР° РЅР° РѕРїРµСЂР°С†РёРё.</span>");
                 }
 
-                log(`<br><b>=== 3. ОТЧЕТЕНИ БРОЙКИ ЗА ${parentDetail} ===</b>`);
-                let myOtcheti = allOtcheti.filter(o => String(o['ID Детайл']).trim().toLowerCase() === parentDetail);
+                log(`<br><b>=== 3. РћРўР§Р•РўР•РќР Р‘Р РћР™РљР Р—Рђ ${parentDetail} ===</b>`);
+                let myOtcheti = allOtcheti.filter(o => String(o['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase() === parentDetail);
                 let completedOps = {};
                 myOtcheti.forEach(r => {
-                    let op = String(r['Операция']).trim().toLowerCase();
-                    let qty = parseFloat(r['Количество']) || 0;
-                    if (r['Статус'] === 'Отчетено' && r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
+                    let op = String(r['РћРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+                    let qty = parseFloat(r['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0;
+                    if (r['РЎС‚Р°С‚СѓСЃ'] === 'РћС‚С‡РµС‚РµРЅРѕ' && r['РћРїРµСЂР°С‚РѕСЂ'] !== 'РЎРРЎРўР•РњРђ (Р•РєСЃРїРµРґРёС†РёСЏ)' && !(r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (РљРѕСЂРµРєС†РёСЏ РЅР°Р»РёС‡РЅРѕСЃС‚)' && qty < 0) && op !== 'РІСЉР·СЃС‚Р°РЅРѕРІРµРЅ' && !op.startsWith('РІР»РѕР¶РµРЅ РІ ')) { 
                         completedOps[op] = (completedOps[op] || 0) + qty; 
                     }
                 });
-                log("Сума на отчетените (от операторите) бройки по операции:");
-                if(Object.keys(completedOps).length === 0) log(" - Няма отчетени бройки.");
-                Object.keys(completedOps).forEach(k => log(` - ${k}: ${completedOps[k]} бр.`));
+                log("РЎСѓРјР° РЅР° РѕС‚С‡РµС‚РµРЅРёС‚Рµ (РѕС‚ РѕРїРµСЂР°С‚РѕСЂРёС‚Рµ) Р±СЂРѕР№РєРё РїРѕ РѕРїРµСЂР°С†РёРё:");
+                if(Object.keys(completedOps).length === 0) log(" - РќСЏРјР° РѕС‚С‡РµС‚РµРЅРё Р±СЂРѕР№РєРё.");
+                Object.keys(completedOps).forEach(k => log(` - ${k}: ${completedOps[k]} Р±СЂ.`));
 
-                log(`<br><b>=== 4. СИМУЛАЦИЯ НА СИСТЕМАТА ===</b>`);
+                log(`<br><b>=== 4. РЎРРњРЈР›РђР¦РРЇ РќРђ РЎРРЎРўР•РњРђРўРђ ===</b>`);
                 let grossCompletedOps = {};
                 let scrappedOps = {};
                 Object.keys(completedOps).forEach(op => {
@@ -119,30 +119,33 @@
                 });
 
                 for (let i = routes.length - 2; i >= 0; i--) {
-                    let opKey = parentDetail + '_' + String(routes[i]['Име на операция']).trim().toLowerCase();
-                    let nextOpKey = parentDetail + '_' + String(routes[i+1]['Име на операция']).trim().toLowerCase();
+                    let opKey = parentDetail + '_' + String(routes[i]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+                    let nextOpKey = parentDetail + '_' + String(routes[i+1]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
                     let requiredFromMe = (grossCompletedOps[nextOpKey] || 0) + (scrappedOps[nextOpKey] || 0);
                     grossCompletedOps[opKey] = Math.max(grossCompletedOps[opKey] || 0, requiredFromMe);
                 }
                 
-                log("Бройки след обратното разпространение (forward/backward):");
+                log("Р‘СЂРѕР№РєРё СЃР»РµРґ РѕР±СЂР°С‚РЅРѕС‚Рѕ СЂР°Р·РїСЂРѕСЃС‚СЂР°РЅРµРЅРёРµ (forward/backward):");
                 routes.forEach(r => {
-                    let opKey = parentDetail + '_' + String(r['Име на операция']).trim().toLowerCase();
-                    log(` - ${opKey} = ${grossCompletedOps[opKey] || 0} бр.`);
+                    let opKey = parentDetail + '_' + String(r['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+                    log(` - ${opKey} = ${grossCompletedOps[opKey] || 0} Р±СЂ.`);
                 });
 
                 if(routes.length > 0) {
-                    let firstOpKey = parentDetail + '_' + String(routes[0]['Име на операция']).trim().toLowerCase();
+                    let firstOpKey = parentDetail + '_' + String(routes[0]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
                     let parentConsumed = grossCompletedOps[firstOpKey] || 0;
-                    log(`\n=> Първа операция е: ${firstOpKey}. Стойност = ${parentConsumed} бр.`);
-                    log(`=> Следователно ${parentDetail} е консумирал: ${parentConsumed} бр. от всички свои компоненти (вкл. ${childDetail})!`);
+                    log(`\n=> РџСЉСЂРІР° РѕРїРµСЂР°С†РёСЏ Рµ: ${firstOpKey}. РЎС‚РѕР№РЅРѕСЃС‚ = ${parentConsumed} Р±СЂ.`);
+                    log(`=> РЎР»РµРґРѕРІР°С‚РµР»РЅРѕ ${parentDetail} Рµ РєРѕРЅСЃСѓРјРёСЂР°Р»: ${parentConsumed} Р±СЂ. РѕС‚ РІСЃРёС‡РєРё СЃРІРѕРё РєРѕРјРїРѕРЅРµРЅС‚Рё (РІРєР». ${childDetail})!`);
                 }
 
-                log("<br><b style='color:lime'>ГОТОВО.</b>");
+                log("<br><b style='color:lime'>Р“РћРўРћР’Рћ.</b>");
             } catch(e) {
-                log("<br><span style='color:red'>ГРЕШКА: " + e.stack + "</span>");
+                log("<br><span style='color:red'>Р“Р Р•РЁРљРђ: " + e.stack + "</span>");
             }
         }
     </script>
 </body>
 </html>
+
+
+
