@@ -26,7 +26,7 @@ body { font-family: 'Segoe UI', sans-serif; background-color: #ffffff; margin: 0
     text-overflow: ellipsis;
 }
 .machine-title { color: #1e3a8a; font-weight: 900; text-decoration: underline; margin-left: 5px;}
-.task-filters { display: flex; width: 100%; background: #fff3cd; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+.task-filters { display: flex; width: 100%; background: #ffffff; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 .t-filter-btn { flex: 1; padding: 12px 5px; text-align: center; font-size: 0.85em; font-weight: 900; color: #64748b; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
 .t-filter-btn.active { color: #2563eb; border-bottom-color: #2563eb; background: #f8fafc; }
 #tasksContainer { width: 100%; max-width: 550px; margin: 15px auto 80px auto; display: flex; flex-direction: column; gap: 20px; }
