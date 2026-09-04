@@ -1,4 +1,4 @@
-﻿const SUPABASE_URL = 'https://aoekbmhgbohsgpwqsizv.supabase.co';
+const SUPABASE_URL = 'https://aoekbmhgbohsgpwqsizv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -42,12 +42,12 @@ function toggleHarmony(idStr) {
     if (histEl && btnEl) {
         if (histEl.classList.contains('hidden-history')) {
             histEl.classList.remove('hidden-history');
-            btnEl.innerText = 'в–¶';
+            btnEl.innerText = '▶';
             btnEl.style.color = '#60a5fa'; 
             btnEl.style.background = 'rgba(59,130,246,0.15)';
         } else {
             histEl.classList.add('hidden-history');
-            btnEl.innerText = 'в—Ђ';
+            btnEl.innerText = '◀';
             btnEl.style.color = '';
             btnEl.style.background = '';
         }
@@ -91,14 +91,14 @@ async function initialFetch() {
     if (loader) {
         loader.style.display = 'flex';
         const txt = loader.querySelector('div');
-        if(txt) txt.innerText = "Р—Р°СЂРµР¶РґР°РЅРµ РЅР° СЃРїСЂР°РІРѕС‡РЅРё РґР°РЅРЅРё... вљ™пёЏ";
+        if(txt) txt.innerText = "Зареждане на справочни данни... ⚙️";
     }
     
     try {
         const [bomRes, routesRes, nomRes] = await Promise.all([
             fetchAll('bom'),
             fetchAll('marshruti'),
-            fetchAll('РќРѕРјРµРЅРєР»Р°С‚СѓСЂР°')
+            fetchAll('Номенклатура')
         ]);
 
         if (bomRes.error) throw bomRes.error;
@@ -110,34 +110,34 @@ async function initialFetch() {
         staticCache.nomData = nomRes.data || [];
 
         staticCache.nomData.forEach(n => {
-            if (n['ID Р”РµС‚Р°Р№Р»']) staticCache.nomMap[String(n['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase()] = n;
+            if (n['ID Детайл']) staticCache.nomMap[String(n['ID Детайл']).trim().toLowerCase()] = n;
         });
 
         staticCache.routesData.forEach(r => {
-            let code = String(r['РљРѕРґ РЅР° РґРµС‚Р°Р№Р»Р°']).trim().toLowerCase();
+            let code = String(r['Код на детайла']).trim().toLowerCase();
             if(!staticCache.routesByDetail[code]) staticCache.routesByDetail[code] = [];
             staticCache.routesByDetail[code].push(r);
         });
 
         Object.keys(staticCache.routesByDetail).forEach(code => {
-            staticCache.routesByDetail[code].sort((a, b) => parseInt(a['в„– РћРїРµСЂР°С†РёСЏ']) - parseInt(b['в„– РћРїРµСЂР°С†РёСЏ']));
+            staticCache.routesByDetail[code].sort((a, b) => parseInt(a['№ Операция']) - parseInt(b['№ Операция']));
         });
 
-        let bomDataSorted = staticCache.bomData.sort((a, b) => String(a['ID РљРѕРјРїРѕРЅРµРЅС‚']).localeCompare(String(b['ID РљРѕРјРїРѕРЅРµРЅС‚'])));
+        let bomDataSorted = staticCache.bomData.sort((a, b) => String(a['ID Компонент']).localeCompare(String(b['ID Компонент'])));
         bomDataSorted.forEach(b => {
-            let p = String(b['ID Р РѕРґРёС‚РµР»']).trim().toLowerCase();
+            let p = String(b['ID Родител']).trim().toLowerCase();
             if(!staticCache.bomChildrenMap[p]) staticCache.bomChildrenMap[p] = [];
             staticCache.bomChildrenMap[p].push(b);
         });
 
         staticCache.isLoaded = true;
     } catch (err) {
-        document.getElementById('error-box').innerText = "Р“СЂРµС€РєР° РїСЂРё Р·Р°СЂРµР¶РґР°РЅРµ РЅР° СЃРїСЂР°РІРѕС‡РЅРёС†Рё: " + err.message;
+        document.getElementById('error-box').innerText = "Грешка при зареждане на справочници: " + err.message;
     }
 }
 
 async function fetchDynamicData() {
-    let plansQuery = client.from('plan').select('*').in('РЎС‚Р°С‚СѓСЃ', ['РђРєС‚РёРІРµРЅ', 'Р—Р°РІСЉСЂС€РµРЅ', 'РћРїР°РєРѕРІР°РЅ']);
+    let plansQuery = client.from('plan').select('*').in('Статус', ['Активен', 'Завършен', 'Опакован']);
     
     const [plansRes, reportsRes, skladRes, invGpRes, invWipRes] = await Promise.all([
         fetchAll('plan'),
@@ -147,8 +147,8 @@ async function fetchDynamicData() {
         fetchAll('inventory_wip')
     ]);
 
-    let activePlans = (plansRes.data || []).filter(p => ['РђРєС‚РёРІРµРЅ', 'Р—Р°РІСЉСЂС€РµРЅ', 'РћРїР°РєРѕРІР°РЅ'].includes(p['РЎС‚Р°С‚СѓСЃ']));
-    let realReports = (reportsRes.data || []).filter(r => r['РћРїРµСЂР°С‚РѕСЂ'] !== 'рџ’‰ РЎРРЎРўР•РњРђ (Р’РёСЂС‚СѓР°Р»РЅР° РєРѕРјРїРµРЅСЃР°С†РёСЏ)');
+    let activePlans = (plansRes.data || []).filter(p => ['Активен', 'Завършен', 'Опакован'].includes(p['Статус']));
+    let realReports = (reportsRes.data || []).filter(r => r['Оператор'] !== '💉 СИСТЕМА (Виртуална компенсация)');
     
     return {
         plansData: activePlans,
@@ -194,13 +194,13 @@ async function loadData() {
         });
 
         if (plansToComplete.length > 0) {
-            client.from('plan').update({ 'РЎС‚Р°С‚СѓСЃ': 'Р—Р°РІСЉСЂС€РµРЅ' }).in('id', plansToComplete).then(res => {
+            client.from('plan').update({ 'Статус': 'Завършен' }).in('id', plansToComplete).then(res => {
                 if (!res.error && plansToComplete.length > 0) console.log("Auto-completed plans:", plansToComplete);
             });
         }
 
     } catch (err) {
-        document.getElementById('error-box').innerText = "Р“СЂРµС€РєР°: " + err.message;
+        document.getElementById('error-box').innerText = "Грешка: " + err.message;
         document.getElementById('loading').style.display = 'none';
     }
 }
@@ -210,7 +210,7 @@ function buildBOMTree(plansData, skladData) {
 
     let skladMap = {};
     skladData.forEach(s => {
-        if (s['ID Р”РµС‚Р°Р№Р»']) skladMap[String(s['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase()] = parseFloat(s['РћСЃС‚Р°С‚СЉРє']) || 0;
+        if (s['ID Детайл']) skladMap[String(s['ID Детайл']).trim().toLowerCase()] = parseFloat(s['Остатък']) || 0;
     });
 
     let planMap = {};
@@ -220,14 +220,14 @@ function buildBOMTree(plansData, skladData) {
     plansData.forEach(p => { 
         planMap[p.id] = p; 
         
-        let originalPlanCode = String(p['Р’СЉС‚СЂРµС€РЅРѕ РёРјРµ']).trim();
+        let originalPlanCode = String(p['Вътрешно име']).trim();
         let actualBomName = originalPlanCode;
         let displayName = originalPlanCode;
-        let targetQty = parseFloat(p['Р¦РµР»РµРІРѕ РєРѕР»РёС‡РµСЃС‚РІРѕ']) || 0;
+        let targetQty = parseFloat(p['Целево количество']) || 0;
 
-        let translated = staticCache.nomData.find(n => String(n['Р’СЉС‚СЂРµС€РЅРѕ РёРјРµ']).trim() === originalPlanCode);
-        if (translated && translated['ID Р”РµС‚Р°Р№Р»']) {
-            actualBomName = String(translated['ID Р”РµС‚Р°Р№Р»']).trim();
+        let translated = staticCache.nomData.find(n => String(n['Вътрешно име']).trim() === originalPlanCode);
+        if (translated && translated['ID Детайл']) {
+            actualBomName = String(translated['ID Детайл']).trim();
             if (originalPlanCode.toUpperCase() === actualBomName.toUpperCase()) {
                 displayName = actualBomName;
             } else {
@@ -252,13 +252,13 @@ function buildBOMTree(plansData, skladData) {
                 plan_qty: requiredQty,
                 parent_code: parentName,
                 ready_qty: skladMap[currentCodeLower] || 0,
-                drawing_url: nomEntry['Р›РёРЅРє РєСЉРј С‡РµСЂС‚РµР¶'] || '',
-                part_type: nomEntry['РўРёРї'] || ''
+                drawing_url: nomEntry['Линк към чертеж'] || '',
+                part_type: nomEntry['Тип'] || ''
             });
 
             children.forEach(c => {
-                let childName = String(c['ID РљРѕРјРїРѕРЅРµРЅС‚']).trim();
-                let multiplier = parseFloat(c['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 1;
+                let childName = String(c['ID Компонент']).trim();
+                let multiplier = parseFloat(c['Количество']) || 1;
                 traverseAndAdd(currentCode, childName, requiredQty * multiplier, false);
             });
         }
@@ -271,7 +271,7 @@ function buildBOMTree(plansData, skladData) {
 
     activeNodes.forEach(row => {
         let pData = planMap[row.plan_id];
-        let pMonthStr = pData ? `${pData['РњРµСЃРµС†']} ${pData['Р“РѕРґРёРЅР°']}` : `РџР›РђРќ ${row.plan_id}`;
+        let pMonthStr = pData ? `${pData['Месец']} ${pData['Година']}` : `ПЛАН ${row.plan_id}`;
         let codeStr = row.code ? String(row.code).trim() : "";
         
         let mergedId = pMonthStr + '___' + codeStr;
@@ -299,7 +299,7 @@ function buildBOMTree(plansData, skladData) {
         if (!mergedNodes[mergedId].planDbIds.includes(row.plan_id)) {
             mergedNodes[mergedId].planDbIds.push(row.plan_id);
         }
-        if (pData && pData['РЎС‚Р°С‚СѓСЃ'] === 'РђРєС‚РёРІРµРЅ' && !mergedNodes[mergedId].activePlanDbIds.includes(row.plan_id)) {
+        if (pData && pData['Статус'] === 'Активен' && !mergedNodes[mergedId].activePlanDbIds.includes(row.plan_id)) {
             mergedNodes[mergedId].activePlanDbIds.push(row.plan_id);
         }
 
@@ -320,8 +320,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let planNameToId = {};
     if (plansData) {
         plansData.forEach(p => {
-            if (p['Р’СЉС‚СЂРµС€РЅРѕ РёРјРµ']) planNameToId[String(p['Р’СЉС‚СЂРµС€РЅРѕ РёРјРµ']).trim()] = String(p.id);
-            let m = (p['РњРµСЃРµС†'] && p['Р“РѕРґРёРЅР°']) ? `${p['РњРµСЃРµС†']} ${p['Р“РѕРґРёРЅР°']}` : '';
+            if (p['Вътрешно име']) planNameToId[String(p['Вътрешно име']).trim()] = String(p.id);
+            let m = (p['Месец'] && p['Година']) ? `${p['Месец']} ${p['Година']}` : '';
             if (m) planNameToId[m] = String(p.id);
             planNameToId[String(p.id)] = String(p.id);
         });
@@ -334,24 +334,24 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let invGpMap = {};
     if (invGpData) {
         invGpData.forEach(r => {
-            let code = String(r['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase();
-            invGpMap[code] = (invGpMap[code] || 0) + (parseFloat(r['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0);
+            let code = String(r['ID Детайл']).trim().toLowerCase();
+            invGpMap[code] = (invGpMap[code] || 0) + (parseFloat(r['Количество']) || 0);
         });
     }
 
     let invWipMap = {};
     if (invWipData) {
         invWipData.forEach(r => {
-            let code = String(r['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase();
-            let op = String(r['РћРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+            let code = String(r['ID Детайл']).trim().toLowerCase();
+            let op = String(r['Операция']).trim().toLowerCase();
             if (!invWipMap[code]) invWipMap[code] = {};
-            invWipMap[code][op] = (invWipMap[code][op] || 0) + (parseFloat(r['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0);
+            invWipMap[code][op] = (invWipMap[code][op] || 0) + (parseFloat(r['Количество']) || 0);
         });
     }
     
     // Performance optimization: compute timestamps once before sorting (O(N) instead of O(N log N))
     let sortedReports = reportsData.map(r => {
-        r._ts = new Date(r['Р’СЂРµРјРµ РЎС‚Р°СЂС‚'] || r['Р”Р°С‚Р°']).getTime();
+        r._ts = new Date(r['Време Старт'] || r['Дата']).getTime();
         return r;
     }).sort((a, b) => a._ts - b._ts);
 
@@ -364,38 +364,38 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let packagedQty = {}; // [NEW] Track packaged items
 
     allCombinedReports.forEach(r => {
-        let code = String(r['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase();
-        let op = String(r['РћРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
-        let key = code + '_' + String(r['РћРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
-        let qty = parseFloat(r['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0;
+        let code = String(r['ID Детайл']).trim().toLowerCase();
+        let op = String(r['Операция']).trim().toLowerCase();
+        let key = code + '_' + String(r['Операция']).trim().toLowerCase();
+        let qty = parseFloat(r['Количество']) || 0;
         
-        if (op.startsWith('РѕРїР°РєРѕРІР°РЅРµ - РєР°С€РѕРЅ') && r['РЎС‚Р°С‚СѓСЃ'] === 'РћС‚С‡РµС‚РµРЅРѕ') {
-            let rawPId = String(r['ID РџР»Р°РЅ'] || '').trim();
+        if (op.startsWith('опаковане - кашон') && r['Статус'] === 'Отчетено') {
+            let rawPId = String(r['ID План'] || '').trim();
             let pId = planNameToId[rawPId] || rawPId;
             let packKey = pId ? (code + '_' + pId) : code;
             packagedQty[packKey] = (packagedQty[packKey] || 0) + qty;
         }
         
-        if (r['РЎС‚Р°С‚СѓСЃ'] === 'Р‘СЂР°Рє') {
-            if (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (Р‘СЂР°РєСѓРІР°РЅ РљРѕРјРїРѕРЅРµРЅС‚)') {
+        if (r['Статус'] === 'Брак') {
+            if (r['Оператор'] === 'СИСТЕМА (Бракуван Компонент)') {
                 componentScrapEvents.push(r);
             } else {
                 opScrapEvents.push(r);
             }
         } 
-        else if (r['РЎС‚Р°С‚СѓСЃ'] === 'РћС‚С‡РµС‚РµРЅРѕ') {
+        else if (r['Статус'] === 'Отчетено') {
             completedOps[key] = (completedOps[key] || 0) + qty;
             
-            let isManual = (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (Р СЉС‡РЅРѕ РґРѕР±Р°РІРµРЅ)' || r['РћРїРµСЂР°С‚РѕСЂ'] === 'рџ’‰ РЎРРЎРўР•РњРђ (Р СЉС‡РЅРѕ РґРѕР±Р°РІРµРЅ)' || (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (РљРѕСЂРµРєС†РёСЏ РЅР°Р»РёС‡РЅРѕСЃС‚)' && qty > 0));
+            let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || r['Оператор'] === '💉 СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
             if (isManual) {
                 manualOps[key] = (manualOps[key] || 0) + qty;
-            } else if (r['РћРїРµСЂР°С‚РѕСЂ'] !== 'РЎРРЎРўР•РњРђ (Р•РєСЃРїРµРґРёС†РёСЏ)' && !(r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (РљРѕСЂРµРєС†РёСЏ РЅР°Р»РёС‡РЅРѕСЃС‚)' && qty < 0) && op !== 'РІСЉР·СЃС‚Р°РЅРѕРІРµРЅ' && !op.startsWith('РІР»РѕР¶РµРЅ РІ ')) { 
+            } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
                 grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
             }
-            opStatusMap[key] = 'РћС‚С‡РµС‚РµРЅРѕ';
+            opStatusMap[key] = 'Отчетено';
             statusEvents.push(r);
-        } else if (r['РЎС‚Р°С‚СѓСЃ'] !== 'Р‘СЂР°Рє') {
-            opStatusMap[key] = r['РЎС‚Р°С‚СѓСЃ']; 
+        } else if (r['Статус'] !== 'Брак') {
+            opStatusMap[key] = r['Статус']; 
             statusEvents.push(r);
         }
     });
@@ -449,9 +449,9 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
     let getMultiplier = (childCode, parentCode) => {
         let pNameLower = parentCode.toLowerCase();
         let cNameLower = childCode.toLowerCase();
-        let bomLines = staticCache.bomData.filter(b => String(b['ID РљРѕРјРїРѕРЅРµРЅС‚']).trim().toLowerCase() === cNameLower && String(b['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase() === pNameLower);
+        let bomLines = staticCache.bomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === cNameLower && String(b['ID Детайл']).trim().toLowerCase() === pNameLower);
         let m = 0;
-        bomLines.forEach(bl => m += (parseFloat(bl['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 1));
+        bomLines.forEach(bl => m += (parseFloat(bl['Количество']) || 1));
         return m || 1;
     };
 
@@ -465,12 +465,12 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
 
         if (partRoutes.length > 0) {
             partRoutes.forEach((route, idx) => {
-                let opName = String(route['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim();
+                let opName = String(route['Име на операция']).trim();
                 let opKey = code.toLowerCase() + '_' + opName.toLowerCase();
                 
                 let globalPhysicalPassed = (invGpMap[code.toLowerCase()] || 0);
                 for (let j = idx; j < partRoutes.length; j++) {
-                    globalPhysicalPassed += (invWipMap[code.toLowerCase()]?.[String(partRoutes[j]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase()] || 0);
+                    globalPhysicalPassed += (invWipMap[code.toLowerCase()]?.[String(partRoutes[j]['Име на операция']).trim().toLowerCase()] || 0);
                 }
                 let globalNet = globalPhysicalPassed; 
                 
@@ -483,13 +483,13 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 
                 let opState = 'gray';
                 
-                let latestStatus = 'РћС‡Р°РєРІР° СЃРµ';
+                let latestStatus = 'Очаква се';
                 for (let i = statusEvents.length - 1; i >= 0; i--) {
                     let e = statusEvents[i];
-                    if (String(e['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase() === code.toLowerCase() && String(e['РћРїРµСЂР°С†РёСЏ'] || '').trim().toLowerCase() === opName.toLowerCase()) {
-                        let rawPIds = String(e['ID РџР»Р°РЅ'] || '').split(',').map(s=>s.trim()).filter(s=>s);
+                    if (String(e['ID Детайл']).trim().toLowerCase() === code.toLowerCase() && String(e['Операция'] || '').trim().toLowerCase() === opName.toLowerCase()) {
+                        let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
                         if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.includes(pid))) {
-                            latestStatus = e['РЎС‚Р°С‚СѓСЃ'] === 'РћС‚С‡РµС‚РµРЅРѕ' ? 'РћС‚С‡РµС‚РµРЅРѕ' : e['РЎС‚Р°С‚СѓСЃ'];
+                            latestStatus = e['Статус'] === 'Отчетено' ? 'Отчетено' : e['Статус'];
                             break;
                         }
                     }
@@ -497,14 +497,14 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 
                 if (doneQty >= n.planQty) opState = 'green';
                 else if (doneQty > 0) opState = 'blue';
-                else if (latestStatus === 'Р—Р°РїРѕС‡РЅР°С‚Р°') opState = 'blue_0';
+                else if (latestStatus === 'Започната') opState = 'blue_0';
                 
                 let opScrap = 0;
                 opScrapEvents.forEach(e => {
-                    if (String(e['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase() === code.toLowerCase() && String(e['РћРїРµСЂР°С†РёСЏ'] || '').trim().toLowerCase() === opName.toLowerCase()) {
-                        let rawPIds = String(e['ID РџР»Р°РЅ'] || '').split(',').map(s=>s.trim()).filter(s=>s);
+                    if (String(e['ID Детайл']).trim().toLowerCase() === code.toLowerCase() && String(e['Операция'] || '').trim().toLowerCase() === opName.toLowerCase()) {
+                        let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
                         if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.includes(pid))) {
-                            opScrap += (parseFloat(e['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0);
+                            opScrap += (parseFloat(e['Количество']) || 0);
                         }
                     }
                 });
@@ -514,7 +514,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 if (idx === 0) finalDoneQtyForChildren = doneQty;
             });
         } else {
-            let globalWarehouse = n.warehouseQty + (completedOps[code + '_РІСЉР·СЃС‚Р°РЅРѕРІРµРЅ'] || 0);
+            let globalWarehouse = n.warehouseQty + (completedOps[code + '_възстановен'] || 0);
             let usedSoFar = alreadyAllocatedWarehouse[code] || 0;
             let availableForThisNode = Math.max(0, globalWarehouse - usedSoFar);
             
@@ -524,7 +524,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
             alreadyAllocatedWarehouse[code] = usedSoFar + allocatedFromWh;
             
             n.operations.push({ 
-                name: doneQty >= n.planQty ? 'Р“РѕС‚РѕРІ (РЎРєР»Р°Рґ)' : 'Р§Р°РєР°С‰ (Р”РѕСЃС‚Р°РІРєР°)', 
+                name: doneQty >= n.planQty ? 'Готов (Склад)' : 'Чакащ (Доставка)', 
                 completed: doneQty,
                 state: doneQty >= n.planQty ? 'green' : 'gray'
             });
@@ -544,10 +544,10 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
 
         let nodeScrap = 0;
         componentScrapEvents.forEach(e => {
-            if (String(e['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase() === n.code.toLowerCase()) {
-                let rawPIds = String(e['ID РџР»Р°РЅ'] || '').split(',').map(s=>s.trim()).filter(s=>s);
+            if (String(e['ID Детайл']).trim().toLowerCase() === n.code.toLowerCase()) {
+                let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
                 if (rawPIds.length > 0 && rawPIds.some(pid => n.planDbIds.includes(pid))) {
-                    nodeScrap += (parseFloat(e['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0);
+                    nodeScrap += (parseFloat(e['Количество']) || 0);
                 }
             }
         });
@@ -561,23 +561,23 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
         let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
-        let isRotorPacket = n.partType && n.partType.toLowerCase().includes("СЂРѕС‚РѕСЂРµРЅ РїР°РєРµС‚");
+        let isRotorPacket = n.partType && n.partType.toLowerCase().includes("роторен пакет");
         
-        if (typeStr.includes("С‚СЏР»Рѕ") || typeStr.includes("С‚РµР»Р°")) n.bucket = 'tiela';
-        else if (typeStr.includes("РїСЂРµРґРµРЅ") || typeStr.includes("РїСЂРµРґРЅРё") || typeStr.includes("РїСЂРµРґРµРЅРєР°РїР°Рє")) n.bucket = 'predni';
-        else if (typeStr.includes("Р·Р°РґРµРЅ") || typeStr.includes("Р·Р°РґРЅРё") || typeStr.includes("Р·Р°РґРµРЅРєР°РїР°Рє")) n.bucket = 'zadni';
-        else if (typeStr.includes("РјРїСЂ")) n.bucket = 'mpr';
+        if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
+        else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) n.bucket = 'predni';
+        else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) n.bucket = 'zadni';
+        else if (typeStr.includes("мпр")) n.bucket = 'mpr';
         else if (isRotorPacket && typeStr.includes("11")) n.bucket = 'small_rotors_var11';
         else if (isRotorPacket && typeStr.includes("25")) n.bucket = 'small_rotors_var25';
-        else if (typeStr.includes("РїР°РєРµС‚")) n.bucket = 'small_rotors';
-        else if (typeStr.includes("СЃС‚Р°С‚РѕСЂ") || typeStr.includes("С‚СЂР°РЅСЃС„РѕСЂРјР°С‚РѕСЂ")) n.bucket = 'statori';
-        else if (typeStr.includes("СЂРѕС‚РѕСЂ") && typeStr.includes("11")) n.bucket = 'var11';
-        else if (typeStr.includes("СЂРѕС‚РѕСЂ") && typeStr.includes("25")) n.bucket = 'var25';
-        else if (typeStr.includes("Р»Р°РіРµСЂ")) n.bucket = 'bearings';
-        else if (typeStr.includes("С‰РёС„С‚")) n.bucket = 'small_pins';
-        else if (typeStr.includes("С€РїРёР»Рє")) n.bucket = 'small_studs';
-        else if (typeStr.includes("РјР°РєР°СЂ") || n.code.toLowerCase().includes("РјР°Рє.")) n.bucket = 'temp_spools';
-        else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("СЂРµР·РѕР»РІРµСЂ") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
+        else if (typeStr.includes("пакет")) n.bucket = 'small_rotors';
+        else if (typeStr.includes("статор") || typeStr.includes("трансформатор")) n.bucket = 'statori';
+        else if (typeStr.includes("ротор") && typeStr.includes("11")) n.bucket = 'var11';
+        else if (typeStr.includes("ротор") && typeStr.includes("25")) n.bucket = 'var25';
+        else if (typeStr.includes("лагер")) n.bucket = 'bearings';
+        else if (typeStr.includes("щифт")) n.bucket = 'small_pins';
+        else if (typeStr.includes("шпилк")) n.bucket = 'small_studs';
+        else if (typeStr.includes("макар") || n.code.toLowerCase().includes("мак.")) n.bucket = 'temp_spools';
+        else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
             n.bucket = 'assembly';
         } 
         else {
@@ -790,11 +790,11 @@ function drawDashboard(jsonString) {
             localConns.forEach(c => {
                 let fromNode = nodes.find(n => n.id === c.from);
                 let toNode = nodes.find(n => n.id === c.to);
-                let isFromSpool = fromNode && fromNode.partType && fromNode.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
-                let isToSpool = toNode && toNode.partType && toNode.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
+                let isFromSpool = fromNode && fromNode.partType && fromNode.partType.trim().toLowerCase() === "макарички";
+                let isToSpool = toNode && toNode.partType && toNode.partType.trim().toLowerCase() === "макарички";
                 
                 if (isFromSpool !== isToSpool) {
-                    return; // РќРµ РіРё РіСЂСѓРїРёСЂР°РјРµ Р·Р°РµРґРЅРѕ, Р°РєРѕ РµРґРЅРѕС‚Рѕ Рµ РјР°РєР°СЂР°, Р° РґСЂСѓРіРѕС‚Рѕ РЅРµ
+                    return; // Не ги групираме заедно, ако едното е макара, а другото не
                 }
 
                 adj[c.from].push(c.to);
@@ -825,14 +825,14 @@ function drawDashboard(jsonString) {
             });
             
             families.sort((a, b) => {
-                let aHasSpool = a.some(n => n.partType && n.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё");
-                let bHasSpool = b.some(n => n.partType && n.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё");
+                let aHasSpool = a.some(n => n.partType && n.partType.trim().toLowerCase() === "макарички");
+                let bHasSpool = b.some(n => n.partType && n.partType.trim().toLowerCase() === "макарички");
                 if (aHasSpool && !bHasSpool) return 1;
                 if (!aHasSpool && bHasSpool) return -1;
-                return b.length - a.length; // РїРѕ-РіРѕР»РµРјРёС‚Рµ СЃРµРјРµР№СЃС‚РІР° РїСЉСЂРІРё
+                return b.length - a.length; // по-големите семейства първи
             });
             
-            let planHTML = `<div class="plan-group"><div class="plan-label">РџР›РђРќ: ${planMonth}</div>`;
+            let planHTML = `<div class="plan-group"><div class="plan-label">ПЛАН: ${planMonth}</div>`;
 
             families.forEach(famNodes => {
                 const childrenMap = {};
@@ -861,8 +861,8 @@ function drawDashboard(jsonString) {
                     let colHTML = `<div class="bom-column">`;
                     
                     levels[lvl].sort((a, b) => {
-                        let aIsSpool = a.partType && a.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
-                        let bIsSpool = b.partType && b.partType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
+                        let aIsSpool = a.partType && a.partType.trim().toLowerCase() === "макарички";
+                        let bIsSpool = b.partType && b.partType.trim().toLowerCase() === "макарички";
                         if (aIsSpool && !bIsSpool) return 1;
                         if (!aIsSpool && bIsSpool) return -1;
                         return 0;
@@ -934,7 +934,7 @@ function drawDashboard(jsonString) {
                     lastRow.appendChild(spacer);
                 }
                     
-                // РќРѕРІР° РєРѕР»РѕРЅР°
+                // Нова колона
                 existingCol = document.createElement('div');
                 existingCol.className = 'bom-column ' + colClass;
                 if (titleText) {
@@ -947,7 +947,7 @@ function drawDashboard(jsonString) {
                 if (titleNode) existingCol.appendChild(titleNode);
             }
             
-            // Р’Р·РёРјР°РјРµ РІСЃРёС‡РєРё РґРµС‚Р°Р№Р»Рё
+            // Взимаме всички детайли
             const nodes = sourceContainer.querySelectorAll('.vsm-node');
             
             if (sourceId === 'w-small-pins' || sourceId === 'w-small-studs') {
@@ -961,7 +961,7 @@ function drawDashboard(jsonString) {
                 nodes.forEach(n => existingCol.appendChild(n));
             }
             
-            // РЎРєСЂРёРІР°РјРµ РѕСЂРёРіРёРЅР°Р»РЅРёСЏ РєРѕРЅС‚РµР№РЅРµСЂ (Р°РєРѕ Рµ РІРёРґРёРј)
+            // Скриваме оригиналния контейнер (ако е видим)
             const lane = sourceContainer.closest('.lane');
             if (lane) lane.style.display = 'none';
             
@@ -971,11 +971,11 @@ function drawDashboard(jsonString) {
 
     appendColumn('w-temp-rotors-11', 'w-var11', '');
     appendColumn('w-temp-rotors-25', 'w-var25', '');
-    appendColumn('w-small-pins', 'w-var25', 'Р©РР¤РўРћР’Р•');
+    appendColumn('w-small-pins', 'w-var25', 'ЩИФТОВЕ');
     
-    appendColumn('w-small-rotors', 'w-bearings', 'РџРђРљР•РўР');
-    appendColumn('w-small-studs', 'w-bearings', 'РЁРџРР›РљР');
-    appendColumn('w-small-others', 'w-bearings', 'Р”Р РЈР“Р');
+    appendColumn('w-small-rotors', 'w-bearings', 'ПАКЕТИ');
+    appendColumn('w-small-studs', 'w-bearings', 'ШПИЛКИ');
+    appendColumn('w-small-others', 'w-bearings', 'ДРУГИ');
 
     const studsContainer = document.getElementById('w-small-studs');
     if (studsContainer) {
@@ -995,8 +995,8 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     let dId = getDomId(node.id);
 
     const isRoot = !parentMap[node.id]; 
-    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="РљСЂР°РµРЅ Р”РµС‚Р°Р№Р» (РџР»Р°РЅ)">рџ”ё</span>' : '';
-    const packageMarker = (node.packagedQty && node.packagedQty > 0) ? `<span style="margin-left:8px; font-weight:800; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:6px; font-size:0.9em; box-shadow:0 1px 2px rgba(0,0,0,0.1);" title="${node.packagedQty} Р±СЂ. РѕРїР°РєРѕРІР°РЅРё">рџ“¦ ${node.packagedQty}</span>` : '';
+    const rootMarker = isRoot ? '<span style="margin-right:4px; color:#fb923c;" title="Краен Детайл (План)">🔸</span>' : '';
+    const packageMarker = (node.packagedQty && node.packagedQty > 0) ? `<span style="margin-left:8px; font-weight:800; color:#d97706; background:#fef3c7; padding:2px 6px; border-radius:6px; font-size:0.9em; box-shadow:0 1px 2px rgba(0,0,0,0.1);" title="${node.packagedQty} бр. опаковани">📦 ${node.packagedQty}</span>` : '';
     
     let headerQty = 0;
     let headerScrap = 0;
@@ -1015,9 +1015,9 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
     }
     
     const drawingLinkHTML = (node.drawingUrl && node.drawingUrl.startsWith('http')) 
-        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="РћС‚РІРѕСЂРё С‡РµСЂС‚РµР¶">рџ“ђ</a>` : '';
+        ? `<a href="${node.drawingUrl}" target="_blank" style="text-decoration:none; margin-left:6px;" title="Отвори чертеж">📐</a>` : '';
         
-    const componentScrapHTML = (node.totalScrappedAsComponent && node.totalScrappedAsComponent > 0) ? `<span style="margin-left:8px; color:#ef4444; font-weight:900; font-size:1em;" title="Р‘СЂР°РєСѓРІР°РЅРё РєР°С‚Рѕ РєРѕРјРїРѕРЅРµРЅС‚">вќЊ: ${node.totalScrappedAsComponent} Р±СЂ.</span>` : '';
+    const componentScrapHTML = (node.totalScrappedAsComponent && node.totalScrappedAsComponent > 0) ? `<span style="margin-left:8px; color:#ef4444; font-weight:900; font-size:1em;" title="Бракувани като компонент">❌: ${node.totalScrappedAsComponent} бр.</span>` : '';
         
     let opsHTML = '';
     let titleClass = 'title-gray';
@@ -1038,7 +1038,7 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
         const formatPast = (op) => `<span class="op-text op-past">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
         const formatFuture = (op) => `<span class="op-text op-future">${op.name} | ${formatQty(0, node.planQty, op.scrapped)}</span>`;
         const formatActive = (op) => {
-            let colorClass = (op.latestStatus === 'Р—Р°РїРѕС‡РЅР°С‚Р°') ? 'active' : 'waiting';
+            let colorClass = (op.latestStatus === 'Започната') ? 'active' : 'waiting';
             return `<span class="op-text op-focus ${colorClass}">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
         };
         const formatWaiting = (op) => `<span class="op-text op-focus waiting">${op.name} | ${formatQty(op.completed, node.planQty, op.scrapped)}</span>`;
@@ -1064,28 +1064,28 @@ function generateNodeHTML(node, parentMap, childMap, allNodesMap) {
                     if (currentPastIndex < pastCount) {
                         pastHiddenArr.push(formatPast(op)); 
                     } else {
-                        if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">вћ”</span> ';
+                        if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
                         visibleOpsHtml += formatPast(op); 
                     }
                 } else if (state === 'active' || state === 'active_0') {
-                    if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">вћ”</span> ';
+                    if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
                     visibleOpsHtml += formatActive(op);
                 } else if (state === 'waiting') {
-                    if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">вћ”</span> ';
+                    if (visibleOpsHtml !== '') visibleOpsHtml += ' <span class="arr">➔</span> ';
                     visibleOpsHtml += formatWaiting(op);
                 } else if (state === 'future') {
                     if (visibleOpsHtml === '') {
-                        visibleOpsHtml += `<span class="op-text op-future"><span class="arr">вћ”</span> ${op.name} | 0/${node.planQty}</span>`;
+                        visibleOpsHtml += `<span class="op-text op-future"><span class="arr">➔</span> ${op.name} | 0/${node.planQty}</span>`;
                     } else {
-                        visibleOpsHtml += ' <span class="arr">вћ”</span> ' + formatFuture(op);
+                        visibleOpsHtml += ' <span class="arr">➔</span> ' + formatFuture(op);
                     }
                 }
             }
 
             let opsHTMLContent = '';
             if(pastHiddenArr.length > 0) {
-                opsHTMLContent += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">в‹Ї</span> `;
-                opsHTMLContent += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">вћ”</span> ')} <span class="arr">вћ”</span> </span>`;
+                opsHTMLContent += `<span class="harmony-toggle" onclick="toggleHarmony('past_${dId}')" id="btn_past_${dId}">⋯</span> `;
+                opsHTMLContent += `<span id="hist_past_${dId}" class="hidden-history">${pastHiddenArr.join(' <span class="arr">➔</span> ')} <span class="arr">➔</span> </span>`;
             }
             
             opsHTMLContent += visibleOpsHtml;
@@ -1154,27 +1154,27 @@ function drawArrows() {
                 
                 let fromType = cardChild.getAttribute('data-part-type');
                 let toType = cardParent.getAttribute('data-part-type');
-                let isFromSpool = fromType && fromType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
-                let isToSpool = toType && toType.trim().toLowerCase() === "РјР°РєР°СЂРёС‡РєРё";
-                let isFromRotorPacket = fromType && fromType.trim().toLowerCase().includes("СЂРѕС‚РѕСЂРµРЅ РїР°РєРµС‚");
-                let isToRotorPacket = toType && toType.trim().toLowerCase().includes("СЂРѕС‚РѕСЂРµРЅ РїР°РєРµС‚");
-                let isFromPin = fromType && fromType.trim().toLowerCase().includes("С‰РёС„С‚");
-                let isToPin = toType && toType.trim().toLowerCase().includes("С‰РёС„С‚");
+                let isFromSpool = fromType && fromType.trim().toLowerCase() === "макарички";
+                let isToSpool = toType && toType.trim().toLowerCase() === "макарички";
+                let isFromRotorPacket = fromType && fromType.trim().toLowerCase().includes("роторен пакет");
+                let isToRotorPacket = toType && toType.trim().toLowerCase().includes("роторен пакет");
+                let isFromPin = fromType && fromType.trim().toLowerCase().includes("щифт");
+                let isToPin = toType && toType.trim().toLowerCase().includes("щифт");
 
                 if ((isFromSpool && !isToSpool) || (isFromRotorPacket && !isToRotorPacket) || (isFromPin && !isToPin)) {
                     let fromLower = conn.from.toLowerCase();
-                    let color = "#94a3b8"; // РїР°СЃС‚РµР»РЅРѕ СЃРёРІРѕ (РїРѕ РїРѕРґСЂР°Р·Р±РёСЂР°РЅРµ)
+                    let color = "#94a3b8"; // пастелно сиво (по подразбиране)
                     
-                    if (fromLower.includes("РѕС‚СЃС‚СЉРї")) color = "#60a5fa"; 
-                    else if (fromLower.includes("РїСЂРѕС†РµРї")) color = "#f87171"; 
-                    else if (fromLower.includes("РЅР°РїСѓРґСЂРµРЅР°")) color = "#fb923c"; 
-                    else if (fromLower.includes("РµРґРЅ. С‡РµР».")) color = "#4ade80"; 
-                    else if (fromLower.includes("РґРІСѓСЃС‚")) color = "#c084fc"; 
-                    else if (fromLower.includes("11")) color = "#facc15"; // Р¶СЉР»С‚Рѕ Р·Р° РІР°СЂ 11
-                    else if (fromLower.includes("25")) color = "#2dd4bf"; // С‚СЋСЂРєРѕР°Р· Р·Р° РІР°СЂ 25
-                    else if (fromLower.includes("РјСѓР»С‚Рё")) color = "#f472b6"; // СЂРѕР·РѕРІРѕ Р·Р° РјСѓР»С‚Рё
-                    else if (fromLower.includes("nr")) color = "#a3e635"; // СЃРІРµС‚Р»РѕР·РµР»РµРЅРѕ Р·Р° NR
-                    else color = "#818cf8"; // РїР°СЃС‚РµР»РЅРѕ РёРЅРґРёРіРѕ
+                    if (fromLower.includes("отстъп")) color = "#60a5fa"; 
+                    else if (fromLower.includes("процеп")) color = "#f87171"; 
+                    else if (fromLower.includes("напудрена")) color = "#fb923c"; 
+                    else if (fromLower.includes("едн. чел.")) color = "#4ade80"; 
+                    else if (fromLower.includes("двуст")) color = "#c084fc"; 
+                    else if (fromLower.includes("11")) color = "#facc15"; // жълто за вар 11
+                    else if (fromLower.includes("25")) color = "#2dd4bf"; // тюркоаз за вар 25
+                    else if (fromLower.includes("мулти")) color = "#f472b6"; // розово за мулти
+                    else if (fromLower.includes("nr")) color = "#a3e635"; // светлозелено за NR
+                    else color = "#818cf8"; // пастелно индиго
                     
                     let shape = 'circle';
                     if (isFromRotorPacket) shape = 'triangle';
@@ -1188,8 +1188,8 @@ function drawArrows() {
                     };
                     
                     let targetOffsetY = -10;
-                    if (shape === 'triangle') targetOffsetY = -22; // РџРѕ-РЅР°РіРѕСЂРµ
-                    if (shape === 'diamond') targetOffsetY = 2;   // РџРѕ-РЅР°РґРѕР»Сѓ
+                    if (shape === 'triangle') targetOffsetY = -22; // По-нагоре
+                    if (shape === 'diamond') targetOffsetY = 2;   // По-надолу
                     
                     html += renderShape(startX + 8, startY);
                     html += renderShape(endX - 12, endY + targetOffsetY);
@@ -1206,6 +1206,4 @@ function drawArrows() {
 }
 
 window.addEventListener('resize', () => requestAnimationFrame(drawArrows));
-
-
 

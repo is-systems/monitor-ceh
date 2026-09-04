@@ -1,8 +1,8 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>РЎРёСЃС‚РµРјР° Р·Р° РѕС‚С‡РёС‚Р°РЅРµ</title>
+    <title>Система за отчитане</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background: #0f172a; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
@@ -20,34 +20,34 @@
 <body>
 
     <div class="container">
-        <h1>РћС‚С‡РёС‚Р°РЅРµ РЅР° РѕРїРµСЂР°С†РёСЏ</h1>
+        <h1>Отчитане на операция</h1>
         <form id="reportForm">
             
             <div class="form-group">
-                <label for="operator">РРјРµ РЅР° СЂР°Р±РѕС‚РЅРёРє / РћРїРµСЂР°С‚РѕСЂ:</label>
-                <input type="text" id="operator" required placeholder="РќР°РїСЂ. РРІР°РЅ РРІР°РЅРѕРІ">
+                <label for="operator">Име на работник / Оператор:</label>
+                <input type="text" id="operator" required placeholder="Напр. Иван Иванов">
             </div>
 
             <div class="form-group">
-                <label for="detail">РР·Р±РµСЂРё Р”РµС‚Р°Р№Р» (РЎР°РјРѕ Р°РєС‚РёРІРЅРё РїРѕ РїР»Р°РЅ):</label>
+                <label for="detail">Избери Детайл (Само активни по план):</label>
                 <select id="detail" required>
-                    <option value="">-- Р—Р°СЂРµР¶РґР°РЅРµ РЅР° РґРµС‚Р°Р№Р»Рё... --</option>
+                    <option value="">-- Зареждане на детайли... --</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="operation">РР·Р±РµСЂРё РћРїРµСЂР°С†РёСЏ:</label>
+                <label for="operation">Избери Операция:</label>
                 <select id="operation" required>
-                    <option value="">-- РџСЉСЂРІРѕ РёР·Р±РµСЂРё РґРµС‚Р°Р№Р» --</option>
+                    <option value="">-- Първо избери детайл --</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="quantity">РР·СЂР°Р±РѕС‚РµРЅРѕ РєРѕР»РёС‡РµСЃС‚РІРѕ:</label>
+                <label for="quantity">Изработено количество:</label>
                 <input type="number" id="quantity" required min="1" value="1">
             </div>
 
-            <button type="submit">РР·РїСЂР°С‚Рё РѕС‚С‡РµС‚</button>
+            <button type="submit">Изпрати отчет</button>
             <div id="message"></div>
         </form>
     </div>
@@ -58,88 +58,86 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU'
         );
 
-        let activeTasks = []; // РўСѓРє С‰Рµ РїР°Р·РёРј РґР°РЅРЅРёС‚Рµ РѕС‚ Р±Р°Р·Р°С‚Р°
+        let activeTasks = []; // Тук ще пазим данните от базата
 
         async function initApp() {
             const detailSelect = document.getElementById('detail');
             
-            // Р”СЉСЂРїР°РјРµ СЃР°РјРѕ СЂР°Р·СЂРµС€РµРЅРёС‚Рµ Р·Р°РґР°С‡Рё РѕС‚ РЅРѕРІРёСЏ РёР·РіР»РµРґ
-            const { data, error } = await client.from('Р°РєС‚РёРІРЅРё_Р·Р°РґР°С‡Рё_Р·Р°_РѕС‚С‡РёС‚Р°РЅРµ').select('*');
+            // Дърпаме само разрешените задачи от новия изглед
+            const { data, error } = await client.from('активни_задачи_за_отчитане').select('*');
 
             if (error || !data || data.length === 0) {
-                detailSelect.innerHTML = '<option value="">РќСЏРјР° Р°РєС‚РёРІРµРЅ РїР»Р°РЅ РІ РјРѕРјРµРЅС‚Р°</option>';
+                detailSelect.innerHTML = '<option value="">Няма активен план в момента</option>';
                 return;
             }
 
             activeTasks = data;
 
-            // РР·РІР»РёС‡Р°РјРµ СЃР°РјРѕ СѓРЅРёРєР°Р»РЅРёС‚Рµ РёРјРµРЅР° РЅР° РґРµС‚Р°Р№Р»Рё, Р·Р° РґР° РЅСЏРјР° РїРѕРІС‚Р°СЂСЏС‰Рё СЃРµ РІ РјРµРЅСЋС‚Рѕ
-            const uniqueDetails = [...new Set(activeTasks.map(task => task.СЂР°Р·СЂРµС€РµРЅ_РґРµС‚Р°Р№Р»))];
+            // Извличаме само уникалните имена на детайли, за да няма повтарящи се в менюто
+            const uniqueDetails = [...new Set(activeTasks.map(task => task.разрешен_детайл))];
             
-            detailSelect.innerHTML = '<option value="">-- РР·Р±РµСЂРё РґРµС‚Р°Р№Р» --</option>';
+            detailSelect.innerHTML = '<option value="">-- Избери детайл --</option>';
             uniqueDetails.forEach(det => {
                 detailSelect.innerHTML += `<option value="${det}">${det}</option>`;
             });
         }
 
-        // РљРѕРіР°С‚Рѕ СЂР°Р±РѕС‚РЅРёРєСЉС‚ РёР·Р±РµСЂРµ РґРµС‚Р°Р№Р», РїСЂРѕРјРµРЅСЏРјРµ РјРµРЅСЋС‚Рѕ СЃ РѕРїРµСЂР°С†РёРёС‚Рµ
+        // Когато работникът избере детайл, променяме менюто с операциите
         document.getElementById('detail').addEventListener('change', function(e) {
             const selectedDetail = e.target.value;
             const opSelect = document.getElementById('operation');
             
-            opSelect.innerHTML = '<option value="">-- РР·Р±РµСЂРё РѕРїРµСЂР°С†РёСЏ --</option>';
+            opSelect.innerHTML = '<option value="">-- Избери операция --</option>';
             
             if (!selectedDetail) return;
 
-            // Р¤РёР»С‚СЂРёСЂР°РјРµ РѕРїРµСЂР°С†РёРёС‚Рµ СЃР°РјРѕ Р·Р° РёР·Р±СЂР°РЅРёСЏ РґРµС‚Р°Р№Р»
-            const relevantOps = activeTasks.filter(task => task.СЂР°Р·СЂРµС€РµРЅ_РґРµС‚Р°Р№Р» === selectedDetail);
+            // Филтрираме операциите само за избрания детайл
+            const relevantOps = activeTasks.filter(task => task.разрешен_детайл === selectedDetail);
             
             relevantOps.forEach(op => {
-                opSelect.innerHTML += `<option value="${op.РёРјРµ_РѕРїРµСЂР°С†РёСЏ}">${op.РЅРѕРјРµСЂ_РѕРїРµСЂР°С†РёСЏ} - ${op.РёРјРµ_РѕРїРµСЂР°С†РёСЏ}</option>`;
+                opSelect.innerHTML += `<option value="${op.име_операция}">${op.номер_операция} - ${op.име_операция}</option>`;
             });
         });
 
-        // РљР°РєРІРѕ СЃРµ СЃР»СѓС‡РІР°, РєРѕРіР°С‚Рѕ СЃРµ РЅР°С‚РёСЃРЅРµ Р±СѓС‚РѕРЅСЉС‚ "РР·РїСЂР°С‚Рё"
+        // Какво се случва, когато се натисне бутонът "Изпрати"
         document.getElementById('reportForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); // РЎРїРёСЂР° РїСЂРµР·Р°СЂРµР¶РґР°РЅРµС‚Рѕ РЅР° СЃС‚СЂР°РЅРёС†Р°С‚Р°
+            e.preventDefault(); // Спира презареждането на страницата
             
             const btn = document.querySelector('button');
             const msg = document.getElementById('message');
             btn.disabled = true;
-            btn.innerText = 'РР·РїСЂР°С‰Р°РЅРµ...';
+            btn.innerText = 'Изпращане...';
 
             const payload = {
-                "ID Р”РµС‚Р°Р№Р»": document.getElementById('detail').value,
-                "РћРїРµСЂР°С‚РѕСЂ": document.getElementById('operator').value,
-                "РљРѕР»РёС‡РµСЃС‚РІРѕ": document.getElementById('quantity').value,
-                "РћРїРµСЂР°С†РёСЏ": document.getElementById('operation').value,
-                "РЎС‚Р°С‚СѓСЃ": "РћС‚С‡РµС‚РµРЅРѕ", // РЎР»Р°РіР°РјРµ Р±Р°Р·РѕРІ СЃС‚Р°С‚СѓСЃ, Р·Р° РґР° РЅРµ РѕСЃС‚Р°РІР° РїСЂР°Р·РЅР° РєРѕР»РѕРЅР°С‚Р°
-                "Р”Р°С‚Р°": new Date().toISOString() // Р—Р°РїРёСЃРІР° С‚РѕС‡РЅРёСЏ С‡Р°СЃ Рё РґР°С‚Р° РЅР° РёР·РїСЂР°С‰Р°РЅРµ
+                "ID Детайл": document.getElementById('detail').value,
+                "Оператор": document.getElementById('operator').value,
+                "Количество": document.getElementById('quantity').value,
+                "Операция": document.getElementById('operation').value,
+                "Статус": "Отчетено", // Слагаме базов статус, за да не остава празна колоната
+                "Дата": new Date().toISOString() // Записва точния час и дата на изпращане
             };
 
             const { error } = await client.from('otcheti').insert([payload]);
 
             if (error) {
                 msg.style.color = '#ef4444';
-                msg.innerText = 'Р’СЉР·РЅРёРєРЅР° РіСЂРµС€РєР° РїСЂРё РёР·РїСЂР°С‰Р°РЅРµС‚Рѕ!';
+                msg.innerText = 'Възникна грешка при изпращането!';
                 console.error(error);
             } else {
                 msg.style.color = '#16a34a';
-                msg.innerText = 'РћС‚С‡РµС‚СЉС‚ Рµ Р·Р°РїРёСЃР°РЅ СѓСЃРїРµС€РЅРѕ!';
-                document.getElementById('reportForm').reset(); // РР·С‡РёСЃС‚РІР° С„РѕСЂРјР°С‚Р°
-                document.getElementById('operation').innerHTML = '<option value="">-- РџСЉСЂРІРѕ РёР·Р±РµСЂРё РґРµС‚Р°Р№Р» --</option>';
+                msg.innerText = 'Отчетът е записан успешно!';
+                document.getElementById('reportForm').reset(); // Изчиства формата
+                document.getElementById('operation').innerHTML = '<option value="">-- Първо избери детайл --</option>';
             }
 
             btn.disabled = false;
-            btn.innerText = 'РР·РїСЂР°С‚Рё РѕС‚С‡РµС‚';
-            setTimeout(() => msg.innerText = '', 4000); // РЎРєСЂРёРІР° СЃСЉРѕР±С‰РµРЅРёРµС‚Рѕ СЃР»РµРґ 4 СЃРµРєСѓРЅРґРё
+            btn.innerText = 'Изпрати отчет';
+            setTimeout(() => msg.innerText = '', 4000); // Скрива съобщението след 4 секунди
         });
 
-        // РЎС‚Р°СЂС‚РёСЂР°РјРµ РїСЂРёР»РѕР¶РµРЅРёРµС‚Рѕ РїСЂРё РѕС‚РІР°СЂСЏРЅРµ РЅР° СЃС‚СЂР°РЅРёС†Р°С‚Р°
+        // Стартираме приложението при отваряне на страницата
         initApp();
     </script>
 </body>
 </html>
-
-
 

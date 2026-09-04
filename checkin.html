@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Р§РµРєРёСЂР°РЅРµ - РџСЂРѕРёР·РІРѕРґСЃС‚РІРѕ</title>
+    <title>Чекиране - Производство</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -74,14 +74,14 @@
         <div class="clock" id="clock">00:00</div>
         <div class="date" id="date">--.--.----</div>
         
-        <div id="statusBanner" class="status-banner">Р—Р°СЂРµР¶РґР°РЅРµ...</div>
+        <div id="statusBanner" class="status-banner">Зареждане...</div>
 
         <form id="checkinForm" onsubmit="handleSubmit(event)">
             <div class="form-group">
-                <label for="emailInput">Р’СЉРІРµРґРµС‚Рµ РІР°С€РёСЏ РёРјРµР№Р»</label>
+                <label for="emailInput">Въведете вашия имейл</label>
                 <input type="email" id="emailInput" required placeholder="example@gmail.com" autocomplete="email">
             </div>
-            <button type="submit" id="submitBtn" class="btn">РџРѕС‚РІСЉСЂРґРё</button>
+            <button type="submit" id="submitBtn" class="btn">Потвърди</button>
         </form>
     </div>
 
@@ -91,40 +91,40 @@
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU'
         );
 
-        // РљРѕРѕСЂРґРёРЅР°С‚Рё РЅР° С†РµС…Р°
+        // Координати на цеха
         const WORKSHOP_LAT = 41.8937;
         const WORKSHOP_LNG = 23.4875;
 
-        // Р§РµС‚РµРј РїР°СЂР°РјРµС‚СЉСЂР° РѕС‚ URL Р°РґСЂРµСЃР° (?action=in РёР»Рё ?action=out)
+        // Четем параметъра от URL адреса (?action=in или ?action=out)
         const urlParams = new URLSearchParams(window.location.search);
         const actionParam = urlParams.get('action'); 
         
-        const actionText = actionParam === 'out' ? 'РР·Р»РёР·Р°РЅРµ' : 'Р’Р»РёР·Р°РЅРµ';
+        const actionText = actionParam === 'out' ? 'Излизане' : 'Влизане';
         
         const banner = document.getElementById('statusBanner');
         const btn = document.getElementById('submitBtn');
         const emailInput = document.getElementById('emailInput');
 
-        // РќР°СЃС‚СЂРѕР№РІР°РјРµ С†РІРµС‚РѕРІРµС‚Рµ СЃРїСЂСЏРјРѕ С‚РѕРІР° РєРѕР№ РєРѕРґ Рµ СЃРєР°РЅРёСЂР°РЅ
+        // Настройваме цветовете спрямо това кой код е сканиран
         if (actionParam === 'out') {
-            banner.innerText = 'рџ”ґ РР—Р›РР—РђРќР• РћРў РЎРњР•РќРђ';
+            banner.innerText = '🔴 ИЗЛИЗАНЕ ОТ СМЕНА';
             banner.className = 'status-banner status-out';
-            btn.innerText = 'РџРѕС‚РІСЉСЂРґРё РР—Р›РР—РђРќР•';
+            btn.innerText = 'Потвърди ИЗЛИЗАНЕ';
             btn.className = 'btn btn-out';
         } else {
-            banner.innerText = 'рџџў Р’Р›РР—РђРќР• РќРђ РЎРњР•РќРђ';
+            banner.innerText = '🟢 ВЛИЗАНЕ НА СМЕНА';
             banner.className = 'status-banner status-in';
-            btn.innerText = 'РџРѕС‚РІСЉСЂРґРё Р’Р›РР—РђРќР•';
+            btn.innerText = 'Потвърди ВЛИЗАНЕ';
             btn.className = 'btn btn-in';
         }
 
-        // РђРІС‚РѕРјР°С‚РёС‡РЅРѕ РїРѕРїСЉР»РІР°РјРµ РёРјРµР№Р»Р°, Р°РєРѕ С‚РµР»РµС„РѕРЅСЉС‚ РіРѕ Рµ Р·Р°РїРѕРјРЅРёР» РѕС‚ РїСЂРµРґРёС€РЅРѕ С‡РµРєРёСЂР°РЅРµ
+        // Автоматично попълваме имейла, ако телефонът го е запомнил от предишно чекиране
         const savedEmail = localStorage.getItem('workerEmail');
         if (savedEmail) {
             emailInput.value = savedEmail;
         }
 
-        // Р”РёРЅР°РјРёС‡РµРЅ С‡Р°СЃРѕРІРЅРёРє
+        // Динамичен часовник
         function updateTime() {
             const now = new Date();
             document.getElementById('clock').innerText = now.toLocaleTimeString('bg-BG', {hour: '2-digit', minute:'2-digit'});
@@ -133,9 +133,9 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // РР·С‡РёСЃР»СЏРІР°РЅРµ РЅР° СЂР°Р·СЃС‚РѕСЏРЅРёРµ (Haversine С„РѕСЂРјСѓР»Р°)
+        // Изчисляване на разстояние (Haversine формула)
         function getDistanceInMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // СЂР°РґРёСѓСЃ РЅР° Р—РµРјСЏС‚Р° РІ РјРµС‚СЂРё
+            const R = 6371e3; // радиус на Земята в метри
             const p1 = lat1 * Math.PI/180;
             const p2 = lat2 * Math.PI/180;
             const dp = (lat2-lat1) * Math.PI/180;
@@ -145,11 +145,11 @@
             return Math.round(R * c);
         }
 
-        // Р’Р·РёРјР°РЅРµ РЅР° Р»РѕРєР°С†РёСЏ
+        // Взимане на локация
         function getUserLocation() {
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
-                    resolve({ loc: "РќРµ СЃРµ РїРѕРґРґСЉСЂР¶Р°", note: "вљ пёЏ GPS РќР• РЎР• РџРћР”Р”РЄР Р–Рђ" });
+                    resolve({ loc: "Не се поддържа", note: "⚠️ GPS НЕ СЕ ПОДДЪРЖА" });
                     return;
                 }
                 navigator.geolocation.getCurrentPosition(
@@ -157,11 +157,11 @@
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         const distance = getDistanceInMeters(lat, lng, WORKSHOP_LAT, WORKSHOP_LNG);
-                        let note = distance > 200 ? `вљ пёЏ РР—Р’РЄРќ РћР‘Р•РљРўРђ (${distance}Рј)` : "";
+                        let note = distance > 200 ? `⚠️ ИЗВЪН ОБЕКТА (${distance}м)` : "";
                         resolve({ loc: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, note: note });
                     },
                     (error) => {
-                        resolve({ loc: "GPS РћС‚РєР°Р·Р°РЅ", note: "вљ пёЏ Р›РРџРЎР’Рђ Р›РћРљРђР¦РРЇ" });
+                        resolve({ loc: "GPS Отказан", note: "⚠️ ЛИПСВА ЛОКАЦИЯ" });
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
@@ -174,75 +174,73 @@
             if (!email) return;
 
             try {
-                // 1. РџР РћР’Р•Р РљРђ Р—Рђ Р”РЈР‘Р›РР РђРќР•
-                Swal.fire({ title: 'РџСЂРѕРІРµСЂРєР°...', text: 'РЎРІРµСЂСЏРІР°РЅРµ СЃ Р±Р°Р·Р°С‚Р° РґР°РЅРЅРё', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                // 1. ПРОВЕРКА ЗА ДУБЛИРАНЕ
+                Swal.fire({ title: 'Проверка...', text: 'Сверяване с базата данни', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 
                 const { data: lastRecord, error: fetchErr } = await client
                     .from('chekiraniya')
-                    .select('Р”РµР№СЃС‚РІРёРµ')
-                    .eq('РРјРµР№Р»', email)
-                    .order('Р’СЂРµРјРµ', { ascending: false })
+                    .select('Действие')
+                    .eq('Имейл', email)
+                    .order('Време', { ascending: false })
                     .limit(1);
 
                 if (fetchErr) throw fetchErr;
 
                 if (lastRecord && lastRecord.length > 0) {
-                    const lastAction = lastRecord[0]['Р”РµР№СЃС‚РІРёРµ'];
-                    if (actionText === 'Р’Р»РёР·Р°РЅРµ' && lastAction === 'Р’Р»РёР·Р°РЅРµ') {
-                        Swal.fire('Р’РЅРёРјР°РЅРёРµ!', 'Р’РµС‡Рµ СЃС‚Рµ С‡РµРєРёСЂР°РЅРё Р·Р° Р’Р»РёР·Р°РЅРµ. РџСЉСЂРІРѕ С‚СЂСЏР±РІР° РґР° РјР°СЂРєРёСЂР°С‚Рµ РР·Р»РёР·Р°РЅРµ.', 'warning');
+                    const lastAction = lastRecord[0]['Действие'];
+                    if (actionText === 'Влизане' && lastAction === 'Влизане') {
+                        Swal.fire('Внимание!', 'Вече сте чекирани за Влизане. Първо трябва да маркирате Излизане.', 'warning');
                         return;
                     }
-                    if (actionText === 'РР·Р»РёР·Р°РЅРµ' && (lastAction === 'РР·Р»РёР·Р°РЅРµ' || lastAction === 'РђРІС‚Рѕ РёР·Р»РёР·Р°РЅРµ')) {
-                        Swal.fire('Р’РЅРёРјР°РЅРёРµ!', 'Р’РµС‡Рµ СЃС‚Рµ СЃРµ РёР·РїРёСЃР°Р»Рё РѕС‚ С†РµС…Р°.', 'warning');
+                    if (actionText === 'Излизане' && (lastAction === 'Излизане' || lastAction === 'Авто излизане')) {
+                        Swal.fire('Внимание!', 'Вече сте се изписали от цеха.', 'warning');
                         return;
                     }
                 }
 
-                // 2. Р’Р—РРњРђРќР• РќРђ Р›РћРљРђР¦РРЇ
-                Swal.fire({ title: 'РџСЂРѕРІРµСЂРєР° РЅР° Р»РѕРєР°С†РёСЏ...', text: 'РњРѕР»СЏ, СЂР°Р·СЂРµС€РµС‚Рµ РґРѕСЃС‚СЉРї РґРѕ GPS, Р°РєРѕ Р±СЉРґРµС‚Рµ РїРѕРїРёС‚Р°РЅРё.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                // 2. ВЗИМАНЕ НА ЛОКАЦИЯ
+                Swal.fire({ title: 'Проверка на локация...', text: 'Моля, разрешете достъп до GPS, ако бъдете попитани.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 const geoInfo = await getUserLocation();
 
-                // 3. Р—РђРџРРЎР’РђРќР•
-                Swal.fire({ title: 'Р—Р°РїРёСЃРІР°РЅРµ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                // 3. ЗАПИСВАНЕ
+                Swal.fire({ title: 'Записване...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 const { error: insertErr } = await client
                     .from('chekiraniya')
                     .insert([{
-                        "РРјРµР№Р»": email,
-                        "Р”РµР№СЃС‚РІРёРµ": actionText,
-                        "Р’СЂРµРјРµ": new Date().toISOString(),
-                        "Р›РѕРєР°С†РёСЏ": geoInfo.loc,
-                        "Р‘РµР»РµР¶РєР°": geoInfo.note
+                        "Имейл": email,
+                        "Действие": actionText,
+                        "Време": new Date().toISOString(),
+                        "Локация": geoInfo.loc,
+                        "Бележка": geoInfo.note
                     }]);
 
                 if (insertErr) throw insertErr;
 
-                // Р—Р°РїРѕРјРЅСЏРјРµ РёРјРµР№Р»Р° РІ РїР°РјРµС‚С‚Р° РЅР° Р±СЂР°СѓР·СЉСЂР° РЅР° С‚РѕР·Рё С‚РµР»РµС„РѕРЅ
+                // Запомняме имейла в паметта на браузъра на този телефон
                 localStorage.setItem('workerEmail', email);
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'РЈСЃРїРµС€РЅРѕ РѕС‚С‡РµС‚РµРЅРѕ!',
-                    text: `${actionText} Р±РµС€Рµ Р·Р°РїРёСЃР°РЅРѕ Р·Р° ${email}`,
+                    title: 'Успешно отчетено!',
+                    text: `${actionText} беше записано за ${email}`,
                     timer: 2500,
                     showConfirmButton: false
                 }).then(() => {
-                    // РљСЂР°СЃРёРІ Р·Р°РІСЉСЂС€РµРє, Р·Р° РґР° Р·РЅР°Рµ С‡РѕРІРµРєСЉС‚, С‡Рµ Рµ РіРѕС‚РѕРІ
+                    // Красив завършек, за да знае човекът, че е готов
                     document.body.innerHTML = `
                         <div style="text-align:center; padding:30px; max-width:400px; background:white; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
-                            <h2 style="color: #16a34a; margin-bottom:10px;">вњЁ Р‘Р»Р°РіРѕРґР°СЂРёРј РІРё!</h2>
-                            <p style="color: #475569; font-size:1.1em;">Р’Р°С€РёСЏС‚ С‡Р°СЃ Рµ СЂРµРіРёСЃС‚СЂРёСЂР°РЅ СѓСЃРїРµС€РЅРѕ.<br>РњРѕР¶Рµ РґР° Р·Р°С‚РІРѕСЂРёС‚Рµ С‚РѕР·Рё РїСЂРѕР·РѕСЂРµС†.</p>
+                            <h2 style="color: #16a34a; margin-bottom:10px;">✨ Благодарим ви!</h2>
+                            <p style="color: #475569; font-size:1.1em;">Вашият час е регистриран успешно.<br>Може да затворите този прозорец.</p>
                         </div>
                     `;
                 });
 
             } catch (err) {
                 console.error(err);
-                Swal.fire('вќЊ Р“СЂРµС€РєР° РїСЂРё РІСЂСЉР·РєР°С‚Р°', 'РњРѕР»СЏ, РїСЂРѕРІРµСЂРµС‚Рµ РёРЅС‚РµСЂРЅРµС‚Р° СЃРё Рё РѕРїРёС‚Р°Р№С‚Рµ РѕС‚РЅРѕРІРѕ.', 'error');
+                Swal.fire('❌ Грешка при връзката', 'Моля, проверете интернета си и опитайте отново.', 'error');
             }
         }
     </script>
 </body>
 </html>
-
-
 

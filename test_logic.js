@@ -1,4 +1,4 @@
-п»їconst fetch = require('node-fetch');
+const fetch = require('node-fetch');
 async function run() {
     let headers = {'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvZWtibWhnYm9oc2dwd3FzaXp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NDU1OTEsImV4cCI6MjEwMjUyMTU5MX0.ikCySPlyg0kPHt0sx34pndAWJAJ9tVCyWonBuG-lLQU'};
     let bomRes = await fetch('https://aoekbmhgbohsgpwqsizv.supabase.co/rest/v1/bom?limit=100000', {headers}).then(r=>r.json());
@@ -9,11 +9,11 @@ async function run() {
     let routesData = marshrutiRes;
     let globalRoutesByDetail = {};
     routesData.forEach(r => {
-        let code = String(r['РљРѕРґ РЅР° РґРµС‚Р°Р№Р»Р°']).trim().toLowerCase();
+        let code = String(r['Код на детайла']).trim().toLowerCase();
         if (!globalRoutesByDetail[code]) globalRoutesByDetail[code] = [];
         globalRoutesByDetail[code].push(r);
     });
-    for(let k in globalRoutesByDetail) globalRoutesByDetail[k].sort((a,b)=>parseInt(a['в„– РћРїРµСЂР°С†РёСЏ'])-parseInt(b['в„– РћРїРµСЂР°С†РёСЏ']));
+    for(let k in globalRoutesByDetail) globalRoutesByDetail[k].sort((a,b)=>parseInt(a['№ Операция'])-parseInt(b['№ Операция']));
     
     let manualOps = {};
     let completedOps = {};
@@ -21,24 +21,24 @@ async function run() {
     let savedQty = {};
     
     otchetiRes.forEach(r => {
-        let code = String(r['ID Р”РµС‚Р°Р№Р»']).trim().toLowerCase();
-        let op = String(r['РћРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+        let code = String(r['ID Детайл']).trim().toLowerCase();
+        let op = String(r['Операция']).trim().toLowerCase();
         let key = code + '_' + op;
-        let qty = parseFloat(r['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 0;
-        let isManual = (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (Р СЉС‡РЅРѕ РґРѕР±Р°РІРµРЅ)' || (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (РљРѕСЂРµРєС†РёСЏ РЅР°Р»РёС‡РЅРѕСЃС‚)' && qty > 0));
+        let qty = parseFloat(r['Количество']) || 0;
+        let isManual = (r['Оператор'] === 'СИСТЕМА (Ръчно добавен)' || (r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty > 0));
         
         if (isManual) {
             manualOps[key] = (manualOps[key] || 0) + qty;
-        } else if (r['РЎС‚Р°С‚СѓСЃ'] === 'РћС‚С‡РµС‚РµРЅРѕ') {
-            if (r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (Р•РєСЃРїРµРґРёС†РёСЏ)') {
-            } else if (op === 'РІСЉР·СЃС‚Р°РЅРѕРІРµРЅ') {
+        } else if (r['Статус'] === 'Отчетено') {
+            if (r['Оператор'] === 'СИСТЕМА (Експедиция)') {
+            } else if (op === 'възстановен') {
                 savedQty[code] = (savedQty[code] || 0) + qty;
-            } else if (op.startsWith('РІР»РѕР¶РµРЅ РІ ')) {
+            } else if (op.startsWith('вложен в ')) {
             } else {
                 completedOps[key] = (completedOps[key] || 0) + qty;
                 grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty;
             }
-        } else if (r['РћРїРµСЂР°С‚РѕСЂ'] !== 'РЎРРЎРўР•РњРђ (Р•РєСЃРїРµРґРёС†РёСЏ)' && !(r['РћРїРµСЂР°С‚РѕСЂ'] === 'РЎРРЎРўР•РњРђ (РљРѕСЂРµРєС†РёСЏ РЅР°Р»РёС‡РЅРѕСЃС‚)' && qty < 0) && op !== 'РІСЉР·СЃС‚Р°РЅРѕРІРµРЅ' && !op.startsWith('РІР»РѕР¶РµРЅ РІ ')) { 
+        } else if (r['Оператор'] !== 'СИСТЕМА (Експедиция)' && !(r['Оператор'] === 'СИСТЕМА (Корекция наличност)' && qty < 0) && op !== 'възстановен' && !op.startsWith('вложен в ')) { 
             grossCompletedOps[key] = (grossCompletedOps[key] || 0) + qty; 
         }
     });
@@ -48,7 +48,7 @@ async function run() {
     Object.keys(globalRoutesByDetail).forEach(code => {
         let routes = globalRoutesByDetail[code];
         if (routes.length > 0) {
-            let lastOpKey = code + '_' + String(routes[routes.length-1]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+            let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
             grossTrueDoneOps[lastOpKey] = grossCompletedOps[lastOpKey] || 0;
             trueDoneOps[lastOpKey] = completedOps[lastOpKey] || 0;
         }
@@ -59,7 +59,7 @@ async function run() {
     Object.keys(globalRoutesByDetail).forEach(code => {
         let routes = globalRoutesByDetail[code];
         if (routes.length > 0) {
-            let lastOpKey = code + '_' + String(routes[routes.length-1]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+            let lastOpKey = code + '_' + String(routes[routes.length-1]['Име на операция']).trim().toLowerCase();
             shippedQty[code] = Math.max(0, (grossTrueDoneOps[lastOpKey]||0) - (trueDoneOps[lastOpKey]||0));
         }
     });
@@ -71,20 +71,20 @@ async function run() {
         if (visited.has(lc)) return 0;
         visited.add(lc);
         let directShipped = shippedQty[lc] || 0;
-        let parents = globalBomData.filter(b => String(b['ID РљРѕРјРїРѕРЅРµРЅС‚']).trim().toLowerCase() === lc);
+        let parents = globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === lc);
         let indirectShipped = 0;
         parents.forEach(p => {
-            let parentCode = String(p['ID Р РѕРґРёС‚РµР»']).trim().toLowerCase();
+            let parentCode = String(p['ID Родител']).trim().toLowerCase();
             if (parentCode !== lc) {
                 let parentRoutes = globalRoutesByDetail[parentCode];
                 let parentConsumed = 0;
                 if (parentRoutes && parentRoutes.length > 0) {
-                    let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+                    let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
                     parentConsumed = grossTrueDoneOps[lastOpKey] || 0;
                 } else {
                     parentConsumed = getTotalShipped(parentCode, visited);
                 }
-                let mult = parseFloat(p['РљРѕР»РёС‡РµСЃС‚РІРѕ']) || 1;
+                let mult = parseFloat(p['Количество']) || 1;
                 indirectShipped += parentConsumed * mult;
             }
         });
@@ -93,9 +93,9 @@ async function run() {
         return finalVal;
     }
 
-    let code = "РІР°Р» РІР°СЂ. 11 #";
+    let code = "вал вар. 11 #";
     let consumedByShipped = getTotalShipped(code);
-    let opKey = code + "_С€Р»Р°Р№С„Р°РЅРµ";
+    let opKey = code + "_шлайфане";
     let globalGross = (grossTrueDoneOps[opKey] || 0) + (manualOps[opKey] || 0);
     let globalNet = Math.max(0, globalGross + (savedQty[code] || 0) - consumedByShipped);
     
@@ -106,14 +106,12 @@ async function run() {
     console.log("globalNet:", globalNet);
     
     console.log("parents of", code, ":");
-    globalBomData.filter(b => String(b['ID РљРѕРјРїРѕРЅРµРЅС‚']).trim().toLowerCase() === code).forEach(p => {
-        let pCode = String(p['ID Р РѕРґРёС‚РµР»']).trim().toLowerCase();
+    globalBomData.filter(b => String(b['ID Компонент']).trim().toLowerCase() === code).forEach(p => {
+        let pCode = String(p['ID Родител']).trim().toLowerCase();
         let parentRoutes = globalRoutesByDetail[pCode];
-        let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['РРјРµ РЅР° РѕРїРµСЂР°С†РёСЏ']).trim().toLowerCase();
+        let lastOpKey = parentCode + '_' + String(parentRoutes[parentRoutes.length-1]['Име на операция']).trim().toLowerCase();
         console.log("  ", pCode, "->", lastOpKey, "-> grossTrueDoneOps:", grossTrueDoneOps[lastOpKey] || 0);
     });
 }
 run();
-
-
 
