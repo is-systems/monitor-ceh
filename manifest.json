@@ -1,6 +1,6 @@
 {
-  "name": "IS-SYSTEMS Контрол",
-  "short_name": "IS-SYSTEMS",
+  "name": "AMCI Контрол",
+  "short_name": "AMCI",
   "start_url": "./terminal.html",
   "display": "standalone",
   "background_color": "#f8fafc",
