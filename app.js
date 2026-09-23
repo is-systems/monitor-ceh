@@ -488,7 +488,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                     let e = statusEvents[i];
                     if (String(e['ID Детайл']).trim().toLowerCase() === code.toLowerCase() && String(e['Операция'] || '').trim().toLowerCase() === opName.toLowerCase()) {
                         let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
-                        if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.includes(pid))) {
+                        if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.map(String).includes(pid))) {
                             latestStatus = e['Статус'] === 'Отчетено' ? 'Отчетено' : e['Статус'];
                             break;
                         }
@@ -503,7 +503,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
                 opScrapEvents.forEach(e => {
                     if (String(e['ID Детайл']).trim().toLowerCase() === code.toLowerCase() && String(e['Операция'] || '').trim().toLowerCase() === opName.toLowerCase()) {
                         let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
-                        if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.includes(pid))) {
+                        if (rawPIds.length === 0 || rawPIds.some(pid => n.planDbIds.map(String).includes(pid))) {
                             opScrap += (parseFloat(e['Количество']) || 0);
                         }
                     }
@@ -546,7 +546,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         componentScrapEvents.forEach(e => {
             if (String(e['ID Детайл']).trim().toLowerCase() === n.code.toLowerCase()) {
                 let rawPIds = String(e['ID План'] || '').split(',').map(s=>s.trim()).filter(s=>s);
-                if (rawPIds.length > 0 && rawPIds.some(pid => n.planDbIds.includes(pid))) {
+                if (rawPIds.length > 0 && rawPIds.some(pid => n.planDbIds.map(String).includes(pid))) {
                     nodeScrap += (parseFloat(e['Количество']) || 0);
                 }
             }
