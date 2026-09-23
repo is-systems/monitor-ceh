@@ -299,6 +299,9 @@ function buildBOMTree(plansData, skladData) {
         if (!mergedNodes[mergedId].planDbIds.includes(row.plan_id)) {
             mergedNodes[mergedId].planDbIds.push(row.plan_id);
         }
+        if (pMonthStr && !mergedNodes[mergedId].planDbIds.includes(pMonthStr)) {
+            mergedNodes[mergedId].planDbIds.push(pMonthStr);
+        }
         if (pData && pData['Статус'] === 'Активен' && !mergedNodes[mergedId].activePlanDbIds.includes(row.plan_id)) {
             mergedNodes[mergedId].activePlanDbIds.push(row.plan_id);
         }
