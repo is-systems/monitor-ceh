@@ -624,8 +624,8 @@ async function saveForm(e) {
                       if (currentTab === 'sklad_gp') opName = 'готов детайл';
                   }
                   
-                  let query = client.from(tName).select('Количество').eq('ID Детайл', cleanDet);
-                  if (tName === 'inventory_wip') query = query.eq('Операция', opName);
+                  let query = client.from(tName).select('Количество, "ID Детайл", "Операция"').ilike('ID Детайл', cleanDet);
+                  if (tName === 'inventory_wip') query = query.ilike('Операция', opName);
                   let { data: currData } = await query;
                   
                   let currentStock = currData && currData.length > 0 ? parseFloat(currData[0]['Количество']) || 0 : 0;
@@ -641,8 +641,8 @@ async function saveForm(e) {
                   
                   let upsertErr = null;
                   if (currData && currData.length > 0) {
-                      let uQuery = client.from(tName).update({ "Количество": newTotal }).eq('ID Детайл', cleanDet);
-                      if (tName === 'inventory_wip') uQuery = uQuery.eq('Операция', opName);
+                      let uQuery = client.from(tName).update({ "Количество": newTotal }).ilike('ID Детайл', cleanDet);
+                      if (tName === 'inventory_wip') uQuery = uQuery.ilike('Операция', opName);
                       let { error } = await uQuery;
                       upsertErr = error;
                   } else {
@@ -690,8 +690,8 @@ async function saveForm(e) {
                   let opName = currentTab === 'sklad_gp' ? 'готов детайл' : op.trim().toLowerCase();
                   let cleanDet = det.toLowerCase();
                   
-                  let query = client.from(tName).select('Количество').eq('ID Детайл', cleanDet);
-                  if (currentTab === 'sklad_wip') query = query.eq('Операция', opName);
+                  let query = client.from(tName).select('Количество, "ID Детайл", "Операция"').ilike('ID Детайл', cleanDet);
+                  if (currentTab === 'sklad_wip') query = query.ilike('Операция', opName);
                   let { data: currData } = await query;
                   
                   let currentStock = currData && currData.length > 0 ? parseFloat(currData[0]['Количество']) || 0 : 0;
@@ -707,8 +707,8 @@ async function saveForm(e) {
                   
                   let upsertErr = null;
                   if (currData && currData.length > 0) {
-                      let uQuery = client.from(tName).update({ "Количество": newTotal }).eq('ID Детайл', cleanDet);
-                      if (currentTab === 'sklad_wip') uQuery = uQuery.eq('Операция', opName);
+                      let uQuery = client.from(tName).update({ "Количество": newTotal }).ilike('ID Детайл', cleanDet);
+                      if (currentTab === 'sklad_wip') uQuery = uQuery.ilike('Операция', opName);
                       let { error } = await uQuery;
                       upsertErr = error;
                   } else {
