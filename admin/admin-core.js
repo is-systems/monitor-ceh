@@ -639,7 +639,16 @@ async function saveForm(e) {
                   let payload = { "ID Детайл": cleanDet, "Количество": newTotal };
                   if (tName === 'inventory_wip') payload["Операция"] = opName;
                   
-                  let { error: upsertErr } = await client.from(tName).upsert([payload], { onConflict: tName === 'inventory_gp' ? 'ID Детайл' : 'ID Детайл, Операция' });
+                  let upsertErr = null;
+                  if (currData && currData.length > 0) {
+                      let uQuery = client.from(tName).update({ "Количество": newTotal }).eq('ID Детайл', cleanDet);
+                      if (tName === 'inventory_wip') uQuery = uQuery.eq('Операция', opName);
+                      let { error } = await uQuery;
+                      upsertErr = error;
+                  } else {
+                      let { error } = await client.from(tName).insert([payload]);
+                      upsertErr = error;
+                  }
                   if (upsertErr) throw upsertErr;
                   
                   let auditNewData = { "ID Детайл": cleanDet, "Разлика": qty, "Ново Количество": newTotal };
@@ -696,7 +705,16 @@ async function saveForm(e) {
                   let payload = { "ID Детайл": cleanDet, "Количество": newTotal };
                   if (currentTab === 'sklad_wip') payload["Операция"] = opName;
                   
-                  let { error: upsertErr } = await client.from(tName).upsert([payload], { onConflict: currentTab === 'sklad_gp' ? 'ID Детайл' : 'ID Детайл, Операция' });
+                  let upsertErr = null;
+                  if (currData && currData.length > 0) {
+                      let uQuery = client.from(tName).update({ "Количество": newTotal }).eq('ID Детайл', cleanDet);
+                      if (currentTab === 'sklad_wip') uQuery = uQuery.eq('Операция', opName);
+                      let { error } = await uQuery;
+                      upsertErr = error;
+                  } else {
+                      let { error } = await client.from(tName).insert([payload]);
+                      upsertErr = error;
+                  }
                   if (upsertErr) throw upsertErr;
                   
                   let auditNewData = { "ID Детайл": cleanDet, "Разлика": diff, "Ново Количество": newTotal };
