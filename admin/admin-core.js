@@ -624,7 +624,7 @@ async function saveForm(e) {
                       if (currentTab === 'sklad_gp') opName = 'готов детайл';
                   }
                   
-                  let query = client.from(tName).select('Количество, "ID Детайл", "Операция"').ilike('ID Детайл', cleanDet);
+                  let query = client.from(tName).select(tName === 'inventory_gp' ? 'Количество, "ID Детайл"' : 'Количество, "ID Детайл", "Операция"').ilike('ID Детайл', cleanDet);
                   if (tName === 'inventory_wip') query = query.ilike('Операция', opName);
                   let { data: currData } = await query;
                   
