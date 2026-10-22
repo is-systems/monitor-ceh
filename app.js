@@ -566,12 +566,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
 
         let isRotorPacket = n.partType && n.partType.toLowerCase().includes("роторен пакет");
         
-        let isResolverType = n.partType && n.partType.toLowerCase().includes("резолвер");
-
-        if (isResolverType || isDirectlyInPlan || isHashVariantOfPlan || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
-            n.bucket = 'assembly';
-        }
-        else if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
+        if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
         else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) n.bucket = 'predni';
         else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) n.bucket = 'zadni';
         else if (typeStr.includes("мпр")) n.bucket = 'mpr';
@@ -585,7 +580,7 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         else if (typeStr.includes("щифт")) n.bucket = 'small_pins';
         else if (typeStr.includes("шпилк")) n.bucket = 'small_studs';
         else if (typeStr.includes("макар") || n.code.toLowerCase().includes("мак.")) n.bucket = 'temp_spools';
-        else if (typeStr.includes("резолвер")) {
+        else if (isDirectlyInPlan || isHashVariantOfPlan || typeStr.includes("резолвер") || n.code.startsWith("575") || n.code.toUpperCase().startsWith("H25") || n.code.toUpperCase().startsWith("DC25")) {
             n.bucket = 'assembly';
         } 
         else {
