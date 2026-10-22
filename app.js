@@ -566,7 +566,10 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
 
         let isRotorPacket = n.partType && n.partType.toLowerCase().includes("роторен пакет");
         
-        if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
+        let isSpecialResolverBody = n.code && (n.code.includes("Тяло Вар. 11 (X-J)") || n.code.includes("Тяло Вар. 11 (X-N)"));
+
+        if (isSpecialResolverBody) n.bucket = 'assembly';
+        else if (typeStr.includes("тяло") || typeStr.includes("тела")) n.bucket = 'tiela';
         else if (typeStr.includes("преден") || typeStr.includes("предни") || typeStr.includes("преденкапак")) n.bucket = 'predni';
         else if (typeStr.includes("заден") || typeStr.includes("задни") || typeStr.includes("заденкапак")) n.bucket = 'zadni';
         else if (typeStr.includes("мпр")) n.bucket = 'mpr';
