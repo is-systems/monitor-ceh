@@ -564,7 +564,8 @@ function categorizeParts(mergedNodes, reportsData, explicitPlanItems, connection
         let baseCode = n.code.toUpperCase().replace(/#+$/, '').trim();
         let isHashVariantOfPlan = n.code.includes('#') && explicitPlanItems.has(`${n.planId}___${baseCode}`);
 
-        let isRotorPacket = n.partType && n.partType.toLowerCase().includes("роторен пакет");
+        let isRotorPacket = (n.partType && n.partType.toLowerCase().includes("роторен пакет"))
+            || (n.code && n.code.toLowerCase().includes("роторен пак"));
         
         let isSpecialResolverBody = n.code && (n.code.includes("Тяло Вар. 11 (X-J)") || n.code.includes("Тяло Вар. 11 (X-N)"));
 
@@ -1160,12 +1161,21 @@ function drawArrows() {
                 
                 let fromType = cardChild.getAttribute('data-part-type');
                 let toType = cardParent.getAttribute('data-part-type');
+                let fromCode = conn.from ? conn.from.split('___')[1] || conn.from : '';
+                let toCode = conn.to ? conn.to.split('___')[1] || conn.to : '';
+
                 let isFromSpool = fromType && fromType.trim().toLowerCase() === "макарички";
                 let isToSpool = toType && toType.trim().toLowerCase() === "макарички";
-                let isFromRotorPacket = fromType && fromType.trim().toLowerCase().includes("роторен пакет");
-                let isToRotorPacket = toType && toType.trim().toLowerCase().includes("роторен пакет");
+                let isFromRotorPacket = (fromType && fromType.trim().toLowerCase().includes("роторен пакет"))
+                    || fromCode.toLowerCase().includes("роторен пак");
+                let isToRotorPacket = (toType && toType.trim().toLowerCase().includes("роторен пакет"))
+                    || toCode.toLowerCase().includes("роторен пак");
                 let isFromPin = fromType && fromType.trim().toLowerCase().includes("щифт");
                 let isToPin = toType && toType.trim().toLowerCase().includes("щифт");
+
+                if (isFromRotorPacket && isToRotorPacket) {
+                    return; // Не чертаем стрелки между самите роторни пакети в колоната за пакети
+                }
 
                 if ((isFromSpool && !isToSpool) || (isFromRotorPacket && !isToRotorPacket) || (isFromPin && !isToPin)) {
                     let fromLower = conn.from.toLowerCase();
@@ -1174,6 +1184,7 @@ function drawArrows() {
                     if (fromLower.includes("отстъп")) color = "#60a5fa"; 
                     else if (fromLower.includes("процеп")) color = "#f87171"; 
                     else if (fromLower.includes("напудрена")) color = "#fb923c"; 
+                    else if (isFromRotorPacket && fromLower.includes("напудрен")) color = "#0d9488"; // по-тъмен тюркоаз за напудрен роторен пакет вар. 25
                     else if (fromLower.includes("едн. чел.")) color = "#4ade80"; 
                     else if (fromLower.includes("двуст")) color = "#c084fc"; 
                     else if (fromLower.includes("11")) color = "#facc15"; // жълто за вар 11
