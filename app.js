@@ -1184,7 +1184,7 @@ function drawArrows() {
                     if (fromLower.includes("отстъп")) color = "#60a5fa"; 
                     else if (fromLower.includes("процеп")) color = "#f87171"; 
                     else if (fromLower.includes("напудрена")) color = "#fb923c"; 
-                    else if (isFromRotorPacket && fromLower.includes("напудрен")) color = "#0d9488"; // по-тъмен тюркоаз за напудрен роторен пакет вар. 25
+                    else if (isFromRotorPacket && fromLower.includes("напудрен")) color = "#115e59"; // по-тъмен тюркоаз (тъмен тийл) за напудрен роторен пакет вар. 25
                     else if (fromLower.includes("едн. чел.")) color = "#4ade80"; 
                     else if (fromLower.includes("двуст")) color = "#c084fc"; 
                     else if (fromLower.includes("11")) color = "#facc15"; // жълто за вар 11
