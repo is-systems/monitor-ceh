@@ -412,8 +412,9 @@ async function loadTasks(isSilent = false) {
                       if (!currentMachine || currentMachine.trim() === "" || isTaken) {
                           matchMachine = true;
                       } else {
-                          let selectedMachines = currentMachine.split(',').map(m => m.toLowerCase().trim()); 
-                          matchMachine = selectedMachines.some(m => machineName.toLowerCase().includes(m));
+                          let selectedMachines = currentMachine.split(',').map(m => normalizeStr(m)).filter(Boolean); 
+                          let currentTaskMachines = machineName.split(',').map(m => normalizeStr(m)).filter(Boolean);
+                          matchMachine = selectedMachines.some(sm => currentTaskMachines.includes(sm));
                       }
 
                       if (matchMachine) {
